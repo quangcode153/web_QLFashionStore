@@ -28,29 +28,34 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto request)
     {
-        var passwordHash = _passwordHasher.HashPassword(request.MatKhau);
-        var user = await _authRepository.AuthenticateAsync(request.TenDangNhap, passwordHash);
+        var user = await _authRepository.GetUserByUsernameAsync(request.TenDangNhap);
 
-        if (user == null)
+        if (user == null || !user.DangHoatDong)
+        {
+            return ApiResponse<LoginResponseDto>.Fail("Tên đăng nhập hoặc mật khẩu không chính xác, hoặc tài khoản đã bị khóa!");
+        }
+
+        if (!_passwordHasher.VerifyPassword(request.MatKhau, user.MatKhauHash))
         {
             return ApiResponse<LoginResponseDto>.Fail("Tên đăng nhập hoặc mật khẩu không chính xác!");
         }
 
-        int userId = (int)user.ma_tai_khoan;
-        string username = (string)user.ten_dang_nhap;
-        string role = (string)user.vai_tro;
-        string fullName = (string)user.ten_nhan_vien;
-        int employeeId = (int)user.ma_nhan_vien;
+        // Tự động nâng cấp mật khẩu cũ sang PBKDF2 + Secret Key (Pepper) nếu chưa dùng định dạng mới
+        if (!user.MatKhauHash.Contains(':'))
+        {
+            var upgradedHash = _passwordHasher.HashPassword(request.MatKhau);
+            await _authRepository.UpdatePasswordHashAsync(user.MaTaiKhoan, upgradedHash);
+        }
 
-        var (token, expiresAt) = _jwtTokenGenerator.GenerateToken(userId, username, role, fullName);
+        var (token, expiresAt) = _jwtTokenGenerator.GenerateToken(user.MaTaiKhoan, user.TenDangNhap, user.VaiTro, user.TenNhanVien);
 
         var response = new LoginResponseDto
         {
-            MaTaiKhoan = userId,
-            TenDangNhap = username,
-            MaNhanVien = employeeId,
-            TenNhanVien = fullName,
-            VaiTro = role,
+            MaTaiKhoan = user.MaTaiKhoan,
+            TenDangNhap = user.TenDangNhap,
+            MaNhanVien = user.MaNhanVien,
+            TenNhanVien = user.TenNhanVien,
+            VaiTro = user.VaiTro,
             Token = token,
             ExpiresAt = expiresAt
         };

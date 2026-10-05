@@ -5,9 +5,21 @@ using Shared.DTOs.Warehouse;
 
 namespace Backend.Repositories;
 
+public class UserAuthModel
+{
+    public int MaTaiKhoan { get; set; }
+    public string TenDangNhap { get; set; } = string.Empty;
+    public string MatKhauHash { get; set; } = string.Empty;
+    public bool DangHoatDong { get; set; }
+    public int MaNhanVien { get; set; }
+    public string TenNhanVien { get; set; } = string.Empty;
+    public string VaiTro { get; set; } = string.Empty;
+}
+
 public interface IAuthRepository
 {
-    Task<dynamic?> AuthenticateAsync(string username, string passwordHash);
+    Task<UserAuthModel?> GetUserByUsernameAsync(string username);
+    Task UpdatePasswordHashAsync(int accountId, string newHash);
 }
 
 public class AuthRepository : IAuthRepository
@@ -19,14 +31,30 @@ public class AuthRepository : IAuthRepository
         _connectionFactory = connectionFactory;
     }
 
-    public async Task<dynamic?> AuthenticateAsync(string username, string passwordHash)
+    public async Task<UserAuthModel?> GetUserByUsernameAsync(string username)
     {
         using var connection = _connectionFactory.CreateConnection();
-        var parameters = new DynamicParameters();
-        parameters.Add("@TenDangNhap", username);
-        parameters.Add("@MatKhauHash", passwordHash);
+        const string sql = @"
+            SELECT 
+                tk.ma_tai_khoan,
+                tk.ten_dang_nhap,
+                tk.mat_khau_hash,
+                tk.dang_hoat_dong,
+                nv.ma_nhan_vien,
+                nv.ten_nhan_vien,
+                nv.vai_tro
+            FROM TaiKhoan tk
+            JOIN NhanVien nv ON tk.ma_nhan_vien = nv.ma_nhan_vien
+            WHERE tk.ten_dang_nhap = @Username;";
 
-        return await connection.QueryFirstOrDefaultAsync("dbo.sp_XacThucDangNhap", parameters, commandType: CommandType.StoredProcedure);
+        return await connection.QueryFirstOrDefaultAsync<UserAuthModel>(sql, new { Username = username });
+    }
+
+    public async Task UpdatePasswordHashAsync(int accountId, string newHash)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = "UPDATE TaiKhoan SET mat_khau_hash = @Hash WHERE ma_tai_khoan = @Id;";
+        await connection.ExecuteAsync(sql, new { Hash = newHash, Id = accountId });
     }
 }
 
