@@ -74,7 +74,7 @@ builder.Services.AddSignalR();
 // 7. Cấu hình Xác thực JWT Token
 var jwtSecretKey = builder.Configuration["JWT_SECRET_KEY"] 
     ?? builder.Configuration["Jwt:Key"] 
-    ?? "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!";
+    ?? throw new InvalidOperationException("CẤU HÌNH BẢO MẬT: Chưa cấu hình khóa bảo mật JWT. Vui lòng thiết lập JWT_SECRET_KEY trong file .env hoặc biến môi trường.");
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? builder.Configuration["Jwt:Issuer"] ?? "FashionStoreBackend";
 var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? builder.Configuration["Jwt:Audience"] ?? "FashionStoreClients";
 
@@ -121,7 +121,7 @@ var app = builder.Build();
 // 9. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
 var connStr = app.Configuration["CONNECTION_STRING"] 
     ?? app.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=.\\SQLEXPRESS;Database=FashionStore;User Id=sa;Password=1532006Quang;TrustServerCertificate=True;MultipleActiveResultSets=True;";
+    ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối cơ sở dữ liệu. Vui lòng thiết lập CONNECTION_STRING trong file .env hoặc biến môi trường.");
 
 DatabaseInitializer.Initialize(connStr, app.Logger);
 

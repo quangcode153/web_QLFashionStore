@@ -16,7 +16,7 @@ public class DbConnectionFactory : IDbConnectionFactory
     {
         _connectionString = configuration["CONNECTION_STRING"] 
             ?? configuration.GetConnectionString("DefaultConnection")
-            ?? "Server=.\\SQLEXPRESS;Database=FashionStore;User Id=sa;Password=1532006Quang;TrustServerCertificate=True;MultipleActiveResultSets=True;";
+            ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối. Vui lòng định nghĩa biến môi trường CONNECTION_STRING trong file .env hoặc appsettings.json.");
     }
 
     public IDbConnection CreateConnection()

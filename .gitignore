@@ -31,15 +31,43 @@ bld/
 .vs/
 .vscode/
 
-# Environment and Secrets files
+# Environment and Secrets files (TUYỆT ĐỐI KHÔNG PUSH LÊN GIT)
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+*.env
+*.env.*
+!*.env.example
+appsettings*.local.json
 appsettings.Production.json
-appsettings.local.json
+appsettings.Development.local.json
 secrets.json
+*.secrets
+*.credential
+*.credentials
+*.token
 
-# Docker & Container local files
+# SSL / TLS Certificates, Private Keys and Sensitive Credentials
+*.key
+*.pem
+*.pfx
+*.p12
+*.cert
+*.cer
+*.crt
+*.pub
+id_rsa*
+*.id_rsa
+*.publishsettings
+
+# SQL Server database dumps and backup files
+*.bak
+*.sql.bak
+*.mdf
+*.ldf
+*.ndf
+
+# Docker & Container local overrides
 docker-compose.override.yml
 *.dockerignore
 
