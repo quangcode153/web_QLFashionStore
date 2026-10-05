@@ -17,7 +17,9 @@ export default function LoginPage() {
 
     try {
       const user = await login(username, password);
-      if (user.vaiTro === 'Quản lý' || user.vaiTro === 'Thu ngân' || user.vaiTro === 'Kho') {
+      const role = user.vaiTro;
+
+      if (role === 'Admin chuỗi' || role === 'Quản lý chi nhánh' || role === 'Nhân viên bán hàng') {
         navigate('/admin/dashboard');
       } else {
         navigate('/');
@@ -121,6 +123,13 @@ export default function LoginPage() {
             {loading ? 'Đang xác thực...' : 'Đăng nhập'}
           </button>
         </form>
+
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          <p><strong>Tài khoản kiểm thử mẫu:</strong></p>
+          <p>• Admin chuỗi: <code>admin</code> / <code>123456</code></p>
+          <p>• Quản lý: <code>cashier01</code> / <code>123456</code></p>
+          <p>• Nhân viên: <code>warehouse01</code> / <code>123456</code></p>
+        </div>
       </div>
     </div>
   );

@@ -2,9 +2,9 @@ namespace Shared.Enums;
 
 public enum UserRole
 {
-    Admin,
-    ThuNgan,
-    ThuKho,
+    AdminChuoi,
+    QuanLyChiNhanh,
+    NhanVienBanHang,
     KhachHang
 }
 

@@ -1,4 +1,5 @@
 using System.Text;
+using Backend.Database;
 using Backend.Middlewares;
 using Backend.Repositories;
 using Backend.Security;
@@ -8,28 +9,31 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-// Load biến môi trường từ .env nếu có ở thư mục gốc hoặc thư mục hiện tại
+// 1. Tự động ánh xạ snake_case trong SQL Server sang PascalCase trong C# DTOs
+Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+// 2. Load biến môi trường từ .env
 DotNetEnv.Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Đăng ký Controllers
+// 3. Đăng ký Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 2. Cấu hình Swagger với hỗ trợ Bearer Token (JWT)
+// 4. Cấu hình Swagger với hỗ trợ Bearer Token (JWT)
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo 
     { 
         Title = "Fashion Store Management & E-Commerce API", 
         Version = "v1",
-        Description = "Hệ thống REST API cho chuỗi cửa hàng thời trang FashionStore"
+        Description = "Hệ thống REST API cho chuỗi cửa hàng thời trang FashionStore (Phân quyền 4 Roles: Admin chuỗi, Quản lý chi nhánh, Nhân viên bán hàng, Khách hàng)"
     });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "Nhập 'Bearer {token}' để xác thực",
+        Description = "Nhập token JWT theo định dạng: Bearer {token}",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
@@ -52,21 +56,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 3. Cấu hình CORS cho phép kết nối từ Frontend
+// 5. Cấu hình CORS chặt chẽ giữa Backend (Port 5000) và Frontend (Port 3000)
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000")
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
-// 4. Cấu hình SignalR (WebSockets)
+// 6. Cấu hình SignalR (WebSockets)
 builder.Services.AddSignalR();
 
-// 5. Cấu hình Xác thực JWT Token
+// 7. Cấu hình Xác thực JWT Token
 var jwtSecretKey = builder.Configuration["JWT_SECRET_KEY"] 
     ?? builder.Configuration["Jwt:Key"] 
     ?? "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!";
@@ -94,7 +99,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 6. Đăng ký Dependency Injection (IoC Container)
+// 8. Đăng ký Dependency Injection (IoC Container)
 builder.Services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -113,19 +118,23 @@ builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 
 var app = builder.Build();
 
-// 7. Cấu hình HTTP Request Pipeline
-if (app.Environment.IsDevelopment() || true)
+// 9. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
+var connStr = app.Configuration["CONNECTION_STRING"] 
+    ?? app.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=.\\SQLEXPRESS;Database=FashionStore;User Id=sa;Password=1532006Quang;TrustServerCertificate=True;MultipleActiveResultSets=True;";
+
+DatabaseInitializer.Initialize(connStr, app.Logger);
+
+// 10. Cấu hình HTTP Request Pipeline
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Fashion Store API v1");
-        c.RoutePrefix = string.Empty; // Mở Swagger trực tiếp tại URL gốc (http://localhost:5000/)
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Fashion Store API v1");
+    c.RoutePrefix = string.Empty; // Mở Swagger trực tiếp tại URL gốc (http://localhost:5000/)
+});
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();

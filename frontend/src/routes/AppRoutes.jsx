@@ -8,12 +8,12 @@ import { RoleGuard } from './RoleGuard';
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* 1. Tuyến đường công khai (Dành cho Khách hàng & Khách vãng lai) */}
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Admin Protected routes (Role-based) */}
-      <Route element={<RoleGuard allowedRoles={['Quản lý', 'Thu ngân', 'Kho']} />}>
+      {/* 2. Tuyến đường phân quyền dành cho Quản lý chi nhánh & Admin chuỗi */}
+      <Route element={<RoleGuard allowedRoles={['Admin chuỗi', 'Quản lý chi nhánh', 'Nhân viên bán hàng']} />}>
         <Route path="/admin/dashboard" element={<DashboardPage />} />
       </Route>
 
