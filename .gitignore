@@ -74,7 +74,6 @@ id_rsa*
 
 # Docker & Container local overrides
 docker-compose.override.yml
-*.dockerignore
 
 # Node / Frontend dependencies & build
 node_modules/
