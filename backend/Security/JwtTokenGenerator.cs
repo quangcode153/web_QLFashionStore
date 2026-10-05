@@ -21,12 +21,18 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     public (string Token, DateTime ExpiresAt) GenerateToken(int userId, string username, string role, string fullName)
     {
-        var secretKey = _configuration["JWT_SECRET_KEY"] 
-            ?? _configuration["Jwt:Key"] 
-            ?? "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!";
-        var issuer = _configuration["JWT_ISSUER"] ?? _configuration["Jwt:Issuer"] ?? "FashionStoreBackend";
-        var audience = _configuration["JWT_AUDIENCE"] ?? _configuration["Jwt:Audience"] ?? "FashionStoreClients";
-        var expireMinutes = int.TryParse(_configuration["JWT_EXPIRE_MINUTES"], out var m) ? m : 480;
+        var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
+            ?? _configuration["JWT_SECRET_KEY"] 
+            ?? _configuration["Jwt:Key"];
+
+        if (string.IsNullOrWhiteSpace(secretKey) || secretKey.Length < 32)
+        {
+            throw new InvalidOperationException("LỖI BẢO MẬT NGHIÊM TRỌNG (Fail-Fast): Khóa bí mật JWT chưa được cấu hình hoặc quá ngắn (< 32 ký tự).");
+        }
+
+        var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? _configuration["JWT_ISSUER"] ?? _configuration["Jwt:Issuer"] ?? "FashionStoreBackend";
+        var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? _configuration["JWT_AUDIENCE"] ?? _configuration["Jwt:Audience"] ?? "FashionStoreClients";
+        var expireMinutes = int.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRE_MINUTES") ?? _configuration["JWT_EXPIRE_MINUTES"], out var m) ? m : 480;
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -36,6 +42,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, username),
             new("fullName", fullName),
             new(ClaimTypes.Role, role),

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Backend.Database;
 using Backend.Middlewares;
 using Backend.Repositories;
@@ -6,8 +7,10 @@ using Backend.Security;
 using Backend.Services;
 using Backend.WebSockets;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Shared.DTOs.Common;
 
 // 1. Tự động ánh xạ snake_case trong SQL Server sang PascalCase trong C# DTOs
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
@@ -71,12 +74,27 @@ builder.Services.AddCors(options =>
 // 6. Cấu hình SignalR (WebSockets)
 builder.Services.AddSignalR();
 
-// 7. Cấu hình Xác thực JWT Token
-var jwtSecretKey = builder.Configuration["JWT_SECRET_KEY"] 
-    ?? builder.Configuration["Jwt:Key"] 
-    ?? throw new InvalidOperationException("CẤU HÌNH BẢO MẬT: Chưa cấu hình khóa bảo mật JWT. Vui lòng thiết lập JWT_SECRET_KEY trong file .env hoặc biến môi trường.");
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? builder.Configuration["Jwt:Issuer"] ?? "FashionStoreBackend";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? builder.Configuration["Jwt:Audience"] ?? "FashionStoreClients";
+// 7. Cấu hình Xác thực JWT Token (Fail-Fast: Không fallback key mặc định)
+var jwtSecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
+    ?? builder.Configuration["JWT_SECRET_KEY"] 
+    ?? builder.Configuration["Jwt:Key"];
+
+if (string.IsNullOrWhiteSpace(jwtSecretKey) || jwtSecretKey.Length < 32)
+{
+    throw new InvalidOperationException(
+        "LỖI BẢO MẬT NGHIÊM TRỌNG (Fail-Fast): Khóa bí mật JWT chưa được cấu hình hoặc quá ngắn (< 32 ký tự). " +
+        "Bắt buộc thiết lập biến môi trường 'JWT_SECRET_KEY' trong file .env hoặc cấu hình server.");
+}
+
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") 
+    ?? builder.Configuration["JWT_ISSUER"] 
+    ?? builder.Configuration["Jwt:Issuer"] 
+    ?? "FashionStoreBackend";
+
+var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") 
+    ?? builder.Configuration["JWT_AUDIENCE"] 
+    ?? builder.Configuration["Jwt:Audience"] 
+    ?? "FashionStoreClients";
 
 builder.Services.AddAuthentication(options =>
 {
@@ -116,16 +134,43 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 
+// 9. Cấu hình Rate Limiting (Chống Brute-Force & DoS)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+        var response = ApiResponse<string>.Fail(
+            "Bạn đã gửi quá nhiều yêu cầu đăng nhập. Vui lòng thử lại sau 1 phút (Chống tấn công Brute-force).");
+        await context.HttpContext.Response.WriteAsJsonAsync(response, token);
+    };
+
+    options.AddPolicy("LoginRateLimit", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: clientIp,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+});
+
 var app = builder.Build();
 
-// 9. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
+// 10. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
 var connStr = app.Configuration["CONNECTION_STRING"] 
     ?? app.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối cơ sở dữ liệu. Vui lòng thiết lập CONNECTION_STRING trong file .env hoặc biến môi trường.");
 
 DatabaseInitializer.Initialize(connStr, app.Logger);
 
-// 10. Cấu hình HTTP Request Pipeline
+// 11. Cấu hình HTTP Request Pipeline
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -135,6 +180,7 @@ app.UseSwaggerUI(c =>
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowFrontend");
+app.UseRateLimiter(); // Middleware kiểm soát tần suất gọi API
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -105,6 +105,7 @@ public interface IOrderService
     Task<ApiResponse<bool>> UpdateOrderStatusAsync(int orderId, string newStatus);
     Task<ApiResponse<IEnumerable<OrderSummaryDto>>> GetAllOrdersAsync();
     Task<ApiResponse<IEnumerable<OrderDetailItemDto>>> GetOrderDetailsAsync(int orderId);
+    Task<(bool Exists, int? CustomerId)> GetOrderOwnershipAsync(int orderId);
 }
 
 public class OrderService : IOrderService
@@ -144,6 +145,11 @@ public class OrderService : IOrderService
     {
         var items = await _orderRepository.GetOrderDetailsAsync(orderId);
         return ApiResponse<IEnumerable<OrderDetailItemDto>>.Ok(items);
+    }
+
+    public async Task<(bool Exists, int? CustomerId)> GetOrderOwnershipAsync(int orderId)
+    {
+        return await _orderRepository.GetOrderOwnershipAsync(orderId);
     }
 }
 

@@ -11,6 +11,7 @@ public interface IOrderRepository
     Task UpdateOrderStatusAsync(int orderId, string newStatus);
     Task<IEnumerable<OrderSummaryDto>> GetAllOrdersAsync();
     Task<IEnumerable<OrderDetailItemDto>> GetOrderDetailsAsync(int orderId);
+    Task<(bool Exists, int? CustomerId)> GetOrderOwnershipAsync(int orderId);
 }
 
 public class OrderRepository : IOrderRepository
@@ -75,5 +76,17 @@ public class OrderRepository : IOrderRepository
         // Kết quả thứ hai là danh sách chi tiết các mặt hàng
         var items = await multi.ReadAsync<OrderDetailItemDto>();
         return items;
+    }
+
+    public async Task<(bool Exists, int? CustomerId)> GetOrderOwnershipAsync(int orderId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = "SELECT ma_hoa_don AS OrderId, ma_khach_hang AS CustomerId FROM HoaDon WHERE ma_hoa_don = @orderId";
+        var row = await connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { orderId });
+        if (row == null)
+        {
+            return (false, null);
+        }
+        return (true, (int?)row.CustomerId);
     }
 }

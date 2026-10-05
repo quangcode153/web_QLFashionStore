@@ -1,11 +1,15 @@
+using System.Security.Claims;
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared.Constants;
 using Shared.DTOs.Auth;
 using Shared.DTOs.Catalog;
+using Shared.DTOs.Common;
 using Shared.DTOs.Order;
 using Shared.DTOs.Warehouse;
+using Shared.Enums;
 
 namespace Backend.Controllers;
 
@@ -22,6 +26,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("LoginRateLimit")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         var response = await _authService.LoginAsync(request);
@@ -78,7 +83,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyChiNhanh},{RoleConstants.NhanVienBanHang}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.NhanVienBanHang},{RoleConstants.ThuNgan}")]
     public async Task<IActionResult> GetAll()
     {
         var result = await _orderService.GetAllOrdersAsync();
@@ -89,6 +94,30 @@ public class OrdersController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetDetails(int id)
     {
+        // 1. Kiểm tra sự tồn tại của đơn hàng và người sở hữu
+        var (exists, customerId) = await _orderService.GetOrderOwnershipAsync(id);
+        if (!exists)
+        {
+            return NotFound(ApiResponse<string>.Fail("Đơn hàng không tồn tại trên hệ thống."));
+        }
+
+        // 2. Chống lỗ hổng IDOR: Nếu không phải nhân sự quản trị (Admin, Quản lý, Thu ngân)
+        // thì người dùng chỉ được xem đơn hàng thuộc sở hữu của chính tài khoản mình
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+        var isStaff = RoleConstants.IsStaff(userRole);
+
+        if (!isStaff)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                ?? User.FindFirst("sub")?.Value;
+
+            if (!int.TryParse(userIdClaim, out var currentUserId) || customerId != currentUserId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, 
+                    ApiResponse<string>.Fail("Bạn không có quyền truy cập thông tin đơn hàng này (IDOR Protection)."));
+            }
+        }
+
         var result = await _orderService.GetOrderDetailsAsync(id);
         return Ok(result);
     }
@@ -102,10 +131,25 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPut("{id}/status")]
-    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyChiNhanh},{RoleConstants.NhanVienBanHang}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.NhanVienBanHang},{RoleConstants.ThuNgan}")]
     public async Task<IActionResult> UpdateStatus(int id, [FromQuery] string status)
     {
-        var result = await _orderService.UpdateOrderStatusAsync(id, status);
+        // 1. Kiểm tra Whitelist trạng thái hợp lệ theo OrderStatus enum
+        if (!OrderStatusHelper.TryNormalizeStatus(status, out var normalizedStatus))
+        {
+            return BadRequest(ApiResponse<string>.Fail(
+                $"Trạng thái '{status}' không hợp lệ. Các giá trị được chấp nhận: {OrderStatusHelper.GetAllowedStatusString()}."));
+        }
+
+        // 2. Kiểm tra sự tồn tại của đơn hàng
+        var (exists, _) = await _orderService.GetOrderOwnershipAsync(id);
+        if (!exists)
+        {
+            return NotFound(ApiResponse<string>.Fail("Đơn hàng không tồn tại trên hệ thống."));
+        }
+
+        // 3. Thực hiện cập nhật trạng thái đã được chuẩn hóa
+        var result = await _orderService.UpdateOrderStatusAsync(id, normalizedStatus);
         return Ok(result);
     }
 }
@@ -122,7 +166,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpPost("import")]
-    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyChiNhanh}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.ThuKho}")]
     public async Task<IActionResult> ImportStock([FromBody] ImportStockRequestDto request)
     {
         var result = await _warehouseService.ImportStockAsync(request);
@@ -130,7 +174,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpGet("low-stock")]
-    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyChiNhanh}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.ThuKho}")]
     public async Task<IActionResult> GetLowStockAlerts()
     {
         var result = await _warehouseService.GetLowStockAlertsAsync();
