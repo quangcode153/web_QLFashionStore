@@ -67,11 +67,11 @@ public static class DatabaseInitializer
                             string trimmedBatch = batch.Trim();
                             if (string.IsNullOrWhiteSpace(trimmedBatch)) continue;
 
-                            // Bỏ qua lệnh USE master hoặc CREATE DATABASE vì đã tạo ở trên
-                            if (trimmedBatch.StartsWith("USE master", StringComparison.OrdinalIgnoreCase) ||
-                                trimmedBatch.StartsWith("CREATE DATABASE", StringComparison.OrdinalIgnoreCase) ||
-                                trimmedBatch.StartsWith("DROP DATABASE", StringComparison.OrdinalIgnoreCase) ||
-                                trimmedBatch.StartsWith("ALTER DATABASE", StringComparison.OrdinalIgnoreCase))
+                            // Bỏ qua các lệnh quản lý cấp database (USE, CREATE, DROP, ALTER DATABASE, SINGLE_USER)
+                            if (trimmedBatch.StartsWith("USE ", StringComparison.OrdinalIgnoreCase) ||
+                                trimmedBatch.Contains("CREATE DATABASE", StringComparison.OrdinalIgnoreCase) ||
+                                trimmedBatch.Contains("DROP DATABASE", StringComparison.OrdinalIgnoreCase) ||
+                                trimmedBatch.Contains("SET SINGLE_USER", StringComparison.OrdinalIgnoreCase))
                             {
                                 continue;
                             }
@@ -87,6 +87,13 @@ public static class DatabaseInitializer
                             {
                                 logger.LogWarning("Bỏ qua lỗi batch hoặc đối tượng đã tồn tại: {Msg}", ex.Message);
                             }
+                        }
+
+                        // Đảm bảo CSDL luôn ở chế độ MULTI_USER
+                        using (var cmdMulti = dbConn.CreateCommand())
+                        {
+                            cmdMulti.CommandText = $"ALTER DATABASE [{targetDatabase}] SET MULTI_USER;";
+                            cmdMulti.ExecuteNonQuery();
                         }
 
                         logger.LogInformation("Sinh toàn bộ bảng, Views, Functions, Procedures, Triggers từ code thành công!");
