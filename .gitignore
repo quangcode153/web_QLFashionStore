@@ -34,10 +34,8 @@ bld/
 # Environment and Secrets files (TUYỆT ĐỐI KHÔNG PUSH LÊN GIT)
 .env
 .env.*
-!.env.example
 *.env
 *.env.*
-!*.env.example
 appsettings*.local.json
 appsettings.Production.json
 appsettings.Development.local.json
@@ -46,6 +44,13 @@ secrets.json
 *.credential
 *.credentials
 *.token
+
+# Local documentation & database scripts (LƯU NỘI BỘ CỤC BỘ, KHÔNG PUSH LÊN GIT)
+doc/
+.env.example
+AGENTS.md
+sqlbtl.sql
+*.sql
 
 # SSL / TLS Certificates, Private Keys and Sensitive Credentials
 *.key
