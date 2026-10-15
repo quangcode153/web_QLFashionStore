@@ -64,7 +64,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000")
+        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5092", "https://localhost:7071")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -125,14 +125,32 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 // Repositories
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<ICatalogRepository, CatalogRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IReportRepository, ReportRepository>();
+builder.Services.AddScoped<IBannerRepository, BannerRepository>();
+builder.Services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
+builder.Services.AddScoped<IBranchRepository, BranchRepository>();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IPromotionService, PromotionService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IBannerService, BannerService>();
+builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
+builder.Services.AddScoped<IBranchService, BranchService>();
 
 // 9. Cấu hình Rate Limiting (Chống Brute-Force & DoS)
 builder.Services.AddRateLimiter(options =>
@@ -148,7 +166,9 @@ builder.Services.AddRateLimiter(options =>
 
     options.AddPolicy("LoginRateLimit", httpContext =>
     {
-        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var clientIp = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()
+            ?? httpContext.Connection.RemoteIpAddress?.ToString() 
+            ?? "unknown";
         return RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: clientIp,
             factory: _ => new FixedWindowRateLimiterOptions
@@ -180,6 +200,25 @@ app.UseSwaggerUI(c =>
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowFrontend");
+
+// Cấu hình Cache-Control cho tài nguyên tĩnh/hình ảnh (1 năm) để tối ưu tốc độ load phía client
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.Context.Request.Path.Value;
+        if (!string.IsNullOrEmpty(path) &&
+            (path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+             path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+        }
+    }
+});
+
 app.UseRateLimiter(); // Middleware kiểm soát tần suất gọi API
 
 app.UseAuthentication();
@@ -192,3 +231,5 @@ app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHub<InventoryHub>("/hubs/inventory");
 
 app.Run();
+
+public partial class Program { }

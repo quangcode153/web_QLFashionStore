@@ -1,0 +1,809 @@
+@namespace Frontend.Components
+@inject IPosApiClient PosApiClient
+@inject IToastService ToastService
+
+@if (IsVisible)
+{
+    <div class="pos-modal-overlay pos-return-modal" @onclick="HandleBackdropClick">
+        <div class="pos-modal-card" @onclick:stopPropagation>
+            <!-- Header -->
+            <div class="modal-card-header">
+                <div class="header-title-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="title-icon">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                    <h3 class="modal-card-title">NHẬP HÀNG TRẢ & ĐỔI TRẢ TẠI QUẦY (POS RETURN)</h3>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseModal" title="Đóng cửa sổ">×</button>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-card-body">
+                <!-- Khung tra cứu hóa đơn -->
+                <div class="lookup-section">
+                    <label class="lookup-label">Nhập mã hóa đơn cần đổi trả:</label>
+                    <div class="lookup-input-bar">
+                        <div class="input-prefix-box">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </div>
+                        <input type="text" 
+                               class="pos-input input-lookup-order-id" 
+                               placeholder="VD: 101 hoặc HD-101..." 
+                               value="@_orderIdSearch" 
+                               @onchange="OnOrderIdChanged" 
+                               @onkeydown="OnKeyDownSearch" />
+                        <button type="button" class="btn btn-primary btn-lookup-order" @onclick="LookupOrderAsync" disabled="@_isSearching">
+                            @if (_isSearching)
+                            {
+                                <span>Đang tìm...</span>
+                            }
+                            else
+                            {
+                                <span>Tra cứu hóa đơn</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert-box alert-error">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>@_errorMessage</span>
+                    </div>
+                }
+
+                @if (_order != null)
+                {
+                    <!-- Thẻ tóm tắt hóa đơn -->
+                    <div class="order-summary-card">
+                        <div class="summary-top">
+                            <div class="order-code-badge">
+                                <span class="order-code">#HD-@_order.MaHoaDon</span>
+                                <span class="order-status-pill @(_order.IsEligibleForReturn ? "status-success" : "status-warning")">
+                                    @_order.TrangThai
+                                </span>
+                            </div>
+                            <div class="order-meta-info">
+                                <span>Ngày lập: <strong>@_order.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</strong></span>
+                                <span class="sep">|</span>
+                                <span>Thu ngân: <strong>@_order.ThuNgan</strong></span>
+                            </div>
+                        </div>
+                        <div class="summary-bottom">
+                            <div class="customer-info">
+                                <span>Khách hàng: <strong>@_order.TenKhachHang</strong></span>
+                                @if (!string.IsNullOrWhiteSpace(_order.SdtKhachHang))
+                                {
+                                    <span class="customer-phone">(@_order.SdtKhachHang)</span>
+                                }
+                            </div>
+                            <div class="order-amounts">
+                                <span>Tiền hàng: <strong>@_order.TienHang.ToString("N0") đ</strong></span>
+                                @if (_order.TienGiamGia > 0)
+                                {
+                                    <span class="discount-txt"> - Giảm: @_order.TienGiamGia.ToString("N0") đ</span>
+                                }
+                                <span class="sep">|</span>
+                                <span class="grand-total-txt">Thanh toán: <strong>@_order.TongThanhToan.ToString("N0") đ</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Khung Địa Chỉ Nhận Hàng Lỗi Hoàn Về & Nơi Tiếp Nhận -->
+                    <div class="return-address-card">
+                        <div class="address-header">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="addr-icon">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            <span class="addr-title">ĐỊA CHỈ TIẾP NHẬN HÀNG LỖI HOÀN VỀ</span>
+                        </div>
+                        <div class="address-body">
+                            <div class="addr-field">
+                                <span class="field-label">Địa chỉ nhận hàng lỗi hoàn về:</span>
+                                <span class="field-value highlight-dest return-destination-address">
+                                    @(string.IsNullOrWhiteSpace(_order.DiaChiNhanHangHoanVe) 
+                                        ? "772 Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM (Kho tiếp nhận QF)" 
+                                        : _order.DiaChiNhanHangHoanVe)
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(_order.DiaChiThuHoi))
+                            {
+                                <div class="addr-field">
+                                    <span class="field-label">Địa chỉ thu hồi của khách (tại nhà):</span>
+                                    <span class="field-value">@_order.DiaChiThuHoi</span>
+                                </div>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(_order.DiaChiGiaoHang))
+                            {
+                                <div class="addr-field">
+                                    <span class="field-label">Địa chỉ giao hàng ban đầu:</span>
+                                    <span class="field-value">@_order.DiaChiGiaoHang</span>
+                                </div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(_order.HinhThucHoan))
+                            {
+                                <div class="addr-field">
+                                    <span class="field-label">Phương thức đổi trả:</span>
+                                    <span class="field-value font-semibold">@_order.HinhThucHoan</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!_order.IsEligibleForReturn)
+                    {
+                        <!-- Cảnh báo đơn không đủ điều kiện đổi trả -->
+                        <div class="alert-box alert-warning">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <div>
+                                <strong>Đơn hàng không đủ điều kiện đổi trả:</strong>
+                                <div>@(_order.IneligibilityReason ?? "Chỉ những đơn hàng ở trạng thái 'Đã hoàn thành' mới có thể tiếp nhận đổi trả.")</div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Bảng sản phẩm trong hóa đơn -->
+                        <div class="return-items-section">
+                            <div class="section-title">Danh sách sản phẩm trong hóa đơn:</div>
+                            <table class="return-items-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;" class="text-center">Chọn</th>
+                                        <th>Sản phẩm</th>
+                                        <th class="text-right">Đơn giá</th>
+                                        <th class="text-center">Đã mua</th>
+                                        <th class="text-center">Đã trả</th>
+                                        <th class="text-center">Có thể trả</th>
+                                        <th style="width: 90px;" class="text-center">SL Trả</th>
+                                        <th style="min-width: 180px;">Lý do hàng lỗi</th>
+                                        <th class="text-right">Hoàn tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in _order.Items)
+                                    {
+                                        var isSelected = _selectedItems.ContainsKey(item.MaBienThe);
+                                        var canReturn = item.SoLuongConLai > 0;
+                                        <tr class="item-row @(isSelected ? "row-selected" : "") @(!canReturn ? "row-disabled" : "")">
+                                            <td class="text-center">
+                                                @if (canReturn)
+                                                {
+                                                    <input type="checkbox" 
+                                                           data-variant-id="@item.MaBienThe"
+                                                           checked="@isSelected"
+                                                           @onchange="(e) => ToggleItemSelection(item, e)" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="item-name">@item.TenSanPham</div>
+                                                <div class="item-variant-info">@item.MauSac - Size @item.KichCo</div>
+                                            </td>
+                                            <td class="text-right tabular-nums">@item.DonGia.ToString("N0") đ</td>
+                                            <td class="text-center tabular-nums">@item.SoLuongMua</td>
+                                            <td class="text-center tabular-nums">@item.SoLuongDaTra</td>
+                                            <td class="text-center tabular-nums">
+                                                @if (canReturn)
+                                                {
+                                                    <span class="badge-available">@item.SoLuongConLai</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge-exhausted">Đã trả đủ</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (canReturn && isSelected)
+                                                {
+                                                    <input type="number" 
+                                                           class="input-return-qty tabular-nums" 
+                                                           data-variant-id="@item.MaBienThe"
+                                                           min="1" 
+                                                           max="@item.SoLuongConLai" 
+                                                           value="@_selectedItems[item.MaBienThe].Quantity" 
+                                                           @onchange="(e) => UpdateReturnQty(item, e)" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (canReturn && isSelected)
+                                                {
+                                                    <input type="text" 
+                                                           class="input-return-reason" 
+                                                           data-variant-id="@item.MaBienThe"
+                                                           placeholder="Nhập lý do hàng lỗi..." 
+                                                           value="@_selectedItems[item.MaBienThe].Reason" 
+                                                           @onchange="(e) => UpdateReturnReason(item, e)" />
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td class="text-right tabular-nums font-bold">
+                                                @if (canReturn && isSelected)
+                                                {
+                                                    <span>@((_selectedItems[item.MaBienThe].Quantity * item.DonGia).ToString("N0")) đ</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>0 đ</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Khung tổng kết hoàn tiền -->
+                        <div class="refund-summary-box">
+                            <div class="refund-note">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <span>Hàng đổi trả sẽ được nhập tự động vào <strong>KHO HÀNG LỖI</strong> (so_luong_loi) và ghi nhật ký TRA_HANG_LOI.</span>
+                            </div>
+                            <div class="refund-calc">
+                                <span>TỔNG TIỀN HOÀN TRẢ KHÁCH:</span>
+                                <span class="refund-amount tabular-nums">@TotalRefundAmount.ToString("N0") đ</span>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="modal-card-footer">
+                <button type="button" class="btn btn-outline" @onclick="CloseModal">Hủy bỏ</button>
+                @if (_order != null && _order.IsEligibleForReturn)
+                {
+                    <button type="button" 
+                            class="btn btn-primary btn-confirm-return" 
+                            disabled="@(_selectedItems.Count == 0 || _isSubmitting)" 
+                            @onclick="ConfirmReturnAsync">
+                        @if (_isSubmitting)
+                        {
+                            <span>Đang xử lý trả hàng...</span>
+                        }
+                        else
+                        {
+                            <span>Xác nhận nhập trả & Hoàn tiền (@TotalRefundAmount.ToString("N0") đ)</span>
+                        }
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .pos-return-modal {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+    }
+    .pos-modal-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+        width: 100%;
+        max-width: 900px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .modal-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #111827;
+        color: #ffffff;
+    }
+    .header-title-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .title-icon {
+        color: #38bdf8;
+    }
+    .modal-card-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: 0.5px;
+    }
+    .btn-close-modal {
+        background: transparent;
+        border: none;
+        color: #9ca3af;
+        font-size: 24px;
+        cursor: pointer;
+        line-height: 1;
+        transition: color 0.15s;
+    }
+    .btn-close-modal:hover {
+        color: #ffffff;
+    }
+    .modal-card-body {
+        padding: 20px 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .lookup-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+        display: block;
+    }
+    .lookup-input-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .input-prefix-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6b7280;
+    }
+    .input-lookup-order-id {
+        flex: 1;
+        padding: 10px 14px;
+        font-size: 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-family: inherit;
+    }
+    .btn-lookup-order {
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 6px;
+        white-space: nowrap;
+    }
+    .order-summary-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .return-address-card {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .address-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #166534;
+        font-size: 13px;
+        font-weight: 700;
+        border-bottom: 1px dashed #bbf7d0;
+        padding-bottom: 6px;
+    }
+    .addr-icon {
+        color: #15803d;
+    }
+    .address-body {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+    }
+    .addr-field {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .field-label {
+        color: #475569;
+        font-weight: 600;
+        min-width: 210px;
+    }
+    .field-value {
+        color: #0f172a;
+    }
+    .highlight-dest {
+        color: #0369a1;
+        font-weight: 700;
+    }
+    .summary-top, .summary-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .order-code {
+        font-weight: 700;
+        font-size: 16px;
+        color: #0f172a;
+        margin-right: 8px;
+    }
+    .order-status-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 4px;
+    }
+    .status-success {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .status-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    .sep {
+        color: #cbd5e1;
+        margin: 0 6px;
+    }
+    .grand-total-txt strong {
+        color: #0284c7;
+        font-size: 15px;
+    }
+    .alert-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+    .alert-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+    }
+    .alert-warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+    }
+    .section-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 8px;
+    }
+    .return-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .return-items-table th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 600;
+        padding: 8px 10px;
+        border-bottom: 2px solid #cbd5e1;
+    }
+    .return-items-table td {
+        padding: 10px;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+    .row-selected {
+        background: #f0fdf4;
+    }
+    .row-disabled {
+        opacity: 0.6;
+        background: #fafafa;
+    }
+    .item-name {
+        font-weight: 600;
+        color: #0f172a;
+    }
+    .item-variant-info {
+        font-size: 11px;
+        color: #64748b;
+    }
+    .badge-available {
+        display: inline-block;
+        padding: 2px 6px;
+        background: #dbeafe;
+        color: #1e40af;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+    .badge-exhausted {
+        display: inline-block;
+        padding: 2px 6px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        border-radius: 4px;
+        font-size: 11px;
+    }
+    .input-return-qty {
+        width: 60px;
+        padding: 4px 6px;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: 600;
+    }
+    .input-return-reason {
+        width: 100%;
+        padding: 4px 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+    .refund-summary-box {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 6px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .refund-note {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #475569;
+    }
+    .refund-calc {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .refund-amount {
+        font-size: 18px;
+        font-weight: 800;
+        color: #dc2626;
+    }
+    .modal-card-footer {
+        padding: 14px 24px;
+        border-top: 1px solid #e5e7eb;
+        background: #f9fafb;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<int> OnReturnSuccess { get; set; }
+
+    private string _orderIdSearch = string.Empty;
+    private bool _isSearching = false;
+    private bool _isSubmitting = false;
+    private string? _errorMessage;
+    private OrderReturnLookupDto? _order;
+
+    private class ReturnItemSelection
+    {
+        public int VariantId { get; set; }
+        public int Quantity { get; set; } = 1;
+        public string Reason { get; set; } = "Khách yêu cầu đổi trả tại quầy";
+    }
+
+    private Dictionary<int, ReturnItemSelection> _selectedItems = new();
+
+    private decimal TotalRefundAmount
+    {
+        get
+        {
+            if (_order == null) return 0;
+            decimal total = 0;
+            foreach (var kvp in _selectedItems)
+            {
+                var item = _order.Items.FirstOrDefault(i => i.MaBienThe == kvp.Key);
+                if (item != null)
+                {
+                    total += kvp.Value.Quantity * item.DonGia;
+                }
+            }
+            return total;
+        }
+    }
+
+    private void OnOrderIdChanged(ChangeEventArgs e)
+    {
+        _orderIdSearch = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnKeyDownSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LookupOrderAsync();
+        }
+    }
+
+    private async Task LookupOrderAsync()
+    {
+        _errorMessage = null;
+        _order = null;
+        _selectedItems.Clear();
+
+        if (string.IsNullOrWhiteSpace(_orderIdSearch))
+        {
+            _errorMessage = "Vui lòng nhập mã hóa đơn cần tra cứu.";
+            return;
+        }
+
+        // Loại bỏ tiền tố "#HD-" hoặc "HD-" nếu người dùng gõ
+        var cleaned = _orderIdSearch.Trim().Replace("#", "").Replace("HD-", "").Replace("DH-", "").Trim();
+        if (!int.TryParse(cleaned, out var orderId) || orderId <= 0)
+        {
+            _errorMessage = "Mã hóa đơn không hợp lệ. Vui lòng nhập số hóa đơn (VD: 101).";
+            return;
+        }
+
+        _isSearching = true;
+        try
+        {
+            var res = await PosApiClient.GetOrderForReturnLookupAsync(orderId);
+            if (res == null)
+            {
+                _errorMessage = $"Không tìm thấy đơn hàng #{orderId} hoặc đơn hàng chưa hoàn thành.";
+            }
+            else
+            {
+                _order = res;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi khi tra cứu: {ex.Message}";
+        }
+        finally
+        {
+            _isSearching = false;
+        }
+    }
+
+    private void ToggleItemSelection(OrderReturnLookupItemDto item, ChangeEventArgs e)
+    {
+        bool isChecked = e.Value is bool b && b;
+        if (isChecked)
+        {
+            if (!_selectedItems.ContainsKey(item.MaBienThe))
+            {
+                _selectedItems[item.MaBienThe] = new ReturnItemSelection
+                {
+                    VariantId = item.MaBienThe,
+                    Quantity = 1,
+                    Reason = "Hàng bị lỗi / Khách đổi trả tại quầy"
+                };
+            }
+        }
+        else
+        {
+            _selectedItems.Remove(item.MaBienThe);
+        }
+    }
+
+    private void UpdateReturnQty(OrderReturnLookupItemDto item, ChangeEventArgs e)
+    {
+        if (_selectedItems.TryGetValue(item.MaBienThe, out var sel))
+        {
+            if (int.TryParse(e.Value?.ToString(), out var qty))
+            {
+                sel.Quantity = Math.Clamp(qty, 1, item.SoLuongConLai);
+            }
+        }
+    }
+
+    private void UpdateReturnReason(OrderReturnLookupItemDto item, ChangeEventArgs e)
+    {
+        if (_selectedItems.TryGetValue(item.MaBienThe, out var sel))
+        {
+            sel.Reason = e.Value?.ToString() ?? string.Empty;
+        }
+    }
+
+    private async Task ConfirmReturnAsync()
+    {
+        if (_order == null || _selectedItems.Count == 0) return;
+
+        _isSubmitting = true;
+        try
+        {
+            int successCount = 0;
+            foreach (var kvp in _selectedItems)
+            {
+                var req = new ReturnOrderRequestDto
+                {
+                    MaBienThe = kvp.Key,
+                    SoLuongTra = kvp.Value.Quantity,
+                    LyDoTra = string.IsNullOrWhiteSpace(kvp.Value.Reason) 
+                        ? "Khách đổi trả tại quầy" 
+                        : kvp.Value.Reason.Trim()
+                };
+
+                var res = await PosApiClient.ProcessReturnAsync(_order.MaHoaDon, req);
+                if (res != null && res.Success)
+                {
+                    successCount++;
+                }
+                else
+                {
+                    ToastService.ShowError(res?.Message ?? "Không thể xử lý trả sản phẩm.");
+                    return;
+                }
+            }
+
+            ToastService.ShowSuccess($"Đã nhập hàng trả cho đơn #{_order.MaHoaDon} thành công! Đã hoàn {TotalRefundAmount:N0} đ cho khách.");
+            await OnReturnSuccess.InvokeAsync(_order.MaHoaDon);
+            await CloseModal();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Lỗi khi xử lý trả hàng: {ex.Message}");
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        _order = null;
+        _orderIdSearch = string.Empty;
+        _errorMessage = null;
+        _selectedItems.Clear();
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleBackdropClick()
+    {
+        await CloseModal();
+    }
+}

@@ -1,0 +1,46 @@
+@if (IsVisible)
+{
+    <div class="yame-modal-backdrop" @onclick="HandleCancel">
+        <div class="yame-modal-dialog" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h4 class="modal-title">@Title</h4>
+                <button type="button" class="btn-close" @onclick="HandleCancel" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>@Message</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="yame-btn yame-btn-outline btn-cancel" @onclick="HandleCancel">
+                    Hủy bỏ
+                </button>
+                <button type="button" class="yame-btn yame-btn-sale btn-confirm" @onclick="HandleConfirm">
+                    Xác nhận
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public string Title { get; set; } = "Xác nhận";
+    [Parameter] public string Message { get; set; } = "Bạn có chắc chắn muốn thực hiện hành động này?";
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private async Task HandleConfirm()
+    {
+        if (OnConfirm.HasDelegate)
+        {
+            await OnConfirm.InvokeAsync();
+        }
+    }
+
+    private async Task HandleCancel()
+    {
+        if (OnCancel.HasDelegate)
+        {
+            await OnCancel.InvokeAsync();
+        }
+    }
+}

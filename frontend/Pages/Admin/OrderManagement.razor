@@ -1,0 +1,1050 @@
+@page "/admin/orders"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject IJSRuntime JS
+
+<div class="orders-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">QUẢN LÝ ĐƠN HÀNG</h2>
+            <p class="page-subtitle">Quản lý các đơn hàng theo khu vực chi nhánh (FR-15, FR-16)</p>
+        </div>
+
+        <div class="branch-scope-control">
+            @if (_isBranchManager)
+            {
+                <div class="branch-badge-locked" title="Khu vực chi nhánh trực thuộc bạn được phân công quản lý">
+                    <span class="branch-dot"></span>
+                    <span class="branch-label-text">Khu vực quản lý:</span>
+                    <strong class="branch-name-val">@_branchName</strong>
+                </div>
+            }
+            else
+            {
+                <div class="branch-dropdown-wrapper">
+                    <span class="branch-dropdown-label">Khu vực / Chi nhánh:</span>
+                    <select class="branch-select-box" @onchange="OnBranchChanged" value="@_selectedBranchId">
+                        <option value="1">Chi nhánh 1 - QF Sư Vạn Hạnh (Q.10, TP.HCM) [Mặc định]</option>
+                        <option value="2">Chi nhánh 2 - QF Quang Trung (Q. Gò Vấp, TP.HCM)</option>
+                        <option value="3">Chi nhánh 3 - QF Lê Văn Sỹ (Q. Phú Nhuận, TP.HCM)</option>
+                        <option value="4">Chi nhánh 4 - QF Cầu Giấy (Q. Cầu Giấy, Hà Nội)</option>
+                        <option value="5">Chi nhánh 5 - QF Chùa Bộc (Q. Đống Đa, Hà Nội)</option>
+                        <option value="6">Chi nhánh 6 - QF Lê Duẩn (Q. Thanh Khê, Đà Nẵng)</option>
+                        <option value="7">Chi nhánh 7 - QF Ninh Kiều (Q. Ninh Kiều, Cần Thơ)</option>
+                        <option value="8">Chi nhánh 8 - QF Ba Mươi Tháng Tư (TP. Biên Hòa)</option>
+                        <option value="9">Chi nhánh 9 - Kho Tổng QF Tân Bình (TP.HCM)</option>
+                        <option value="0">Tất cả chi nhánh (Toàn hệ thống)</option>
+                    </select>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Thanh công cụ Tìm kiếm Mã Đơn & Bộ lọc Trạng thái -->
+    <div class="toolbar-card">
+        <div class="search-box-wrapper">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" 
+                   class="order-search-input" 
+                   placeholder="Tìm kiếm theo mã đơn (VD: #101), tên khách hàng, SĐT..." 
+                   @bind="_searchTerm" 
+                   @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                <button type="button" class="btn-clear-search" @onclick="ClearSearch" title="Xóa tìm kiếm">&times;</button>
+            }
+        </div>
+
+        <div class="filter-tabs">
+            <button class="tab-btn @(_selectedStatus == null ? "active" : "")" 
+                    @onclick="() => FilterByStatus(null)">
+                Tất cả (@_orders.Count)
+            </button>
+            <button class="tab-btn @(_selectedStatus == "Chờ xử lý" ? "active" : "")" 
+                    data-filter="Chờ xử lý" 
+                    @onclick='() => FilterByStatus("Chờ xử lý")'>
+                Chờ xử lý (@_orders.Count(x => x.TrangThai == "Chờ xử lý"))
+            </button>
+            <button class="tab-btn @(_selectedStatus == "Đã hoàn thành" ? "active" : "")" 
+                    data-filter="Đã hoàn thành" 
+                    @onclick='() => FilterByStatus("Đã hoàn thành")'>
+                Đã hoàn thành (@_orders.Count(x => x.TrangThai == "Đã hoàn thành"))
+            </button>
+            <button class="tab-btn @(_selectedStatus == "Đã hủy" ? "active" : "")" 
+                    data-filter="Đã hủy" 
+                    @onclick='() => FilterByStatus("Đã hủy")'>
+                Đã hủy (@_orders.Count(x => x.TrangThai == "Đã hủy"))
+            </button>
+        </div>
+    </div>
+
+    <!-- Bảng danh sách đơn hàng gọn gàng (Compact View) -->
+    <div class="card table-card">
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Mã đơn</th>
+                        <th>Khách hàng</th>
+                        <th>Khu vực chi nhánh</th>
+                        <th>Người bán / Kênh</th>
+                        <th>Thời gian</th>
+                        <th class="text-right">Tiền hàng</th>
+                        <th class="text-right">Tổng thanh toán</th>
+                        <th class="text-center" style="width: 130px;">Trạng thái</th>
+                        <th class="text-center" style="width: 170px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (FilteredOrders.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <div class="empty-state">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                                    </svg>
+                                    <p>Không tìm thấy đơn hàng nào thuộc chi nhánh hoặc phù hợp với bộ lọc hiện tại.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var o in PagedOrders)
+                        {
+                            <tr class="order-row">
+                                <td class="font-weight-bold font-mono">
+                                    <a href="javascript:void(0)" class="order-id-link" @onclick="() => ViewOrderDetails(o)">
+                                        #@o.MaHoaDon
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="customer-info-cell">
+                                        <span class="customer-name font-weight-bold">@o.TenKhachHang</span>
+                                        @if (o.TenKhachHang == "Khách vãng lai" || string.IsNullOrEmpty(o.SdtKhachHang) || o.SdtKhachHang == "N/A")
+                                        {
+                                            <span class="badge-guest-tag">Khách vãng lai quầy</span>
+                                        }
+                                        <span class="customer-phone text-muted font-mono">@(string.IsNullOrWhiteSpace(o.SdtKhachHang) || o.SdtKhachHang == "N/A" ? "-" : o.SdtKhachHang)</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="branch-cell-info">
+                                        <span class="branch-tag-pill">
+                                            📍 @(string.IsNullOrEmpty(o.TenChiNhanh) ? $"Chi nhánh #{o.MaChiNhanh}" : o.TenChiNhanh)
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(o.NguoiLapDon) && o.NguoiLapDon != "Đặt online qua Web")
+                                    {
+                                        <span class="channel-badge pos-channel" title="Đơn thanh toán quầy POS do nhân viên hỗ trợ">
+                                            POS &bull; @o.NguoiLapDon
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="channel-badge online-channel" title="Khách đặt trực tuyến tiếp nhận tại chi nhánh">
+                                            Online &bull; Website
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-muted text-sm tabular-nums">@o.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-right tabular-nums">@o.TienHang.ToString("N0") đ</td>
+                                <td class="text-right font-weight-bold text-primary tabular-nums">@o.TongThanhToan.ToString("N0") đ</td>
+                                <td class="text-center">
+                                    <span class="status-badge status-@GetStatusCss(o.TrangThai)">@o.TrangThai</span>
+                                </td>
+                                <td class="text-center">
+                                    <div class="actions-wrapper">
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                @onclick="() => ViewOrderDetails(o)" 
+                                                title="Xem chi tiết các mặt hàng">
+                                            Chi tiết
+                                        </button>
+
+                                        @if (o.TrangThai == "Chờ xử lý")
+                                        {
+                                            <button class="btn btn-sm btn-success" 
+                                                    data-action-complete="@o.MaHoaDon" 
+                                                    @onclick='() => UpdateStatus(o.MaHoaDon, "Đã hoàn thành")' 
+                                                    title="Chuyển trạng thái sang Hoàn tất">
+                                                Hoàn tất
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" 
+                                                    data-action-cancel="@o.MaHoaDon"
+                                                    @onclick='() => UpdateStatus(o.MaHoaDon, "Đã hủy")' 
+                                                    title="Hủy đơn hàng">
+                                                Hủy
+                                            </button>
+                                        }
+                                        else if (o.TrangThai == "Đã hoàn thành")
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    @onclick='() => UpdateStatus(o.MaHoaDon, "Chờ xử lý")' 
+                                                    title="Thao tác tay: Chuyển lại chờ xử lý">
+                                                Mở lại
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    @onclick='() => UpdateStatus(o.MaHoaDon, "Chờ xử lý")' 
+                                                    title="Thao tác tay: Khôi phục đơn hàng">
+                                                Khôi phục
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Thanh phân trang Pagination gọn gàng -->
+        @if (FilteredOrders.Count > 0)
+        {
+            <div class="pagination-footer">
+                <div class="pagination-info">
+                    Hiển thị <strong>@((_currentPage - 1) * _pageSize + 1)</strong> - <strong>@(Math.Min(_currentPage * _pageSize, FilteredOrders.Count))</strong> trong tổng số <strong>@FilteredOrders.Count</strong> đơn hàng
+                </div>
+
+                <div class="pagination-controls">
+                    <button class="page-nav-btn" 
+                            disabled="@(_currentPage <= 1)" 
+                            @onclick="() => ChangePage(_currentPage - 1)">
+                        &laquo; Trước
+                    </button>
+
+                    @for (int p = 1; p <= TotalPages; p++)
+                    {
+                        var pageNumber = p;
+                        <button class="page-num-btn @(_currentPage == pageNumber ? "active" : "")" 
+                                @onclick="() => ChangePage(pageNumber)">
+                            @pageNumber
+                        </button>
+                    }
+
+                    <button class="page-nav-btn" 
+                            disabled="@(_currentPage >= TotalPages)" 
+                            @onclick="() => ChangePage(_currentPage + 1)">
+                        Sau &raquo;
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Modal Chi Tiết Đơn Hàng & Thao Tác Tay -->
+@if (_showDetailModal && _selectedOrder != null)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseDetailModal">
+        <div class="modal-dialog-custom" @onclick:stopPropagation="true">
+            <div class="modal-header-custom">
+                <div>
+                    <h3 class="modal-title-custom">CHI TIẾT ĐƠN HÀNG #@_selectedOrder.MaHoaDon</h3>
+                    <p class="modal-subtitle-custom">Ngày tạo: @_selectedOrder.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseDetailModal">&times;</button>
+            </div>
+
+            <div class="modal-body-custom">
+                <div class="order-summary-grid">
+                    <div class="summary-box">
+                        <span class="box-label">Khách hàng:</span>
+                        <strong class="box-val">@_selectedOrder.TenKhachHang</strong>
+                        <span class="box-sub">@(string.IsNullOrWhiteSpace(_selectedOrder.SdtKhachHang) || _selectedOrder.SdtKhachHang == "N/A" ? "Khách vãng lai" : _selectedOrder.SdtKhachHang)</span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="box-label">Khu vực / Chi nhánh:</span>
+                        <strong class="box-val text-primary">📍 @(string.IsNullOrEmpty(_selectedOrder.TenChiNhanh) ? $"Chi nhánh #{_selectedOrder.MaChiNhanh}" : _selectedOrder.TenChiNhanh)</strong>
+                        <span class="box-sub">Chi nhánh tiếp nhận & phục vụ</span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="box-label">Người bán / Thu ngân:</span>
+                        <strong class="box-val">@(string.IsNullOrEmpty(_selectedOrder.NguoiLapDon) || _selectedOrder.NguoiLapDon == "Đặt online qua Web" ? "Hệ thống Online" : _selectedOrder.NguoiLapDon)</strong>
+                        <span class="box-sub">@(string.IsNullOrEmpty(_selectedOrder.NguoiLapDon) || _selectedOrder.NguoiLapDon == "Đặt online qua Web" ? "Đơn trực tuyến" : "Thanh toán quầy POS")</span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="box-label">Trạng thái:</span>
+                        <span class="status-badge status-@GetStatusCss(_selectedOrder.TrangThai)">@_selectedOrder.TrangThai</span>
+                    </div>
+                </div>
+
+                <div class="detail-items-section">
+                    <h5 class="items-title">Danh sách mặt hàng (@_orderDetails.Count sản phẩm):</h5>
+                    @if (_isLoadingDetails)
+                    {
+                        <div class="loading-box text-center py-4">Đang tải chi tiết các mặt hàng...</div>
+                    }
+                    else if (_orderDetails.Count == 0)
+                    {
+                        <div class="text-muted text-center py-3">Không có thông tin mặt hàng.</div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="detail-table">
+                                <thead>
+                                    <tr>
+                                        <th>Sản phẩm</th>
+                                        <th>Màu sắc</th>
+                                        <th>Kích cỡ</th>
+                                        <th class="text-center">Số lượng</th>
+                                        <th class="text-right">Đơn giá</th>
+                                        <th class="text-right">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in _orderDetails)
+                                    {
+                                        <tr>
+                                            <td class="font-weight-bold">@item.TenSanPham</td>
+                                            <td class="text-muted">@item.MauSac</td>
+                                            <td class="text-muted">@item.KichCo</td>
+                                            <td class="text-center tabular-nums">@item.SoLuong</td>
+                                            <td class="text-right tabular-nums">@item.DonGia.ToString("N0") đ</td>
+                                            <td class="text-right font-weight-bold tabular-nums">@item.ThanhTien.ToString("N0") đ</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+
+                <div class="order-totals-bar">
+                    <div class="totals-row">
+                        <span>Tiền hàng:</span>
+                        <span>@_selectedOrder.TienHang.ToString("N0") đ</span>
+                    </div>
+                    @if (_selectedOrder.TienGiamGia > 0)
+                    {
+                        <div class="totals-row text-success">
+                            <span>Giảm giá:</span>
+                            <span>-@_selectedOrder.TienGiamGia.ToString("N0") đ</span>
+                        </div>
+                    }
+                    <div class="totals-row totals-grand">
+                        <span>Tổng thanh toán:</span>
+                        <span class="text-primary font-weight-bold">@_selectedOrder.TongThanhToan.ToString("N0") đ</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <div class="modal-actions-left">
+                    @if (_selectedOrder.TrangThai == "Chờ xử lý")
+                    {
+                        <button class="btn btn-success" @onclick='() => UpdateStatusFromModal("Đã hoàn thành")'>
+                            Hoàn tất đơn
+                        </button>
+                        <button class="btn btn-danger" @onclick='() => UpdateStatusFromModal("Đã hủy")'>
+                            Hủy đơn
+                        </button>
+                    }
+                    else if (_selectedOrder.TrangThai == "Đã hoàn thành")
+                    {
+                        <button class="btn btn-outline-secondary" @onclick='() => UpdateStatusFromModal("Chờ xử lý")'>
+                            Chuyển về Chờ xử lý
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-outline-secondary" @onclick='() => UpdateStatusFromModal("Chờ xử lý")'>
+                            Khôi phục đơn
+                        </button>
+                    }
+                </div>
+                <button class="btn btn-secondary" @onclick="CloseDetailModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .orders-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .page-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .page-subtitle {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin: 3px 0 0 0;
+    }
+
+    /* Bộ điều khiển phạm vi chi nhánh */
+    .branch-scope-control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .branch-badge-locked {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    .branch-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        display: inline-block;
+        box-shadow: 0 0 6px #22c55e;
+    }
+
+    .branch-dropdown-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        padding: 5px 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .branch-dropdown-label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #64748b;
+        white-space: nowrap;
+    }
+
+    .branch-select-box {
+        border: none;
+        background: transparent;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+        cursor: pointer;
+        outline: none;
+        padding: 2px 4px;
+    }
+
+    .branch-tag-pill {
+        display: inline-block;
+        padding: 3px 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .badge-guest-tag {
+        display: inline-block;
+        margin-top: 2px;
+        padding: 2px 6px;
+        background: #fef3c7;
+        color: #92400e;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+
+    /* Thanh công cụ tìm kiếm & bộ lọc */
+    .toolbar-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        background: #ffffff;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+
+    .search-box-wrapper {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        max-width: 420px;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    .order-search-input {
+        width: 100%;
+        padding: 7px 30px 7px 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color 0.15s ease;
+    }
+
+    .order-search-input:focus {
+        border-color: #0f172a;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn-clear-search {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        font-size: 1.1rem;
+        color: #94a3b8;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .filter-tabs {
+        display: flex;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 6px;
+        gap: 2px;
+    }
+
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 5px 12px;
+        border-radius: 5px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Bảng danh sách compact */
+    .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        padding: 9px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #475569;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .admin-table td {
+        padding: 9px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .order-row:hover {
+        background: #f8fafc;
+    }
+
+    .order-id-link {
+        color: #0f172a;
+        font-weight: 800;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .customer-info-cell {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .customer-name { font-weight: 600; color: #0f172a; }
+    .customer-phone { font-size: 0.74rem; color: #64748b; }
+
+    .channel-badge {
+        font-size: 0.72rem;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .pos-channel { background: #ede9fe; color: #5b21b6; }
+    .online-channel { background: #e0f2fe; color: #0369a1; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .status-pending { background: #fef3c7; color: #b45309; }
+    .status-completed { background: #d1fae5; color: #065f46; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; }
+
+    .actions-wrapper {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-sm {
+        padding: 3px 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+    }
+
+    .btn-success { background: #10b981; color: white; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-outline-info { background: transparent; border-color: #0284c7; color: #0284c7; }
+    .btn-outline-info:hover { background: #0284c7; color: white; }
+    .btn-outline-secondary { background: transparent; border-color: #94a3b8; color: #475569; }
+    .btn-outline-secondary:hover { background: #f1f5f9; }
+
+    /* Thanh phân trang */
+    .pagination-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: #fafafa;
+        border-top: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 0.8rem;
+    }
+
+    .pagination-info { color: #64748b; }
+    .pagination-controls { display: flex; gap: 4px; align-items: center; }
+
+    .page-nav-btn, .page-num-btn {
+        padding: 4px 8px;
+        font-size: 0.78rem;
+        border: 1px solid #cbd5e1;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #334155;
+    }
+
+    .page-num-btn.active {
+        background: #0f172a;
+        color: white;
+        border-color: #0f172a;
+        font-weight: 700;
+    }
+
+    .page-nav-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Modal Chi Tiết */
+    .modal-backdrop-custom {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+        padding: 16px;
+    }
+
+    .modal-dialog-custom {
+        background: white;
+        border-radius: 8px;
+        max-width: 650px;
+        width: 100%;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+        overflow: hidden;
+    }
+
+    .modal-header-custom {
+        padding: 14px 18px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fafafa;
+    }
+
+    .modal-title-custom { font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0; }
+    .modal-subtitle-custom { font-size: 0.75rem; color: #64748b; margin: 2px 0 0 0; }
+    .btn-close-modal { background: none; border: none; font-size: 1.4rem; color: #94a3b8; cursor: pointer; }
+
+    .modal-body-custom {
+        padding: 16px 18px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .order-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        background: #f8fafc;
+        padding: 10px;
+        border-radius: 6px;
+    }
+
+    .summary-box { display: flex; flex-direction: column; gap: 2px; }
+    .box-label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .box-val { font-size: 0.85rem; color: #0f172a; }
+    .box-sub { font-size: 0.72rem; color: #64748b; }
+
+    .detail-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+
+    .detail-table th {
+        background: #f1f5f9;
+        padding: 7px 10px;
+        border-bottom: 1px solid #cbd5e1;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .detail-table td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .order-totals-bar {
+        border-top: 1px dashed #cbd5e1;
+        padding-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-end;
+        font-size: 0.85rem;
+    }
+
+    .totals-row { display: flex; gap: 16px; min-width: 220px; justify-content: space-between; }
+    .totals-grand { font-size: 1rem; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+
+    .modal-footer-custom {
+        padding: 12px 18px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fafafa;
+    }
+
+    .modal-actions-left { display: flex; gap: 8px; }
+
+    .font-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace); }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-weight-bold { font-weight: 700; }
+</style>
+
+@code {
+    private List<OrderSummaryDto> _orders = new();
+    private string? _selectedStatus = null;
+    private string _searchTerm = string.Empty;
+
+    // Phân quyền & Quản lý phạm vi chi nhánh
+    private int _selectedBranchId = 1; // Admin mặc định vào chi nhánh 1
+    private bool _isBranchManager = false;
+    private string _branchName = "QF Sư Vạn Hạnh (Q.10, TP.HCM)";
+
+    // Phân trang gọn gàng
+    private int _currentPage = 1;
+    private int _pageSize = 8;
+
+    // Chi tiết đơn hàng
+    private bool _showDetailModal = false;
+    private OrderSummaryDto? _selectedOrder;
+    private List<OrderDetailItemDto> _orderDetails = new();
+    private bool _isLoadingDetails = false;
+
+    private List<OrderSummaryDto> FilteredOrders
+    {
+        get
+        {
+            var list = _orders.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_selectedStatus))
+            {
+                list = list.Where(x => x.TrangThai == _selectedStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant().TrimStart('#');
+                list = list.Where(x => 
+                    x.MaHoaDon.ToString().Contains(term) ||
+                    (!string.IsNullOrEmpty(x.TenKhachHang) && x.TenKhachHang.ToLowerInvariant().Contains(term)) ||
+                    (!string.IsNullOrEmpty(x.SdtKhachHang) && x.SdtKhachHang.Contains(term)) ||
+                    (!string.IsNullOrEmpty(x.NguoiLapDon) && x.NguoiLapDon.ToLowerInvariant().Contains(term)));
+            }
+
+            return list.ToList();
+        }
+    }
+
+    private List<OrderSummaryDto> PagedOrders
+    {
+        get
+        {
+            return FilteredOrders
+                .Skip((_currentPage - 1) * _pageSize)
+                .Take(_pageSize)
+                .ToList();
+        }
+    }
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredOrders.Count / (double)_pageSize));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                if (!string.IsNullOrEmpty(role))
+                {
+                    if (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) && 
+                        !role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Quản lý 1 chi nhánh: chỉ quản lý các đơn hàng tại chi nhánh của mình
+                        _isBranchManager = true;
+                        var branchStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+                        if (int.TryParse(branchStr, out var bId) && bId > 0)
+                        {
+                            _selectedBranchId = bId;
+                        }
+                        else
+                        {
+                            _selectedBranchId = 1;
+                        }
+                        _branchName = GetBranchDisplayName(_selectedBranchId);
+                        await LoadOrders();
+                        StateHasChanged();
+                    }
+                    else
+                    {
+                        // Quản trị viên (Admin) / Quản lý chuỗi: mặc định vào khu vực chi nhánh 1
+                        _isBranchManager = false;
+                        _selectedBranchId = 1;
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private async Task LoadOrders()
+    {
+        try
+        {
+            int? branchParam = _selectedBranchId > 0 ? _selectedBranchId : null;
+            var res = await AdminApi.GetAllOrdersAsync(branchParam);
+            _orders = res ?? new();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải danh sách đơn hàng: {ex.Message}");
+        }
+    }
+
+    private async Task OnBranchChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var bId))
+        {
+            _selectedBranchId = bId;
+            _currentPage = 1;
+            await LoadOrders();
+        }
+    }
+
+    private string GetBranchDisplayName(int branchId) => branchId switch
+    {
+        1 => "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
+        2 => "QF Quang Trung (Q. Gò Vấp, TP.HCM)",
+        3 => "QF Lê Văn Sỹ (Q. Phú Nhuận, TP.HCM)",
+        4 => "QF Cầu Giấy (Q. Cầu Giấy, Hà Nội)",
+        5 => "QF Chùa Bộc (Q. Đống Đa, Hà Nội)",
+        6 => "QF Lê Duẩn (Q. Thanh Khê, Đà Nẵng)",
+        7 => "QF Ninh Kiều (Q. Ninh Kiều, Cần Thơ)",
+        8 => "QF Ba Mươi Tháng Tư (TP. Biên Hòa)",
+        9 => "Kho Tổng QF Tân Bình (TP.HCM)",
+        _ => $"Chi nhánh #{branchId}"
+    };
+
+    private void FilterByStatus(string? status)
+    {
+        _selectedStatus = status;
+        _currentPage = 1;
+    }
+
+    private void ClearSearch()
+    {
+        _searchTerm = string.Empty;
+        _currentPage = 1;
+    }
+
+    private void ChangePage(int newPage)
+    {
+        if (newPage >= 1 && newPage <= TotalPages)
+        {
+            _currentPage = newPage;
+        }
+    }
+
+    private async Task UpdateStatus(int orderId, string status)
+    {
+        try
+        {
+            var success = await AdminApi.UpdateOrderStatusAsync(orderId, status);
+            if (success)
+            {
+                var target = _orders.FirstOrDefault(x => x.MaHoaDon == orderId);
+                if (target != null)
+                {
+                    target.TrangThai = status;
+                }
+                Toast.ShowSuccess($"Đã cập nhật trạng thái đơn #{orderId} sang '{status}'!");
+                StateHasChanged();
+            }
+            else
+            {
+                Toast.ShowError($"Cập nhật trạng thái đơn #{orderId} thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi cập nhật: {ex.Message}");
+        }
+    }
+
+    private async Task ViewOrderDetails(OrderSummaryDto order)
+    {
+        _selectedOrder = order;
+        _showDetailModal = true;
+        _isLoadingDetails = true;
+        _orderDetails = new();
+
+        try
+        {
+            var details = await AdminApi.GetOrderDetailsAsync(order.MaHoaDon);
+            _orderDetails = details ?? new();
+        }
+        catch
+        {
+            _orderDetails = new();
+        }
+        finally
+        {
+            _isLoadingDetails = false;
+        }
+    }
+
+    private async Task UpdateStatusFromModal(string status)
+    {
+        if (_selectedOrder == null) return;
+        await UpdateStatus(_selectedOrder.MaHoaDon, status);
+        _selectedOrder.TrangThai = status;
+    }
+
+    private void CloseDetailModal()
+    {
+        _showDetailModal = false;
+        _selectedOrder = null;
+        _orderDetails = new();
+    }
+
+    private string GetStatusCss(string status)
+    {
+        return status switch
+        {
+            "Chờ xử lý" => "pending",
+            "Đã hoàn thành" => "completed",
+            "Đã hủy" => "cancelled",
+            _ => "pending"
+        };
+    }
+}

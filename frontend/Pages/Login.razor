@@ -1,0 +1,612 @@
+@page "/login"
+@namespace Frontend.Pages
+@using System.Net.Http.Json
+@using global::Shared.DTOs.Auth
+@using global::Shared.DTOs.Common
+@inject HttpClient Http
+@inject Frontend.Services.IToastService Toast
+@inject Frontend.Services.ICartService CartService
+@inject Frontend.Services.IAuthStateService AuthStateService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Đăng nhập tài khoản | QF Noir</PageTitle>
+
+<div class="login-page-container">
+    <div class="login-card">
+        <!-- Brand Header -->
+        <div class="login-brand-header">
+            <a href="/" class="login-logo-link qf-brand-lockup" style="justify-content: center; margin-bottom: 1.25rem;">
+                <img src="images/logo.png" alt="QF Noir" class="qf-emblem-img" style="height: 48px;" />
+                <div class="qf-brand-divider" style="height: 38px;"></div>
+                <div class="qf-brand-title-wrap">
+                    <span class="qf-brand-name" style="font-size: 1.7rem;">QF NOIR</span>
+                </div>
+            </a>
+            <h1 class="login-title">ĐĂNG NHẬP</h1>
+            <p class="login-subtitle">Chào mừng bạn quay lại hệ thống thời trang QF Noir</p>
+        </div>
+
+        <!-- Quick Demo Fill Chips (4 Roles Chuẩn Hệ Thống) -->
+        <div class="demo-accounts-box">
+            <span class="demo-label">Tài khoản thử nghiệm nhanh (4 vai trò hệ thống):</span>
+            <div class="demo-chips-row">
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "admin" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("admin", "123456")'
+                        title="Quản trị viên tối cao toàn chuỗi">
+                    Admin chuỗi
+                </button>
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "manager01" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("manager01", "123456")'
+                        title="Quản lý chi nhánh">
+                    Quản lý chi nhánh
+                </button>
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "warehouse01" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("warehouse01", "123456")'
+                        title="Thủ kho quản lý tồn & nhập kho">
+                    Thủ kho
+                </button>
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "coordinator01" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("coordinator01", "123456")'
+                        title="Điều phối đơn hàng & tiếp nhận đổi trả online">
+                    Điều phối viên
+                </button>
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "cashier01" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("cashier01", "123456")'
+                        title="Nhân viên làm việc tại quầy POS">
+                    Nhân viên POS
+                </button>
+                <button type="button" 
+                        class="demo-chip @(_loginModel.TenDangNhap == "customer01" ? "active" : "")" 
+                        @onclick='() => SetDemoUser("customer01", "123456")'
+                        title="Khách hàng mua sắm & thành viên VIP">
+                    Khách hàng
+                </button>
+            </div>
+        </div>
+
+        <!-- Login Form -->
+        <EditForm Model="@_loginModel" OnValidSubmit="HandleLogin">
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="login-alert-error" role="alert">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>@_errorMessage</span>
+                </div>
+            }
+
+            <div class="form-group">
+                <label for="username" class="form-label">Tên đăng nhập hoặc Email</label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <input type="text" 
+                           id="username" 
+                           class="form-control" 
+                           placeholder="Nhập tên đăng nhập (vd: admin)" 
+                           @bind="_loginModel.TenDangNhap" 
+                           required 
+                           autocomplete="username" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="form-label-row">
+                    <label for="password" class="form-label">Mật khẩu</label>
+                    <a href="javascript:void(0)" class="forgot-link" @onclick="ShowForgotNotice">Quên mật khẩu?</a>
+                </div>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <input type="@(_showPassword ? "text" : "password")" 
+                           id="password" 
+                           class="form-control" 
+                           placeholder="Nhập mật khẩu" 
+                           @bind="_loginModel.MatKhau" 
+                           required 
+                           autocomplete="current-password" />
+                    <button type="button" class="btn-toggle-eye" @onclick="() => _showPassword = !_showPassword" tabindex="-1" aria-label="Ẩn/hiện mật khẩu">
+                        @if (_showPassword)
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-check-row">
+                <label class="check-container">
+                    <input type="checkbox" @bind="_rememberMe" />
+                    <span class="checkmark"></span>
+                    <span class="check-text">Ghi nhớ đăng nhập</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn-login-submit" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span class="btn-spinner"></span>
+                    <span>ĐANG XÁC THỰC...</span>
+                }
+                else
+                {
+                    <span>ĐĂNG NHẬP</span>
+                }
+            </button>
+        </EditForm>
+
+        <!-- Secondary Navigation -->
+        <div class="login-footer-links">
+            <p class="register-prompt">
+                Chưa có tài khoản? 
+                <a href="@(string.IsNullOrEmpty(ReturnUrl) ? "/register" : $"/register?returnUrl={Uri.EscapeDataString(ReturnUrl)}")" class="register-link font-weight-bold">Đăng ký ngay</a>
+                <span class="text-separator">|</span>
+                <a href="/catalog" class="guest-link">Mua sắm tiếp</a>
+            </p>
+            <div class="back-home-box">
+                <a href="/" class="back-home-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Quay về Trang chủ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-page-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1.5rem;
+        background-color: #FFFFFF;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 440px;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 1rem 0;
+    }
+
+    .login-brand-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .login-logo-img {
+        height: 38px;
+        max-width: 180px;
+        object-fit: contain;
+        margin-bottom: 1.25rem;
+    }
+
+    .login-logo-fallback .brand-text {
+        font-family: var(--font-display);
+        font-size: 1.6rem;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        color: #000000;
+        display: block;
+        margin-bottom: 1.25rem;
+    }
+
+    .brand-tld {
+        color: #E11D48;
+    }
+
+    .login-title {
+        font-family: var(--font-display);
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        color: #0F172A;
+        margin-bottom: 0.35rem;
+    }
+
+    .login-subtitle {
+        font-size: 0.85rem;
+        color: #64748B;
+        line-height: 1.4;
+    }
+
+    /* Demo accounts bar */
+    .demo-accounts-box {
+        background-color: #F8FAFC;
+        border: none;
+        border-radius: 6px;
+        padding: 0.85rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .demo-label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748B;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .demo-chips-row {
+        display: flex;
+        gap: 0.4rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .demo-chip {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #1E293B;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .demo-chip:hover {
+        background: #000000;
+        color: #FFFFFF;
+        border-color: #000000;
+    }
+
+    /* Alert */
+    .login-alert-error {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        background-color: #FEF2F2;
+        border: 1px solid #FCA5A5;
+        color: #DC2626;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        font-size: 0.825rem;
+        margin-bottom: 1.25rem;
+    }
+
+    /* Form */
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-label-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.4rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.825rem;
+        font-weight: 600;
+        color: #1E293B;
+        margin-bottom: 0.4rem;
+    }
+
+    .forgot-link {
+        font-size: 0.78rem;
+        color: #64748B;
+        text-decoration: none;
+    }
+
+    .forgot-link:hover {
+        color: #000000;
+        text-decoration: underline;
+    }
+
+    .input-with-icon {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .field-icon {
+        position: absolute;
+        left: 12px;
+        color: #94A3B8;
+        pointer-events: none;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 2.4rem;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        color: #0F172A;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: #FFFFFF;
+    }
+
+    .form-control:focus {
+        border-color: #000000;
+        box-shadow: 0 0 0 1px #000000;
+    }
+
+    .btn-toggle-eye {
+        position: absolute;
+        right: 12px;
+        background: transparent;
+        border: none;
+        color: #94A3B8;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        padding: 4px;
+    }
+
+    .btn-toggle-eye:hover {
+        color: #0F172A;
+    }
+
+    .form-check-row {
+        margin-bottom: 1.5rem;
+    }
+
+    .check-container {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.825rem;
+        color: #475569;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .check-container input {
+        accent-color: #000000;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+    }
+
+    .btn-login-submit {
+        width: 100%;
+        padding: 0.875rem;
+        background-color: #000000;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    .btn-login-submit:hover:not(:disabled) {
+        background-color: #27272A;
+    }
+
+    .btn-login-submit:active:not(:disabled) {
+        transform: scale(0.99);
+    }
+
+    .btn-login-submit:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    .btn-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #FFFFFF;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .login-footer-links {
+        margin-top: 2rem;
+        text-align: center;
+        border-top: 1px solid #F1F5F9;
+        padding-top: 1.5rem;
+    }
+
+    .register-prompt {
+        font-size: 0.825rem;
+        color: #64748B;
+        margin-bottom: 1rem;
+    }
+
+    .register-link {
+        color: #000000;
+        font-weight: 600;
+        text-decoration: underline;
+    }
+
+    .back-home-box {
+        margin-top: 0.5rem;
+    }
+
+    .back-home-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.8rem;
+        color: #64748B;
+        text-decoration: none;
+        transition: color 0.15s ease;
+    }
+
+    .back-home-link:hover {
+        color: #000000;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private LoginRequestDto _loginModel = new();
+    private bool _showPassword;
+    private bool _rememberMe = true;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private void SetDemoUser(string user, string pass)
+    {
+        _loginModel.TenDangNhap = user;
+        _loginModel.MatKhau = pass;
+        _errorMessage = null;
+    }
+
+    private void ShowForgotNotice()
+    {
+        Toast.ShowInfo("Vui lòng liên hệ quản trị viên hoặc hotline 1900 8888 để được cấp lại mật khẩu.");
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/auth/login", _loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var apiResult = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponseDto>>();
+                var loginData = apiResult?.Data;
+
+                if (loginData != null && !string.IsNullOrEmpty(loginData.Token))
+                {
+                    // Store token & user profile in localStorage and AuthStateService
+                    await AuthStateService.SetAuthAsync(
+                        loginData.Token, 
+                        loginData.TenDangNhap, 
+                        loginData.VaiTro, 
+                        loginData.TenNhanVien, 
+                        loginData.MaNhanVien.ToString());
+
+                    if (loginData.MaChiNhanh.HasValue)
+                    {
+                        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "staffBranchId", loginData.MaChiNhanh.Value.ToString());
+                        if (!string.IsNullOrEmpty(loginData.TenChiNhanh))
+                        {
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "staffBranchName", loginData.TenChiNhanh);
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(loginData.LoaiThuKho))
+                    {
+                        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "loaiThuKho", loginData.LoaiThuKho);
+                    }
+
+                    // Hợp nhất giỏ hàng khách vãng lai vào tài khoản vừa đăng nhập
+                    await CartService.MergeGuestCartOnLoginAsync(loginData.TenDangNhap);
+
+                    Toast.ShowSuccess($"Đăng nhập thành công! Chào mừng {loginData.TenNhanVien ?? loginData.TenDangNhap}.");
+
+                    // Điều hướng chính xác theo môi trường làm việc phù hợp từng Role
+                    if (!string.IsNullOrEmpty(ReturnUrl))
+                    {
+                        Navigation.NavigateTo(ReturnUrl);
+                    }
+                    else if (loginData.VaiTro.Contains("Admin", StringComparison.OrdinalIgnoreCase) || 
+                             loginData.VaiTro.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.VaiTro.Contains("hệ thống", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 1. Quản lý đa chi nhánh -> Môi trường Tổng quan & Báo cáo toàn chuỗi
+                        Navigation.NavigateTo("/admin/dashboard");
+                    }
+                    else if (loginData.VaiTro.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 2. Quản lý chi nhánh -> Môi trường Quản lý Đơn hàng & Kho Chi nhánh
+                        Navigation.NavigateTo("/admin/orders");
+                    }
+                    else if (loginData.VaiTro.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.VaiTro.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.TenDangNhap.StartsWith("warehouse", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.TenDangNhap.Contains("kho", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 3. Thủ kho -> Môi trường Quản lý Kho & Nhập hàng chuyên biệt
+                        Navigation.NavigateTo("/warehouse");
+                    }
+                    else if (loginData.VaiTro.Contains("Order Coordinator", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.VaiTro.Contains("Điều phối", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.TenDangNhap.StartsWith("coordinator", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 4. Điều phối viên đơn hàng -> Cổng chuyên biệt Order Support Portal
+                        Navigation.NavigateTo("/staff/order-support");
+                    }
+                    else if (loginData.VaiTro.Contains("ThuNgan", StringComparison.OrdinalIgnoreCase) || 
+                             loginData.VaiTro.Contains("Thu ngân", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.VaiTro.Contains("Nhân viên", StringComparison.OrdinalIgnoreCase) ||
+                             loginData.VaiTro.Contains("bán hàng", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 5. Nhân viên thu ngân -> Môi trường Máy tính tiền POS tại quầy
+                        Navigation.NavigateTo("/pos");
+                    }
+                    else
+                    {
+                        // 4. Khách hàng -> Môi trường Cá nhân khách hàng (Điểm thưởng VIP & Lịch sử đơn mua)
+                        Navigation.NavigateTo("/profile");
+                    }
+                }
+                else
+                {
+                    _errorMessage = apiResult?.Message ?? "Đăng nhập không thành công, vui lòng thử lại.";
+                }
+            }
+            else
+            {
+                var errorResult = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponseDto>>();
+                _errorMessage = errorResult?.Message ?? "Tên đăng nhập hoặc mật khẩu không chính xác.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Không thể kết nối đến máy chủ: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

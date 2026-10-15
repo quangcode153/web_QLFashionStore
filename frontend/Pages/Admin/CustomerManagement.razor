@@ -1,0 +1,1523 @@
+@page "/admin/customers"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+
+<PageTitle>Quản lý tài khoản khách hàng | QF Noir Admin</PageTitle>
+
+<div class="customer-management-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <div class="header-breadcrumb">QUẢN TRỊ KHÁCH HÀNG & THÀNH VIÊN</div>
+            <h2 class="page-title">QUẢN LÝ TÀI KHOẢN KHÁCH HÀNG</h2>
+            <p class="page-subtitle">Kiểm soát hồ sơ khách hàng, phân hạng thành viên VIP, điểm thưởng tích lũy và bảo mật tài khoản</p>
+        </div>
+        <div class="header-actions">
+            <!-- Nút Tự động xét duyệt hạng VIP -->
+            <button class="btn-action-secondary" @onclick="HandleEvaluateRanks" disabled="@_isEvaluatingRanks" title="Quét toàn bộ chi tiêu thực tế để tự động thăng hạng Bạc/Vàng">
+                @if (_isEvaluatingRanks)
+                {
+                    <span class="spinner-small"></span>
+                    <span>Đang xét duyệt...</span>
+                }
+                else
+                {
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>Xét hạng VIP tự động</span>
+                }
+            </button>
+
+            <!-- Nút Thêm khách hàng mới -->
+            <button class="btn-action-primary" @onclick="OpenCreateModal" title="Tạo tài khoản khách hàng mới">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Thêm khách hàng</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Thống kê nhanh (KPI Summary Cards) -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">TỔNG KHÁCH HÀNG</div>
+            <div class="kpi-val">@(_customersList?.Count ?? 0)</div>
+            <div class="kpi-sub">Thành viên đăng ký hệ thống</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">HẠNG THÀNH VIÊN VIP</div>
+            <div class="kpi-val text-amber">
+                @(_customersList?.Count(c => c.TenCapDo == "Vàng" || c.TenCapDo == "Bạc") ?? 0)
+            </div>
+            <div class="kpi-sub">
+                Hạng Vàng: @(_customersList?.Count(c => c.TenCapDo == "Vàng") ?? 0) &bull; Hạng Bạc: @(_customersList?.Count(c => c.TenCapDo == "Bạc") ?? 0)
+            </div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">ĐANG HOẠT ĐỘNG</div>
+            <div class="kpi-val text-emerald">@(_customersList?.Count(c => !c.DaXoa) ?? 0)</div>
+            <div class="kpi-sub">Được phép đăng nhập & mua sắm</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">TÀI KHOẢN ĐÃ KHÓA</div>
+            <div class="kpi-val text-rose">@(_customersList?.Count(c => c.DaXoa) ?? 0)</div>
+            <div class="kpi-sub">Bị tạm khóa do vi phạm / yêu cầu</div>
+        </div>
+    </div>
+
+    <!-- Thanh Tìm Kiếm & Bộ Lọc -->
+    <div class="filter-bar">
+        <div class="search-input-wrapper">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="search-input" placeholder="Tìm theo tên, SĐT, email, tên đăng nhập..." 
+                   @bind="_searchTerm" @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                <button type="button" class="clear-btn" @onclick="() => _searchTerm = string.Empty">×</button>
+            }
+        </div>
+
+        <div class="filter-controls">
+            <!-- Lọc Cấp độ -->
+            <div class="filter-tabs">
+                <button class="tab-btn @(_selectedRankFilter == null ? "active" : "")" @onclick="() => _selectedRankFilter = null">
+                    Tất cả hạng
+                </button>
+                <button class="tab-btn @(_selectedRankFilter == 1 ? "active" : "")" @onclick="() => _selectedRankFilter = 1">
+                    Thường
+                </button>
+                <button class="tab-btn @(_selectedRankFilter == 2 ? "active" : "")" @onclick="() => _selectedRankFilter = 2">
+                    Bạc (Giảm 5%)
+                </button>
+                <button class="tab-btn @(_selectedRankFilter == 3 ? "active" : "")" @onclick="() => _selectedRankFilter = 3">
+                    Vàng (Giảm 10%)
+                </button>
+            </div>
+
+            <!-- Lọc Trạng thái -->
+            <div class="filter-tabs">
+                <button class="tab-btn @(_selectedStatusFilter == null ? "active" : "")" @onclick="() => _selectedStatusFilter = null">
+                    Tất cả TT
+                </button>
+                <button class="tab-btn @(_selectedStatusFilter == false ? "active" : "")" @onclick="() => _selectedStatusFilter = false">
+                    Hoạt động
+                </button>
+                <button class="tab-btn @(_selectedStatusFilter == true ? "active" : "")" @onclick="() => _selectedStatusFilter = true">
+                    Đã khóa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bảng Danh Sách Tài Khoản Khách Hàng -->
+    <div class="card catalog-card">
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 75px;">Mã KH</th>
+                        <th>Họ tên & Tài khoản</th>
+                        <th>Số điện thoại</th>
+                        <th>Email liên hệ</th>
+                        <th class="text-center">Cấp độ VIP</th>
+                        <th class="text-center">Điểm thưởng</th>
+                        <th class="text-right">Tổng chi tiêu</th>
+                        <th class="text-center">Đơn hàng</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-center" style="width: 130px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_isLoading)
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-5 text-muted">
+                                <span class="spinner-small spinner-dark"></span> Đang tải danh sách tài khoản khách hàng...
+                            </td>
+                        </tr>
+                    }
+                    else if (FilteredCustomers == null || !FilteredCustomers.Any())
+                    {
+                        <tr>
+                            <td colspan="10" class="text-center py-5 text-muted">
+                                Không tìm thấy tài khoản khách hàng nào phù hợp với bộ lọc.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var cus in FilteredCustomers)
+                        {
+                            <tr class="@(cus.DaXoa ? "row-locked" : "")">
+                                <td class="font-mono text-muted">#KH-@cus.MaKhachHang</td>
+                                <td>
+                                    <div class="customer-info-cell">
+                                        <span class="customer-name">@cus.TenKhachHang</span>
+                                        @if (!string.IsNullOrWhiteSpace(cus.TenDangNhap))
+                                        {
+                                            <span class="customer-username font-mono">@@@cus.TenDangNhap</span>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="phone-text font-mono">@(string.IsNullOrWhiteSpace(cus.DienThoai) ? "-" : cus.DienThoai)</span>
+                                </td>
+                                <td>
+                                    <span class="email-text">@(string.IsNullOrWhiteSpace(cus.Email) ? "-" : cus.Email)</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="rank-badge rank-@GetRankCssClass(cus.TenCapDo)">
+                                        @cus.TenCapDo
+                                        @if (cus.PhanTramGiamGia > 0)
+                                        {
+                                            <small class="discount-pill">-@cus.PhanTramGiamGia%</small>
+                                        }
+                                    </span>
+                                </td>
+                                <td class="text-center tabular-nums">
+                                    <span class="point-badge">@cus.DiemThuong pts</span>
+                                </td>
+                                <td class="text-right tabular-nums">
+                                    <span class="spending-val">@cus.TongChiTieu.ToString("N0") đ</span>
+                                </td>
+                                <td class="text-center tabular-nums">
+                                    <span class="order-count-badge">@cus.TongSoDonHang</span>
+                                </td>
+                                <td class="text-center">
+                                    @if (!cus.DaXoa)
+                                    {
+                                        <span class="status-indicator active">
+                                            <span class="dot"></span>
+                                            <span>Hoạt động</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-indicator locked">
+                                            <span class="dot"></span>
+                                            <span>Đã khóa</span>
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="row-actions">
+                                        <!-- Xem lịch sử đơn hàng -->
+                                        <button class="btn-action-ghost" @onclick="() => OpenOrderHistoryModal(cus)" title="Xem lịch sử đơn hàng của khách hàng">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-7z"></path>
+                                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                                <path d="M16 10a4 4 0 0 1-8 0"></path>
+                                            </svg>
+                                        </button>
+                                        <!-- Sửa thông tin -->
+                                        <button class="btn-action-ghost" @onclick="() => OpenEditModal(cus)" title="Chỉnh sửa thông tin / Hạng thành viên">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                        </button>
+                                        <!-- Khóa / Mở khóa -->
+                                        <button class="btn-action-ghost @(cus.DaXoa ? "btn-unlock" : "btn-lock")" 
+                                                @onclick="() => HandleToggleStatus(cus)" 
+                                                title="@(cus.DaXoa ? "Mở khóa tài khoản" : "Khóa tài khoản này")">
+                                            @if (cus.DaXoa)
+                                            {
+                                                <!-- Icon Unlock -->
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                                    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                                                </svg>
+                                            }
+                                            else
+                                            {
+                                                <!-- Icon Lock -->
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                                </svg>
+                                            }
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL 1: TẠO MỚI TÀI KHOẢN KHÁCH HÀNG                                     -->
+<!-- ========================================================================= -->
+@if (_isCreateModalOpen)
+{
+    <div class="modal-backdrop" @onclick="CloseCreateModal">
+        <div class="modal-panel modal-panel-md" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge">TÀI KHOẢN THÀNH VIÊN</div>
+                    <h3 class="modal-title">THÊM KHÁCH HÀNG MỚI</h3>
+                    <p class="modal-subtitle">Tạo hồ sơ và tài khoản đăng nhập cho khách hàng thân thiết</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseCreateModal">✕</button>
+            </div>
+
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_createErrorMessage))
+                {
+                    <div class="alert-box alert-error">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>@_createErrorMessage</span>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="form-label">Họ và tên khách hàng <span class="required">*</span></label>
+                    <input type="text" class="form-control" placeholder="VD: Nguyễn Văn A..." @bind="_createForm.TenKhachHang" />
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Số điện thoại <span class="required">*</span></label>
+                        <input type="text" class="form-control font-mono" placeholder="VD: 0912345678" @bind="_createForm.DienThoai" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tên đăng nhập (Username)</label>
+                        <input type="text" class="form-control font-mono" placeholder="VD: nguyenvana (tùy chọn)" @bind="_createForm.TenDangNhap" />
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Địa chỉ Email</label>
+                        <input type="email" class="form-control" placeholder="VD: nva@gmail.com" @bind="_createForm.Email" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mật khẩu khởi tạo</label>
+                        <input type="text" class="form-control font-mono" placeholder="Mặc định: 123456" @bind="_createForm.MatKhau" />
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Cấp độ thành viên ban đầu</label>
+                        <select class="form-control" @bind="_createForm.MaCapDo">
+                            <option value="1">Hạng Thường (0% chiết khấu)</option>
+                            <option value="2">Hạng Bạc (Giảm 5%)</option>
+                            <option value="3">Hạng Vàng (Giảm 10%)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Điểm thưởng khởi tạo</label>
+                        <input type="number" class="form-control tabular-nums" min="0" @bind="_createForm.DiemThuong" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" @onclick="CloseCreateModal" disabled="@_isSubmittingCreate">
+                    Hủy bỏ
+                </button>
+                <button type="button" class="btn-modal-submit" @onclick="SubmitCreateCustomer" disabled="@_isSubmittingCreate">
+                    @if (_isSubmittingCreate)
+                    {
+                        <span class="spinner-small"></span>
+                        <span>Đang tạo tài khoản...</span>
+                    }
+                    else
+                    {
+                        <span>Lưu tài khoản khách hàng</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL 2: CHỈNH SỬA THÔNG TIN & HẠNG THÀNH VIÊN                            -->
+<!-- ========================================================================= -->
+@if (_isEditModalOpen && _editingCustomer != null)
+{
+    <div class="modal-backdrop" @onclick="CloseEditModal">
+        <div class="modal-panel modal-panel-md" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge">HỒ SƠ KHÁCH HÀNG #KH-@_editingCustomer.MaKhachHang</div>
+                    <h3 class="modal-title">CHỈNH SỬA TÀI KHOẢN KHÁCH HÀNG</h3>
+                    <p class="modal-subtitle">Cập nhật thông tin liên hệ, điều chỉnh điểm thưởng và cấp độ thành viên</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseEditModal">✕</button>
+            </div>
+
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_editErrorMessage))
+                {
+                    <div class="alert-box alert-error">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>@_editErrorMessage</span>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="form-label">Họ và tên khách hàng <span class="required">*</span></label>
+                    <input type="text" class="form-control" @bind="_editForm.TenKhachHang" />
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Số điện thoại</label>
+                        <input type="text" class="form-control font-mono" @bind="_editForm.DienThoai" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Địa chỉ Email</label>
+                        <input type="email" class="form-control" @bind="_editForm.Email" />
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Cấp độ thành viên VIP</label>
+                        <select class="form-control" @bind="_editForm.MaCapDo">
+                            <option value="1">Hạng Thường (0% giảm giá)</option>
+                            <option value="2">Hạng Bạc (Giảm giá 5%)</option>
+                            <option value="3">Hạng Vàng (Giảm giá 10%)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Điểm thưởng tích lũy (pts)</label>
+                        <input type="number" class="form-control tabular-nums" min="0" @bind="_editForm.DiemThuong" />
+                    </div>
+                </div>
+
+                <div class="spending-preview-box">
+                    <span class="preview-label">Tổng chi tiêu thực tế tích lũy:</span>
+                    <strong class="preview-val">@_editingCustomer.TongChiTieu.ToString("N0") đ</strong>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" @onclick="CloseEditModal" disabled="@_isSubmittingEdit">
+                    Hủy bỏ
+                </button>
+                <button type="button" class="btn-modal-submit" @onclick="SubmitEditCustomer" disabled="@_isSubmittingEdit">
+                    @if (_isSubmittingEdit)
+                    {
+                        <span class="spinner-small"></span>
+                        <span>Đang cập nhật...</span>
+                    }
+                    else
+                    {
+                        <span>Lưu thay đổi</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL 3: XEM LỊCH SỬ ĐƠN HÀNG CỦA KHÁCH HÀNG                              -->
+<!-- ========================================================================= -->
+@if (_isOrderHistoryModalOpen && _viewingCustomer != null)
+{
+    <div class="modal-backdrop" @onclick="CloseOrderHistoryModal">
+        <div class="modal-panel modal-panel-lg" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge">LỊCH SỬ MUA SẮM KHÁCH HÀNG</div>
+                    <h3 class="modal-title">#KH-@_viewingCustomer.MaKhachHang - @_viewingCustomer.TenKhachHang</h3>
+                    <p class="modal-subtitle">
+                        SĐT: @_viewingCustomer.DienThoai &bull; Hạng: @_viewingCustomer.TenCapDo &bull; Tổng chi tiêu: @_viewingCustomer.TongChiTieu.ToString("N0") đ
+                    </p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseOrderHistoryModal">✕</button>
+            </div>
+
+            <div class="modal-body-p0">
+                @if (_isLoadingOrders)
+                {
+                    <div class="py-5 text-center text-muted">
+                        <span class="spinner-small spinner-dark"></span> Đang tải lịch sử đơn hàng...
+                    </div>
+                }
+                else if (_customerOrdersList == null || !_customerOrdersList.Any())
+                {
+                    <div class="py-5 text-center text-muted">
+                        Khách hàng này chưa có đơn hàng nào trong hệ thống.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="variant-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Mã ĐH</th>
+                                    <th>Thời gian tạo</th>
+                                    <th class="text-right">Tiền hàng</th>
+                                    <th class="text-right">Giảm giá</th>
+                                    <th class="text-right">Thanh toán</th>
+                                    <th class="text-center">Số món</th>
+                                    <th class="text-center">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ord in _customerOrdersList)
+                                {
+                                    <tr>
+                                        <td class="font-mono text-muted"><strong>#@ord.MaHoaDon</strong></td>
+                                        <td class="font-mono text-sm">@ord.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td class="text-right tabular-nums">@ord.TienHang.ToString("N0") đ</td>
+                                        <td class="text-right tabular-nums text-emerald">
+                                            @(ord.TienGiamGia > 0 ? $"-{ord.TienGiamGia:N0} đ" : "0 đ")
+                                        </td>
+                                        <td class="text-right tabular-nums font-weight-bold">@ord.TongThanhToan.ToString("N0") đ</td>
+                                        <td class="text-center tabular-nums">@ord.SoMatHang</td>
+                                        <td class="text-center">
+                                            <span class="order-status-pill status-@GetOrderStatusClass(ord.TrangThai)">
+                                                @ord.TrangThai
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" @onclick="CloseOrderHistoryModal">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .customer-management-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 4px;
+    }
+
+    .header-breadcrumb {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #94a3b8;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+
+    .page-title {
+        font-family: var(--font-display, inherit);
+        font-size: 1.45rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.01em;
+    }
+
+    .page-subtitle {
+        font-size: 0.82rem;
+        color: #64748b;
+        margin: 3px 0 0 0;
+    }
+
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .btn-action-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: #0f172a;
+        color: #ffffff;
+        border: 1px solid #0f172a;
+        border-radius: 7px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-action-primary:hover {
+        background: #1e293b;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px -1px rgba(15, 23, 42, 0.22);
+    }
+
+    .btn-action-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #ffffff;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-action-secondary:hover:not(:disabled) {
+        background: #f8fafc;
+        border-color: #0f172a;
+        color: #0f172a;
+    }
+
+    .btn-action-secondary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* KPI GRID */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .kpi-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        margin-bottom: 4px;
+    }
+
+    .kpi-val {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-sub {
+        font-size: 0.72rem;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    .text-amber { color: #d97706; }
+    .text-emerald { color: #059669; }
+    .text-rose { color: #e11d48; }
+
+    /* FILTER BAR */
+    .filter-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 320px;
+        max-width: 100%;
+    }
+
+    .search-input-wrapper svg {
+        position: absolute;
+        left: 12px;
+        pointer-events: none;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 8px 30px 8px 36px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.83rem;
+        transition: all 0.15s ease;
+    }
+
+    .search-input:focus {
+        border-color: #0f172a;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .clear-btn {
+        position: absolute;
+        right: 10px;
+        background: none;
+        border: none;
+        font-size: 1rem;
+        color: #94a3b8;
+        cursor: pointer;
+    }
+
+    .filter-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .filter-tabs {
+        display: flex;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 6px;
+        gap: 2px;
+    }
+
+    .tab-btn {
+        background: none;
+        border: none;
+        padding: 5px 11px;
+        border-radius: 5px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    }
+
+    /* CARD VÀ BẢNG */
+    .catalog-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        padding: 11px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #475569;
+        text-align: left;
+        font-size: 0.76rem;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .admin-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .row-locked {
+        background-color: #fff1f2 !important;
+        opacity: 0.85;
+    }
+
+    .customer-info-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .customer-name {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.84rem;
+    }
+
+    .customer-username {
+        font-size: 0.72rem;
+        color: #64748b;
+    }
+
+    .phone-text, .email-text {
+        font-size: 0.8rem;
+        color: #334155;
+    }
+
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 12px;
+    }
+
+    .rank-gold {
+        background: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+
+    .rank-silver {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
+
+    .rank-standard {
+        background: #f8fafc;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+    }
+
+    .discount-pill {
+        background: rgba(0, 0, 0, 0.08);
+        padding: 1px 4px;
+        border-radius: 6px;
+        font-size: 0.65rem;
+    }
+
+    .point-badge {
+        font-weight: 700;
+        color: #0284c7;
+        background: #e0f2fe;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.74rem;
+    }
+
+    .spending-val {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .order-count-badge {
+        background: #f1f5f9;
+        padding: 2px 7px;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    /* STATUS INDICATOR */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 12px;
+    }
+
+    .status-indicator.active {
+        background: #ecfdf5;
+        color: #047857;
+    }
+
+    .status-indicator.active .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+    }
+
+    .status-indicator.locked {
+        background: #fef2f2;
+        color: #b91c1c;
+    }
+
+    .status-indicator.locked .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ef4444;
+    }
+
+    .row-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .btn-action-ghost {
+        background: transparent;
+        border: 1px solid #cbd5e1;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        color: #475569;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-action-ghost:hover {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    .btn-lock:hover {
+        background: #ef4444 !important;
+        border-color: #ef4444 !important;
+        color: #ffffff !important;
+    }
+
+    .btn-unlock:hover {
+        background: #10b981 !important;
+        border-color: #10b981 !important;
+        color: #ffffff !important;
+    }
+
+    /* MODAL STYLES */
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 16px;
+    }
+
+    .modal-panel {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+        overflow: hidden;
+        animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-panel-md {
+        width: 540px;
+        max-width: 100%;
+    }
+
+    .modal-panel-lg {
+        width: 780px;
+        max-width: 100%;
+    }
+
+    @@keyframes modalFadeIn {
+        from { opacity: 0; transform: scale(0.96) translateY(6px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 18px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #ffffff;
+    }
+
+    .modal-badge {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+
+    .modal-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.01em;
+    }
+
+    .modal-subtitle {
+        font-size: 0.78rem;
+        color: #64748b;
+        margin: 3px 0 0 0;
+    }
+
+    .btn-close-modal {
+        background: none;
+        border: none;
+        font-size: 1.1rem;
+        color: #94a3b8;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-close-modal:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .modal-body {
+        padding: 20px 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .modal-body-p0 {
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .modal-footer {
+        padding: 14px 24px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #f8fafc;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .required { color: #ef4444; }
+
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.83rem;
+        color: #0f172a;
+        background: #ffffff;
+        transition: all 0.15s ease;
+    }
+
+    .form-control:focus {
+        border-color: #0f172a;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+
+    .alert-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .spending-preview-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.82rem;
+    }
+
+    .preview-label { color: #64748b; font-weight: 600; }
+    .preview-val { color: #0f172a; font-size: 0.95rem; }
+
+    .btn-modal-cancel {
+        padding: 8px 14px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+    }
+
+    .btn-modal-cancel:hover:not(:disabled) {
+        background: #f1f5f9;
+    }
+
+    .btn-modal-submit {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: #0f172a;
+        border: 1px solid #0f172a;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #ffffff;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-modal-submit:hover:not(:disabled) {
+        background: #1e293b;
+    }
+
+    .btn-modal-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* BẢNG LỊCH SỬ ĐƠN HÀNG */
+    .variant-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+
+    .variant-table th {
+        background: #ffffff;
+        padding: 9px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #64748b;
+        text-align: left;
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .variant-table td {
+        padding: 10px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .order-status-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .status-completed { background: #ecfdf5; color: #047857; }
+    .status-pending { background: #fef3c7; color: #b45309; }
+    .status-cancelled { background: #fef2f2; color: #b91c1c; }
+
+    .spinner-small {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: #ffffff;
+        animation: spin 0.6s linear infinite;
+    }
+
+    .spinner-dark {
+        border-color: rgba(15, 23, 42, 0.2);
+        border-top-color: #0f172a;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .font-mono { font-family: var(--font-mono, SFMono-Regular, Menlo, Monaco, Consolas, monospace); }
+    .font-weight-bold { font-weight: 700; }
+    .text-sm { font-size: 0.78rem; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-muted { color: #94a3b8; }
+</style>
+
+@code {
+    private List<CustomerAccountDto>? _customersList;
+    private bool _isLoading = true;
+    private string _searchTerm = string.Empty;
+    private int? _selectedRankFilter = null;
+    private bool? _selectedStatusFilter = null;
+
+    // State Tự động xét duyệt hạng
+    private bool _isEvaluatingRanks = false;
+
+    // State Modal Tạo Mới
+    private bool _isCreateModalOpen = false;
+    private bool _isSubmittingCreate = false;
+    private string _createErrorMessage = string.Empty;
+    private CreateCustomerAccountDto _createForm = new();
+
+    // State Modal Sửa
+    private bool _isEditModalOpen = false;
+    private bool _isSubmittingEdit = false;
+    private string _editErrorMessage = string.Empty;
+    private CustomerAccountDto? _editingCustomer;
+    private UpdateCustomerAccountDto _editForm = new();
+
+    // State Modal Lịch Sử Đơn Hàng
+    private bool _isOrderHistoryModalOpen = false;
+    private bool _isLoadingOrders = false;
+    private CustomerAccountDto? _viewingCustomer;
+    private List<CustomerOrderHistoryItemDto>? _customerOrdersList;
+
+    private IEnumerable<CustomerAccountDto>? FilteredCustomers
+    {
+        get
+        {
+            if (_customersList == null) return null;
+            var list = _customersList.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant();
+                list = list.Where(c =>
+                    c.TenKhachHang.ToLowerInvariant().Contains(term) ||
+                    (c.DienThoai != null && c.DienThoai.Contains(term)) ||
+                    (c.Email != null && c.Email.ToLowerInvariant().Contains(term)) ||
+                    (c.TenDangNhap != null && c.TenDangNhap.ToLowerInvariant().Contains(term)) ||
+                    c.MaKhachHang.ToString().Contains(term));
+            }
+
+            if (_selectedRankFilter.HasValue)
+            {
+                list = list.Where(c => c.MaCapDo == _selectedRankFilter.Value);
+            }
+
+            if (_selectedStatusFilter.HasValue)
+            {
+                list = list.Where(c => c.DaXoa == _selectedStatusFilter.Value);
+            }
+
+            return list;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        _isLoading = true;
+        try
+        {
+            _customersList = await AdminApi.GetAllCustomersAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải danh sách khách hàng: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleEvaluateRanks()
+    {
+        _isEvaluatingRanks = true;
+        try
+        {
+            var res = await AdminApi.EvaluateMemberRanksAsync();
+            if (res.Success)
+            {
+                Toast.ShowSuccess(res.Message ?? "Tự động xét duyệt hạng thành viên VIP thành công!");
+                await LoadCustomers();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Xét duyệt hạng thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi thực thi xét duyệt: {ex.Message}");
+        }
+        finally
+        {
+            _isEvaluatingRanks = false;
+        }
+    }
+
+    private async Task HandleToggleStatus(CustomerAccountDto cus)
+    {
+        var actionText = cus.DaXoa ? "mở khóa" : "khóa";
+        try
+        {
+            var ok = await AdminApi.ToggleCustomerStatusAsync(cus.MaKhachHang);
+            if (ok)
+            {
+                cus.DaXoa = !cus.DaXoa;
+                Toast.ShowSuccess($"Đã {actionText} tài khoản khách hàng #{cus.MaKhachHang} ({cus.TenKhachHang}) thành công!");
+            }
+            else
+            {
+                Toast.ShowError($"Không thể {actionText} tài khoản khách hàng.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi cập nhật: {ex.Message}");
+        }
+    }
+
+    // =========================================================================
+    // MODAL TẠO MỚI
+    // =========================================================================
+    private void OpenCreateModal()
+    {
+        _createErrorMessage = string.Empty;
+        _createForm = new CreateCustomerAccountDto
+        {
+            MatKhau = "123456",
+            MaCapDo = 1,
+            DiemThuong = 0
+        };
+        _isCreateModalOpen = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        _isCreateModalOpen = false;
+        _createErrorMessage = string.Empty;
+    }
+
+    private async Task SubmitCreateCustomer()
+    {
+        _createErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_createForm.TenKhachHang))
+        {
+            _createErrorMessage = "Vui lòng nhập họ và tên khách hàng.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_createForm.DienThoai))
+        {
+            _createErrorMessage = "Vui lòng nhập số điện thoại khách hàng.";
+            return;
+        }
+
+        _isSubmittingCreate = true;
+        try
+        {
+            var res = await AdminApi.CreateCustomerAccountAsync(_createForm);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã tạo thành công tài khoản cho khách hàng: {_createForm.TenKhachHang}!");
+                CloseCreateModal();
+                await LoadCustomers();
+            }
+            else
+            {
+                _createErrorMessage = res.Message ?? "Tạo tài khoản thất bại.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _createErrorMessage = $"Lỗi xử lý: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingCreate = false;
+        }
+    }
+
+    // =========================================================================
+    // MODAL CHỈNH SỬA
+    // =========================================================================
+    private void OpenEditModal(CustomerAccountDto cus)
+    {
+        _editingCustomer = cus;
+        _editErrorMessage = string.Empty;
+        _editForm = new UpdateCustomerAccountDto
+        {
+            MaKhachHang = cus.MaKhachHang,
+            TenKhachHang = cus.TenKhachHang,
+            DienThoai = cus.DienThoai,
+            Email = cus.Email,
+            MaCapDo = cus.MaCapDo,
+            DiemThuong = cus.DiemThuong,
+            DaXoa = cus.DaXoa
+        };
+        _isEditModalOpen = true;
+    }
+
+    private void CloseEditModal()
+    {
+        _isEditModalOpen = false;
+        _editingCustomer = null;
+        _editErrorMessage = string.Empty;
+    }
+
+    private async Task SubmitEditCustomer()
+    {
+        _editErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_editForm.TenKhachHang))
+        {
+            _editErrorMessage = "Tên khách hàng không được để trống.";
+            return;
+        }
+
+        _isSubmittingEdit = true;
+        try
+        {
+            var res = await AdminApi.UpdateCustomerAccountAsync(_editForm);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Cập nhật thành công thông tin khách hàng #{_editForm.MaKhachHang}!");
+                CloseEditModal();
+                await LoadCustomers();
+            }
+            else
+            {
+                _editErrorMessage = res.Message ?? "Cập nhật thất bại.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _editErrorMessage = $"Lỗi xử lý: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingEdit = false;
+        }
+    }
+
+    // =========================================================================
+    // MODAL LỊCH SỬ ĐƠN HÀNG
+    // =========================================================================
+    private async Task OpenOrderHistoryModal(CustomerAccountDto cus)
+    {
+        _viewingCustomer = cus;
+        _isOrderHistoryModalOpen = true;
+        _isLoadingOrders = true;
+
+        try
+        {
+            _customerOrdersList = await AdminApi.GetCustomerOrdersForAdminAsync(cus.MaKhachHang);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải đơn hàng: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingOrders = false;
+        }
+    }
+
+    private void CloseOrderHistoryModal()
+    {
+        _isOrderHistoryModalOpen = false;
+        _viewingCustomer = null;
+        _customerOrdersList = null;
+    }
+
+    private static string GetRankCssClass(string? rank)
+    {
+        if (string.IsNullOrWhiteSpace(rank)) return "standard";
+        var r = rank.ToLowerInvariant();
+        if (r.Contains("vàng") || r.Contains("gold")) return "gold";
+        if (r.Contains("bạc") || r.Contains("silver")) return "silver";
+        return "standard";
+    }
+
+    private static string GetOrderStatusClass(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return "pending";
+        var s = status.ToLowerInvariant();
+        if (s.Contains("hoàn thành")) return "completed";
+        if (s.Contains("hủy")) return "cancelled";
+        return "pending";
+    }
+}

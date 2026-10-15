@@ -1,0 +1,109 @@
+@namespace Frontend.Components
+@using global::Shared.DTOs.Catalog
+
+@if (Product != null)
+{
+    <div class="yame-product-card @(IsOutOfStock ? "is-out-of-stock" : "")" @onclick="HandleCardClick">
+        <div class="product-img-wrapper">
+            @if (IsOutOfStock)
+            {
+                <span class="badge-out-of-stock">HẾT HÀNG</span>
+            }
+            else if (HasDiscount)
+            {
+                <span class="badge-sale">-@DiscountPercentage%</span>
+            }
+
+            <img class="product-img" 
+                 src="@(string.IsNullOrEmpty(Product.AnhDaiDien) ? "/images/no-image.svg" : Product.AnhDaiDien)" 
+                 alt="@Product.TenSanPham" 
+                 loading="lazy" 
+                 decoding="async" 
+                 onerror="this.onerror=null;this.src='/images/no-image.svg';" />
+
+            <div class="product-actions-overlay">
+                <button type="button" 
+                        class="btn-quick-add" 
+                        disabled="@IsOutOfStock" 
+                        @onclick="HandleQuickAdd" 
+                        @onclick:stopPropagation="true">
+                    @(IsOutOfStock ? "Hết hàng" : "Thêm vào giỏ")
+                </button>
+            </div>
+        </div>
+
+        <div class="product-info">
+            <div class="product-brand-cat">
+                @if (!string.IsNullOrEmpty(Product.TenThuongHieu))
+                {
+                    <span class="product-brand">@Product.TenThuongHieu</span>
+                }
+                @if (!string.IsNullOrEmpty(Product.TenDanhMuc))
+                {
+                    <span class="product-category"> • @Product.TenDanhMuc</span>
+                }
+            </div>
+
+            <h3 class="product-title" title="@Product.TenSanPham">
+                <a href="/product/@Product.MaSanPham" @onclick:stopPropagation="true">@Product.TenSanPham</a>
+            </h3>
+
+            @if (!string.IsNullOrEmpty(Product.ChatLieu))
+            {
+                <p class="product-material">@Product.ChatLieu</p>
+            }
+
+            <div class="product-price-box">
+                <span class="current-price">@Product.GiaThapNhat.ToString("N0") ₫</span>
+                @if (HasDiscount)
+                {
+                    <span class="original-price">@Product.GiaCaoNhat.ToString("N0") ₫</span>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public ProductListItemDto? Product { get; set; }
+    [Parameter] public EventCallback<ProductListItemDto> OnAddToCart { get; set; }
+    [Parameter] public EventCallback<int> OnSelectProduct { get; set; }
+
+    private bool IsOutOfStock => (Product?.TongTonKho ?? 0) <= 0;
+    private bool HasDiscount => Product != null && Product.GiaCaoNhat > Product.GiaThapNhat && Product.GiaCaoNhat > 0;
+    
+    private int DiscountPercentage
+    {
+        get
+        {
+            if (!HasDiscount || Product!.GiaCaoNhat <= 0) return 0;
+            var diff = Product.GiaCaoNhat - Product.GiaThapNhat;
+            return (int)Math.Round((diff / Product.GiaCaoNhat) * 100);
+        }
+    }
+
+    [Inject] private NavigationManager NavManager { get; set; } = default!;
+
+    private async Task HandleQuickAdd()
+    {
+        if (Product != null && !IsOutOfStock && OnAddToCart.HasDelegate)
+        {
+            await OnAddToCart.InvokeAsync(Product);
+        }
+    }
+
+    private async Task HandleCardClick()
+    {
+        if (Product != null)
+        {
+            if (OnSelectProduct.HasDelegate)
+            {
+                await OnSelectProduct.InvokeAsync(Product.MaSanPham);
+            }
+            else
+            {
+                NavManager.NavigateTo($"/product/{Product.MaSanPham}");
+            }
+        }
+    }
+}

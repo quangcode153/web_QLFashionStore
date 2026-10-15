@@ -1,0 +1,556 @@
+@page "/policies/{slug}"
+@page "/policies"
+@page "/policy/{slug}"
+@page "/policy"
+@page "/terms"
+@page "/chinh-sach-giao-hang"
+@page "/shipping"
+@page "/feedback"
+@page "/khieu-nai-gop-y"
+@namespace Frontend.Pages
+@inject NavigationManager Navigation
+@inject Frontend.Services.ICustomerApiClient CustomerApi
+@inject Frontend.Services.IToastService Toast
+
+<PageTitle>@CurrentPolicy.Title | QF Fashion</PageTitle>
+
+<div class="policy-page-container">
+    <div class="yame-container">
+        <!-- Breadcrumb chuẩn QF Minimalist -->
+        <nav class="policy-breadcrumb" aria-label="Đường dẫn">
+            <a href="/" class="bc-link">Trang chủ</a>
+            <span class="bc-sep">›</span>
+            <span class="bc-curr">@CurrentPolicy.Title</span>
+        </nav>
+
+        <!-- Quick Tabs chuyển đổi chính sách -->
+        <div class="policy-nav-tabs" role="tablist">
+            @foreach (var item in _policyList)
+            {
+                <a href="/policies/@item.Slug" class="policy-tab-item @(CurrentPolicy.Slug == item.Slug ? "active" : "")">
+                    @item.Title
+                </a>
+            }
+        </div>
+
+        <!-- Main Editorial Content Direct on Page (Hoàn toàn không viền khung hộp) -->
+        <article class="policy-article-wrapper">
+            <h1 class="policy-editorial-title">@CurrentPolicy.Title</h1>
+
+            <div class="policy-editorial-body">
+                @CurrentPolicy.Content
+            </div>
+
+            @if (CurrentPolicy.Slug == "khieu-nai-gop-y")
+            {
+                <div class="feedback-form-card">
+                    <div class="feedback-form-header">
+                        <h3 class="feedback-form-title">PHIẾU TIẾP NHẬN KHIẾU NẠI & GÓP Ý TRỰC TUYẾN</h3>
+                        <p class="feedback-form-desc">Mọi thông tin gửi qua biểu mẫu này sẽ được chuyển thẳng đến bộ phận Quản lý & Chăm sóc khách hàng của QF Fashion.</p>
+                    </div>
+
+                    @if (_isSubmittedSuccess)
+                    {
+                        <div class="feedback-success-banner">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            <div>
+                                <strong>Gửi thành công!</strong>
+                                <p>Cảm ơn bạn đã gửi ý kiến đóng góp. Chúng tôi sẽ xử lý và liên hệ phản hồi lại bạn sớm nhất.</p>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="feedback-form-grid">
+                        <div class="feedback-field">
+                            <label>Họ và tên (*):</label>
+                            <input type="text" class="form-control" placeholder="Họ và tên của bạn..." @bind="_fbHoTen" />
+                        </div>
+
+                        <div class="feedback-field">
+                            <label>Số điện thoại liên hệ (*):</label>
+                            <input type="tel" class="form-control" placeholder="Số điện thoại nhận hỗ trợ..." @bind="_fbDienThoai" />
+                        </div>
+
+                        <div class="feedback-field">
+                            <label>Địa chỉ Email (tùy chọn):</label>
+                            <input type="email" class="form-control" placeholder="Email nhận thông báo kết quả..." @bind="_fbEmail" />
+                        </div>
+
+                        <div class="feedback-field">
+                            <label>Phân loại ý kiến (*):</label>
+                            <select class="form-control select-fb-type" @bind="_fbLoaiPhanHoi">
+                                <option value="Góp ý sản phẩm">Góp ý sản phẩm</option>
+                                <option value="Khiếu nại dịch vụ">Khiếu nại dịch vụ / thái độ phục vụ</option>
+                                <option value="Hỗ trợ đơn hàng">Hỗ trợ giao vận / đơn hàng</option>
+                                <option value="Báo lỗi website">Báo lỗi kỹ thuật website</option>
+                                <option value="Khác">Ý kiến đóng góp khác</option>
+                            </select>
+                        </div>
+
+                        <div class="feedback-field full-width">
+                            <label>Tiêu đề góp ý / khiếu nại (*):</label>
+                            <input type="text" class="form-control" placeholder="Tóm tắt nội dung chính (VD: Đơn hàng #5001 bị giao chậm, Góp ý form áo...)" @bind="_fbTieuDe" />
+                        </div>
+
+                        <div class="feedback-field full-width">
+                            <label>Nội dung chi tiết (*):</label>
+                            <textarea class="form-control feedback-textarea" rows="4" placeholder="Mô tả cụ thể sự việc hoặc ý kiến của bạn để được hỗ trợ tốt nhất..." @bind="_fbNoiDung"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="feedback-actions">
+                        <button type="button" class="btn btn-submit-feedback" disabled="@_isSubmittingFeedback" @onclick="SubmitFeedbackForm">
+                            @if (_isSubmittingFeedback)
+                            {
+                                <span>ĐANG GỬI PHIẾU...</span>
+                            }
+                            else
+                            {
+                                <span>GỬI PHIẾU GÓP Ý & KHIẾU NẠI</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+        </article>
+    </div>
+</div>
+
+<style>
+    .policy-page-container {
+        padding: 2rem 0 5rem 0;
+        background-color: #FFFFFF;
+        min-height: 80vh;
+    }
+    .policy-breadcrumb {
+        font-size: 0.85rem;
+        color: #64748B;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .policy-breadcrumb .bc-link {
+        color: #64748B;
+        text-decoration: none;
+        transition: color 0.15s ease;
+    }
+    .policy-breadcrumb .bc-link:hover {
+        color: #0F172A;
+    }
+    .policy-breadcrumb .bc-sep {
+        color: #94A3B8;
+        font-size: 0.85rem;
+    }
+    .policy-breadcrumb .bc-curr {
+        color: #0F172A;
+        font-weight: 500;
+    }
+
+    /* Policy Navigation Pills */
+    .policy-nav-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid #E2E8F0;
+    }
+    .policy-tab-item {
+        padding: 0.5rem 1.15rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #475569;
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .policy-tab-item:hover {
+        color: #0F172A;
+        border-color: #CBD5E1;
+        background-color: #F1F5F9;
+    }
+    .policy-tab-item.active {
+        background-color: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
+    }
+
+    /* Editorial Content Area */
+    .policy-article-wrapper {
+        max-width: 900px;
+        margin: 0;
+    }
+    .policy-editorial-title {
+        font-family: var(--font-display);
+        font-size: 2.4rem;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: #0F172A;
+        margin-bottom: 2.25rem;
+        line-height: 1.25;
+    }
+    .policy-editorial-body {
+        font-size: 1rem;
+        line-height: 1.85;
+        color: #334155;
+    }
+    .policy-editorial-body p {
+        margin-bottom: 1.25rem;
+        color: #334155;
+    }
+    .policy-editorial-body h3 {
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #0F172A;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        margin-top: 2.25rem;
+        margin-bottom: 1rem;
+    }
+    .policy-editorial-body ul {
+        margin-left: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .policy-editorial-body li {
+        margin-bottom: 0.5rem;
+    }
+    .policy-editorial-body strong {
+        color: #0F172A;
+    }
+
+    /* Feedback Form Styling */
+    .feedback-form-card {
+        margin-top: 2.5rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 2rem;
+    }
+    .feedback-form-header {
+        margin-bottom: 1.5rem;
+    }
+    .feedback-form-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 0.5rem 0;
+        letter-spacing: -0.01em;
+    }
+    .feedback-form-desc {
+        font-size: 0.875rem;
+        color: #64748b;
+        margin: 0;
+    }
+    .feedback-success-banner {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+        padding: 1rem 1.25rem;
+        border-radius: 8px;
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+    .feedback-success-banner strong {
+        color: #047857;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .feedback-success-banner p {
+        margin: 0;
+    }
+    .feedback-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .feedback-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .feedback-field.full-width {
+        grid-column: span 2;
+    }
+    .feedback-field label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #334155;
+    }
+    .feedback-field .form-control {
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        background: #ffffff;
+        color: #0f172a;
+    }
+    .feedback-field .form-control:focus {
+        outline: none;
+        border-color: #0f172a;
+    }
+    .feedback-textarea {
+        resize: vertical;
+        font-family: inherit;
+    }
+    .feedback-actions {
+        margin-top: 1.25rem;
+        display: flex;
+        justify-content: flex-end;
+    }
+    .btn-submit-feedback {
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        padding: 11px 24px;
+        font-size: 0.875rem;
+        font-weight: 700;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .btn-submit-feedback:hover:not(:disabled) {
+        background: #1e293b;
+    }
+    .btn-submit-feedback:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    @@media (max-width: 640px) {
+        .feedback-form-grid {
+            grid-template-columns: 1fr;
+        }
+        .feedback-field.full-width {
+            grid-column: span 1;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public string? slug { get; set; }
+
+    private record PolicyItem(string Slug, string Title, RenderFragment Content);
+
+    private readonly List<PolicyItem> _policyList = new();
+
+    protected override void OnInitialized()
+    {
+        _policyList.Add(new("chinh-sach-giao-hang", "Chính sách giao hàng & Vận chuyển", @<div>
+            <p>QF Fashion cam kết mang lại trải nghiệm mua sắm tiện lợi và an tâm nhất với chính sách vận chuyển, giao nhận hàng minh bạch trên toàn quốc:</p>
+
+            <h3>1. BIỂU PHÍ VẬN CHUYỂN TOÀN QUỐC</h3>
+            <ul>
+                <li><strong>Miễn phí vận chuyển (FREESHIP 100%):</strong> Áp dụng cho mọi đơn hàng có giá trị thanh toán từ <strong>50.000 ₫</strong> trở lên trên phạm vi toàn quốc.</li>
+                <li><strong>Đơn hàng dưới 50.000 ₫:</strong> Áp dụng mức phí vận chuyển đồng giá tiêu chuẩn là <strong>25.000 ₫</strong> cho mỗi đơn hàng.</li>
+            </ul>
+
+            <h3>2. THỜI GIAN GIAO HÀNG TIÊU CHUẨN</h3>
+            <ul>
+                <li><strong>Nội thành TP. Hồ Chí Minh & Hà Nội:</strong> Nhận hàng trong vòng <strong>1 – 2 ngày làm việc</strong>. (Hỗ trợ ưu tiên giao nhanh cho thành viên VIP).</li>
+                <li><strong>Các tỉnh thành và khu vực khác:</strong> Nhận hàng trong vòng <strong>2 – 4 ngày làm việc</strong> tùy khu vực địa lý.</li>
+                <li>Mọi đơn hàng đặt trước 16:00 mỗi ngày sẽ được QF đóng gói và bàn giao ngay cho đơn vị vận chuyển uy tín (Giao Hàng Nhanh, Viettel Post, Shopee Xpress) ngay trong ngày.</li>
+            </ul>
+
+            <h3>3. QUY TRÌNH ĐỒNG KIỂM & TIÊU CHUẨN ĐÓNG GÓI CHUẨN QF</h3>
+            <ul>
+                <li><strong>Quyền đồng kiểm khi nhận hàng:</strong> Quý khách được phép mở hộp kiểm tra đúng mẫu mã, màu sắc, kích cỡ trước khi thanh toán hoặc ký nhận với nhân viên giao hàng.</li>
+                <li><strong>Tiêu chuẩn đóng gói 2 lớp bảo vệ:</strong> Mọi sản phẩm đều được bọc trong túi zip chống bụi nước và bảo quản trong hộp carton thời trang mang thương hiệu QF Noir cao cấp.</li>
+            </ul>
+
+            <h3>4. HỖ TRỢ ĐỔI TRẢ KHI NHẬN HÀNG</h3>
+            <ul>
+                <li>Nếu sản phẩm không vừa size hoặc không đúng với nhu cầu, quý khách có thể gửi trả ngay cho nhân viên giao hàng hoặc liên hệ CSKH theo hotline <strong>1900 8888</strong> để được hỗ trợ đổi size miễn phí tận nhà trong vòng <strong>14 ngày</strong>.</li>
+            </ul>
+        </div>));
+
+        _policyList.Add(new("chinh-sach-doi-tra", "Chính sách đổi trả 14 ngày", @<div>
+            <p>QF Fashion hỗ trợ quý khách đổi hàng linh hoạt trong vòng <strong>14 ngày</strong> kể từ khi nhận sản phẩm trên toàn bộ hệ thống cửa hàng:</p>
+            <h3>1. ĐIỀU KIỆN ÁP DỤNG</h3>
+            <ul>
+                <li>Sản phẩm còn nguyên tem mác, chưa qua giặt ủi và không bị dơ bẩn hoặc rách hỏng do tác động người dùng.</li>
+                <li>Áp dụng cho cả đơn mua trực tiếp tại quầy và đơn hàng đặt online.</li>
+                <li>Hỗ trợ đổi size, đổi màu hoặc đổi sang mẫu sản phẩm khác có giá trị tương đương hoặc lớn hơn.</li>
+            </ul>
+            <h3>2. QUY TRÌNH ĐỔI HÀNG</h3>
+            <ul>
+                <li><strong>Tại cửa hàng:</strong> Quý khách chỉ cần cung cấp số điện thoại đặt hàng cho nhân viên thu ngân tại bất kỳ chi nhánh QF nào trên toàn quốc.</li>
+                <li><strong>Qua đường bưu điện:</strong> Đóng gói sản phẩm và gửi về trung tâm xử lý đơn QF. Đội ngũ CSKH sẽ gửi sản phẩm mới đến tận nhà quý khách.</li>
+            </ul>
+        </div>));
+
+        _policyList.Add(new("chinh-sach-bao-hanh", "Chính sách bảo hành 365 ngày", @<div>
+            <p>Tất cả sản phẩm may mặc của QF Fashion được áp dụng chính sách <strong>Bảo Hành 365 Ngày</strong> trọn vẹn:</p>
+            <h3>1. CÁC HẠNG MỤC ĐƯỢC BẢO HÀNH MIỄN PHÍ</h3>
+            <ul>
+                <li>Bung chỉ, đứt chỉ đường may tại các vị trí chịu lực (đũng quần, nách áo, gấu áo).</li>
+                <li>Hư hỏng khóa kéo (dây kéo zip, cúc bấm, cúc cài).</li>
+                <li>Lỗi vải do nhà sản xuất (loang màu sau lần giặt đầu tiên theo đúng hướng dẫn giặt).</li>
+            </ul>
+            <h3>2. CAM KẾT THỜI GIAN BẢO HÀNH</h3>
+            <ul>
+                <li>Thời gian xử lý may sửa: từ 3 đến 7 ngày làm việc.</li>
+                <li>Không cần xuất trình hóa đơn giấy, hệ thống tự động lưu trữ thông tin bảo hành theo số điện thoại của bạn.</li>
+            </ul>
+        </div>));
+
+        _policyList.Add(new("chinh-sach-thanh-vien-vip", "Chính sách Thành viên VIP", @<div>
+            <p>Chương trình Khách hàng thân thiết VIP QF mang lại những đặc quyền mua sắm vượt trội:</p>
+            <h3>1. QUY CHẾ XÉT HẠNG</h3>
+            <ul>
+                <li>Hạng thẻ được cập nhật tức thì ngay sau mỗi hóa đơn mua sắm thành công.</li>
+                <li>Điểm ví tích lũy có giá trị sử dụng trừ trực tiếp vào tiền mặt cho các lần mua hàng tiếp theo.</li>
+                <li>Hạng thẻ VIP không bị hạ bậc trong suốt năm dương lịch.</li>
+            </ul>
+            <h3>2. MỨC CHIẾT KHẤU THEO THỨ HẠNG</h3>
+            <ul>
+                <li><strong>Thành viên:</strong> Tích điểm 1% trên mỗi đơn hàng.</li>
+                <li><strong>Hạng Bạc (Silver):</strong> Giảm 5% mọi đơn hàng, tích 2% điểm ví.</li>
+                <li><strong>Hạng Vàng (Gold):</strong> Giảm 10% mọi đơn hàng, tích 3% điểm ví.</li>
+                <li><strong>Hạng Kim Cương (Diamond):</strong> Giảm 15% trọn đời, tích 5% điểm ví.</li>
+            </ul>
+        </div>));
+
+        _policyList.Add(new("chinh-sach-bao-mat", "Chính sách bảo mật thông tin", @<div>
+            <p>QF Fashion cam kết bảo vệ thông tin cá nhân và quyền riêng tư của quý khách hàng tuyệt đối:</p>
+            <h3>1. THU THẬP THÔNG TIN</h3>
+            <ul>
+                <li>Thông tin thu thập bao gồm: Họ tên, Số điện thoại, Địa chỉ nhận hàng và Lịch sử đơn hàng nhằm mục đích giao vận và chăm sóc khách hàng.</li>
+            </ul>
+            <h3>2. CAM KẾT BẢO MẬT</h3>
+            <ul>
+                <li>Tuyệt đối không chia sẻ, bán hoặc chuyển giao dữ liệu khách hàng cho bất kỳ bên thứ ba nào vì mục đích thương mại.</li>
+                <li>Toàn bộ thông tin tài khoản và mật khẩu được mã hóa chuẩn PBKDF2 với secret salt.</li>
+            </ul>
+        </div>));
+
+        _policyList.Add(new("dieu-khoan-dich-vu", "Điều khoản dịch vụ", @<div>
+            <p>Chào mừng Quý khách đến với website thương mại điện tử QF Fashion. Khi truy cập và sử dụng dịch vụ trên website, Quý khách được xem là đã đọc, hiểu và đồng ý tuân thủ toàn bộ các điều khoản dịch vụ dưới đây.</p>
+
+            <h3>THÔNG TIN ĐƠN VỊ CHỦ QUẢN</h3>
+            <p>Tên đơn vị: HỆ THỐNG THỜI TRANG QF FASHION</p>
+            <p>Mã số doanh nghiệp: 0310874914 – Đăng ký lần đầu: 24/05/2011</p>
+            <p>Địa chỉ: 766/3b-3c Sư Vạn Hạnh, Phường Hòa Hưng, Thành Phố Hồ Chí Minh</p>
+            <p>Điện thoại: (028) 3868 4857 – Mua hàng: 1900 8888 – Email: cskh@qffashion.vn</p>
+
+            <h3>1. ĐIỀU KIỆN SỬ DỤNG DỊCH VỤ</h3>
+            <p>Khi sử dụng dịch vụ tại QF Fashion, quý khách cần đảm bảo có đầy đủ năng lực hành vi dân sự theo quy định pháp luật Việt Nam. Nghiêm cấm mọi hành vi can thiệp trái phép vào hệ thống.</p>
+
+            <h3>2. QUYỀN VÀ TRÁCH NHIỆM CỦA KHÁCH HÀNG</h3>
+            <p>Khách hàng có trách nhiệm cung cấp thông tin liên hệ, số điện thoại và địa chỉ nhận hàng chính xác khi đặt hàng. Khách hàng có quyền yêu cầu đổi hàng hoặc bảo hành theo đúng quy định cam kết.</p>
+
+            <h3>3. ĐIỀU KHOẢN VỀ GIÁ VÀ THANH TOÁN</h3>
+            <p>Toàn bộ giá niêm yết trên website đã bao gồm thuế Giá Trị Gia Tăng (VAT). Khách hàng có thể lựa chọn thanh toán bằng hình thức Tiền mặt khi nhận hàng (COD), Chuyển khoản QR ngân hàng hoặc thanh toán tại quầy thu ngân của toàn hệ thống chi nhánh.</p>
+        </div>));
+
+        _policyList.Add(new("khieu-nai-gop-y", "Khiếu nại & Góp ý", @<div>
+            <p>QF Fashion luôn coi trọng từng phản ánh và góp ý của khách hàng nhằm nâng cao chất lượng sản phẩm và phong cách phục vụ chuỗi:</p>
+            <h3>1. CAM KẾT TIẾP NHẬN & GIẢI QUYẾT</h3>
+            <ul>
+                <li>Mọi ý kiến gửi qua hệ thống được ghi nhận lập tức vào CSDL quản trị và kích hoạt thông báo tới quản lý CSKH.</li>
+                <li>Thời gian phản hồi ban đầu: Trong vòng <strong>2 đến 4 giờ làm việc</strong>.</li>
+                <li>Thời gian giải quyết dứt điểm sự cố: Tối đa <strong>24 đến 48 giờ</strong>.</li>
+            </ul>
+            <h3>2. CÁC HÌNH THỨC LIÊN HỆ TRỰC TIẾP</h3>
+            <ul>
+                <li>Đường dây nóng khiếu nại dịch vụ: <strong>1900 8888</strong> (Nhánh 2).</li>
+                <li>Hộp thư điện tử tiếp nhận: <strong>cskh@qffashion.vn</strong>.</li>
+                <li>Quý khách vui lòng điền trực tiếp thông tin vào biểu mẫu tiếp nhận bên dưới để được xử lý nhanh nhất.</li>
+            </ul>
+        </div>));
+    }
+
+    private PolicyItem CurrentPolicy
+    {
+        get
+        {
+            var targetSlug = slug;
+            if (string.IsNullOrWhiteSpace(targetSlug))
+            {
+                var uri = Navigation.Uri.ToLowerInvariant();
+                if (uri.Contains("chinh-sach-giao-hang") || uri.Contains("shipping") || uri.Contains("freeship") || uri.Contains("giao-hang"))
+                {
+                    targetSlug = "chinh-sach-giao-hang";
+                }
+                else if (uri.EndsWith("/terms") || uri.Contains("dieu-khoan"))
+                {
+                    targetSlug = "dieu-khoan-dich-vu";
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(targetSlug))
+            {
+                return _policyList.First();
+            }
+
+            return _policyList.FirstOrDefault(p => 
+                p.Slug.Equals(targetSlug, StringComparison.OrdinalIgnoreCase) ||
+                (targetSlug.Contains("giao-hang") && p.Slug == "chinh-sach-giao-hang") ||
+                (targetSlug.Contains("freeship") && p.Slug == "chinh-sach-giao-hang") ||
+                (targetSlug.Contains("van-chuyen") && p.Slug == "chinh-sach-giao-hang") ||
+                ((targetSlug.Contains("khieu-nai") || targetSlug.Contains("gop-y") || targetSlug.Contains("feedback")) && p.Slug == "khieu-nai-gop-y")
+            ) ?? _policyList.First();
+        }
+    }
+
+    private string _fbHoTen = string.Empty;
+    private string _fbDienThoai = string.Empty;
+    private string? _fbEmail;
+    private string _fbLoaiPhanHoi = "Góp ý sản phẩm";
+    private string _fbTieuDe = string.Empty;
+    private string _fbNoiDung = string.Empty;
+    private bool _isSubmittingFeedback = false;
+    private bool _isSubmittedSuccess = false;
+
+    private async Task SubmitFeedbackForm()
+    {
+        if (string.IsNullOrWhiteSpace(_fbHoTen) || string.IsNullOrWhiteSpace(_fbDienThoai) || string.IsNullOrWhiteSpace(_fbTieuDe) || string.IsNullOrWhiteSpace(_fbNoiDung))
+        {
+            Toast.ShowWarning("Vui lòng điền đầy đủ họ tên, số điện thoại, tiêu đề và nội dung.");
+            return;
+        }
+
+        _isSubmittingFeedback = true;
+        try
+        {
+            var req = new global::Shared.DTOs.Feedback.CreateFeedbackRequestDto
+            {
+                HoTen = _fbHoTen.Trim(),
+                DienThoai = _fbDienThoai.Trim(),
+                Email = string.IsNullOrWhiteSpace(_fbEmail) ? null : _fbEmail.Trim(),
+                LoaiPhanHoi = _fbLoaiPhanHoi,
+                TieuDe = _fbTieuDe.Trim(),
+                NoiDung = _fbNoiDung.Trim()
+            };
+
+            var res = await CustomerApi.SubmitFeedbackAsync(req);
+            if (res.Success)
+            {
+                Toast.ShowSuccess(res.Message ?? "Đã gửi phiếu thành công!");
+                _isSubmittedSuccess = true;
+                _fbHoTen = string.Empty;
+                _fbDienThoai = string.Empty;
+                _fbEmail = null;
+                _fbTieuDe = string.Empty;
+                _fbNoiDung = string.Empty;
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Gửi phiếu thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi gửi phiếu: {ex.Message}");
+        }
+        finally
+        {
+            _isSubmittingFeedback = false;
+        }
+    }
+}

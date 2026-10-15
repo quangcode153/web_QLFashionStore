@@ -1,0 +1,949 @@
+@inherits LayoutComponentBase
+@namespace Frontend.Layout
+@inject NavigationManager Navigation
+@inject Frontend.Services.IAuthStateService AuthStateService
+@inject ISignalRNotificationService SignalRService
+@inject IJSRuntime JS
+
+<div class="admin-layout">
+    <!-- Sidebar Tối Giản Cao Cấp -->
+    <aside class="admin-sidebar">
+        <div class="admin-brand">
+            <a href="@GetBrandHomeUrl()" class="brand-link">
+                <div class="brand-logo-frame">
+                    <img src="images/logo.png" alt="QF Noir" class="brand-logo-img" />
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">QF NOIR</span>
+                    <span class="brand-sub">Quản Trị Hệ Thống</span>
+                </div>
+            </a>
+        </div>
+
+        <!-- Role Context Banner nhỏ trên sidebar -->
+        <div class="sidebar-role-indicator">
+            <div class="role-icon-box @(_currentRoleClass)">
+                @if (_currentRoleType == RoleType.ChainAdmin)
+                {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                }
+                else if (_currentRoleType == RoleType.BranchManager)
+                {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="2" width="18" height="20" rx="2"></rect><line x1="9" y1="6" x2="9" y2="6.01"></line><line x1="15" y1="6" x2="15" y2="6.01"></line><line x1="9" y1="12" x2="9" y2="12.01"></line><line x1="15" y1="12" x2="15" y2="12.01"></line></svg>
+                }
+                else if (_currentRoleType == RoleType.WarehouseKeeper)
+                {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                }
+                else
+                {
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                }
+            </div>
+            <div class="role-indicator-text">
+                <span class="role-indicator-title">@_roleShortTitle</span>
+                <span class="role-indicator-sub">@_scopeSubtitle</span>
+            </div>
+        </div>
+
+        <nav class="admin-nav">
+            @if (_currentRoleType == RoleType.ChainAdmin)
+            {
+                <!-- Nhóm: Báo Cáo & Tổng Quan (Chỉ Quản lý chuỗi) -->
+                <div class="nav-group-label">BÁO CÁO & PHÂN TÍCH</div>
+                <NavLink class="nav-item" href="/admin/dashboard" Match="NavLinkMatch.All">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"></rect>
+                        <rect x="14" y="3" width="7" height="5"></rect>
+                        <rect x="14" y="12" width="7" height="9"></rect>
+                        <rect x="3" y="16" width="7" height="5"></rect>
+                    </svg>
+                    <span>Tổng quan & Báo cáo</span>
+                </NavLink>
+
+                <!-- Nhóm: Vận Hành Chuỗi & Chi Nhánh -->
+                <div class="nav-group-label">VẬN HÀNH & KHO</div>
+                <NavLink class="nav-item" href="/admin/orders">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Quản lý Đơn hàng</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/staff/order-support">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    <span>Điều phối & Đổi trả</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/warehouse">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Kho & Cảnh báo tồn</span>
+                </NavLink>
+
+                <!-- Nhóm: Danh Mục & Cấu Hình Chuỗi -->
+                <div class="nav-group-label">HỆ THỐNG & NHẬT KÝ</div>
+                <NavLink class="nav-item" href="/admin/products">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-7z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    <span>Sản phẩm & Biến thể</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/banners">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <span>Banner & Chiến dịch</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/accounts">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Tài khoản & Phân quyền</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/audit-logs">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Nhật ký & Sửa đổi</span>
+                </NavLink>
+
+                <!-- Nhóm: CSKH & Truyền Thông -->
+                <div class="nav-group-label">CSKH & TRUYỀN THÔNG</div>
+                <NavLink class="nav-item" href="/admin/customers">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Khách hàng & VIP</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/feedback">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        <line x1="9" y1="10" x2="15" y2="10"></line>
+                        <line x1="12" y1="7" x2="12" y2="7.01"></line>
+                    </svg>
+                    <span>Khiếu nại & Góp ý</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/announcements">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Thông báo nội bộ</span>
+                </NavLink>
+            }
+            else if (_currentRoleType == RoleType.BranchManager)
+            {
+                <!-- Nhóm: Vận Hành Chi Nhánh (Cửa hàng trưởng) -->
+                <div class="nav-group-label">VẬN HÀNH CHI NHÁNH</div>
+                <NavLink class="nav-item" href="/admin/orders">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Quản lý Đơn hàng</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/warehouse">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Kho & Cảnh báo tồn</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/accounts">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Tài khoản nhân viên</span>
+                </NavLink>
+
+                <div class="nav-group-label">DỮ LIỆU & KIỂM SOÁT</div>
+                <NavLink class="nav-item" href="/admin/products">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-7z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    <span>Sản phẩm & Biến thể</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/audit-logs">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Nhật ký & Sửa đổi</span>
+                </NavLink>
+
+                <div class="nav-group-label">CSKH & TRUYỀN THÔNG</div>
+                <NavLink class="nav-item" href="/admin/customers">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Khách hàng & VIP</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/feedback">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        <line x1="9" y1="10" x2="15" y2="10"></line>
+                        <line x1="12" y1="7" x2="12" y2="7.01"></line>
+                    </svg>
+                    <span>Khiếu nại & Góp ý</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/announcements">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Thông báo nội bộ</span>
+                </NavLink>
+            }
+            else if (_currentRoleType == RoleType.WarehouseKeeper)
+            {
+                <!-- Nhóm: Nghiệp Vụ Thủ Kho Chuyên Trách -->
+                <div class="nav-group-label">ĐIỀU HÀNH KHO</div>
+                <NavLink class="nav-item" href="/warehouse" Match="NavLinkMatch.All">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Kho & Nhập hàng</span>
+                </NavLink>
+
+                <div class="nav-group-label">TRUYỀN THÔNG NỘI BỘ</div>
+                <NavLink class="nav-item" href="/admin/announcements">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Thông báo nội bộ</span>
+                </NavLink>
+            }
+            else if (_currentRoleType == RoleType.OrderCoordinator)
+            {
+                <!-- Nhóm: Điều Phối Giao Vận & Đổi Trả -->
+                <div class="nav-group-label">ĐIỀU PHỐI ĐƠN HÀNG</div>
+                <NavLink class="nav-item" href="/staff/order-support" Match="NavLinkMatch.All">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    <span>Trung tâm điều phối</span>
+                </NavLink>
+
+                <NavLink class="nav-item" href="/admin/orders">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Danh sách tất cả đơn</span>
+                </NavLink>
+
+                <div class="nav-group-label">TRUYỀN THÔNG NỘI BỘ</div>
+                <NavLink class="nav-item" href="/admin/announcements">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span>Thông báo nội bộ</span>
+                </NavLink>
+            }
+        </nav>
+
+        <div class="sidebar-footer">
+            @if (_currentRoleType != RoleType.WarehouseKeeper)
+            {
+                <a href="/pos" class="footer-link pos-shortcut-link" title="Mở máy tính tiền POS">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <span>Mở quầy POS bán lẻ</span>
+                    <span class="pos-status-dot" title="Máy POS sẵn sàng"></span>
+                </a>
+            }
+            <a href="/" class="footer-link" target="_blank" title="Xem giao diện khách hàng ngoài trang chủ">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>Cửa hàng Storefront</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div class="topbar-left">
+                <!-- Role Badge Phân Biệt Cực Kỳ Tinh Tế -->
+                <div class="role-badge-container">
+                    <span class="role-badge @_currentRoleBadgeClass">
+                        @if (_currentRoleType == RoleType.ChainAdmin)
+                        {
+                            <span class="badge-role-symbol">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                            </span>
+                            <span>QUẢN LÝ CHUỖI TOÀN HỆ THỐNG</span>
+                        }
+                        else if (_currentRoleType == RoleType.BranchManager)
+                        {
+                            <span class="badge-role-symbol">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                            </span>
+                            <span>QUẢN LÝ CHI NHÁNH (QF Q10)</span>
+                        }
+                        else if (_currentRoleType == RoleType.WarehouseKeeper)
+                        {
+                            <span class="badge-role-symbol">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                            </span>
+                            <span>THỦ KHO QUẢN LÝ TỒN & NHẬP HÀNG</span>
+                        }
+                        else if (_currentRoleType == RoleType.OrderCoordinator)
+                        {
+                            <span class="badge-role-symbol">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                            </span>
+                            <span>ĐIỀU PHỐI ĐƠN HÀNG (ORDER COORDINATOR)</span>
+                        }
+                        else
+                        {
+                            <span class="badge-role-symbol">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                            </span>
+                            <span>NHÂN VIÊN (POS)</span>
+                        }
+                    </span>
+                    <span class="branch-scope-tag">@_branchScopeText</span>
+                </div>
+            </div>
+
+            <div class="topbar-right">
+                <RealtimeNotificationBell />
+                <div class="topbar-divider"></div>
+                
+                <div class="admin-profile">
+                    <div class="avatar-squircle">@_avatarLetters</div>
+                    <div class="profile-meta">
+                        <span class="profile-name">@_profileName</span>
+                        <span class="profile-role">@_profileSub</span>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-admin-logout" @onclick="HandleLogout" title="Đăng xuất khỏi hệ thống">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Thoát</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="admin-body">
+            @Body
+        </main>
+    </div>
+</div>
+
+<style>
+    .admin-layout {
+        display: flex;
+        min-height: 100vh;
+        background: #f8fafc;
+        font-family: var(--font-family);
+    }
+
+    /* SIDEBAR: THAN ĐẬM SANG TRỌNG, BỚT AI */
+    .admin-sidebar {
+        width: 250px;
+        background: #090d16;
+        color: #f1f5f9;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .admin-brand {
+        padding: 18px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .brand-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .brand-logo-frame {
+        width: 34px;
+        height: 34px;
+        border-radius: 6px;
+        background: #ffffff;
+        padding: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .brand-logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .brand-text .brand-title {
+        display: block;
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 1.05rem;
+        letter-spacing: 0.06em;
+        color: #ffffff;
+    }
+
+    .brand-text .brand-sub {
+        display: block;
+        font-size: 0.72rem;
+        color: #64748b;
+        letter-spacing: 0.02em;
+    }
+
+    /* ROLE INDICATOR TRÊN SIDEBAR */
+    .sidebar-role-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        margin: 12px 12px 4px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 6px;
+    }
+
+    .role-icon-box {
+        width: 28px;
+        height: 28px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .role-icon-box.chain-admin {
+        background: #eab308;
+        color: #000000;
+    }
+
+    .role-icon-box.branch-manager {
+        background: #0284c7;
+        color: #ffffff;
+    }
+
+    .role-icon-box.warehouse-keeper {
+        background: #f59e0b;
+        color: #ffffff;
+    }
+
+    .role-icon-box.cashier-staff {
+        background: #10b981;
+        color: #ffffff;
+    }
+
+    .role-indicator-text {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .role-indicator-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #f8fafc;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+
+    .role-indicator-sub {
+        font-size: 0.68rem;
+        color: #94a3b8;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+    }
+
+    /* NAVIGATION */
+    .admin-nav {
+        flex: 1;
+        padding: 10px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        overflow-y: auto;
+    }
+
+    .nav-group-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #475569;
+        letter-spacing: 0.06em;
+        padding: 12px 10px 4px 10px;
+        text-transform: uppercase;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 5px;
+        color: #94a3b8;
+        text-decoration: none;
+        font-size: 0.84rem;
+        font-weight: 500;
+        transition: all 0.15s ease;
+    }
+
+    .nav-item svg {
+        flex-shrink: 0;
+        opacity: 0.8;
+    }
+
+    .nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #f1f5f9;
+    }
+
+    .nav-item:hover svg {
+        opacity: 1;
+    }
+
+    .nav-item.active {
+        background: rgba(255, 255, 255, 0.09);
+        color: #ffffff;
+        font-weight: 600;
+    }
+
+    .nav-item.active svg {
+        color: #eab308;
+        opacity: 1;
+    }
+
+    .sidebar-footer {
+        padding: 14px 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .footer-link {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: #64748b;
+        text-decoration: none;
+        font-size: 0.78rem;
+        padding: 6px 10px;
+        border-radius: 4px;
+        transition: all 0.15s ease;
+    }
+
+    .footer-link:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: #cbd5e1;
+    }
+
+    .pos-shortcut-link {
+        color: #38bdf8;
+        font-weight: 600;
+        background: rgba(56, 189, 248, 0.06);
+    }
+
+    .pos-shortcut-link:hover {
+        background: rgba(56, 189, 248, 0.12);
+        color: #7dd3fc;
+    }
+
+    .pos-status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        margin-left: auto;
+    }
+
+    /* TOPBAR */
+    .admin-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .admin-topbar {
+        height: 60px;
+        min-height: 60px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .role-badge-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .role-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+
+    .role-badge.chain-badge {
+        background: #fef9c3;
+        color: #854d0e;
+        border: 1px solid #fef08a;
+    }
+
+    .role-badge.branch-badge {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+
+    .role-badge.warehouse-badge {
+        background: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+
+    .role-badge.staff-badge {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    .badge-role-symbol {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .badge-role-symbol svg {
+        display: block;
+    }
+
+    .branch-scope-tag {
+        font-size: 0.72rem;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 3px 8px;
+        border-radius: 4px;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .topbar-divider {
+        width: 1px;
+        height: 20px;
+        background-color: #e2e8f0;
+    }
+
+    .admin-profile {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* SQUIRCLE AVATAR: BỚT HÌNH TRÒN GENERIC AI */
+    .avatar-squircle {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .profile-meta .profile-name {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .profile-meta .profile-role {
+        display: block;
+        font-size: 0.7rem;
+        color: #64748b;
+        margin-top: 1px;
+        line-height: 1.2;
+    }
+
+    .btn-admin-logout {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #ffffff;
+        color: #64748b;
+        border: 1px solid #cbd5e1;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        height: 30px;
+    }
+
+    .btn-admin-logout:hover {
+        background: #fee2e2;
+        color: #dc2626;
+        border-color: #fca5a5;
+    }
+
+    .admin-body {
+        flex: 1;
+        padding: 22px 24px;
+        overflow-y: auto;
+    }
+</style>
+
+@code {
+    private enum RoleType
+    {
+        ChainAdmin,        // 1. Quản lý chuỗi (Admin)
+        BranchManager,     // 2. Quản lý chi nhánh
+        WarehouseKeeper,   // 3. Thủ kho
+        CashierStaff,      // 4. Nhân viên bán hàng
+        OrderCoordinator   // 5. Điều phối viên đơn hàng & đổi trả
+    }
+
+    private RoleType _currentRoleType = RoleType.ChainAdmin;
+
+    private string _currentRoleClass => _currentRoleType switch
+    {
+        RoleType.ChainAdmin => "chain-admin",
+        RoleType.BranchManager => "branch-manager",
+        RoleType.WarehouseKeeper => "warehouse-keeper",
+        RoleType.OrderCoordinator => "coordinator-staff",
+        _ => "cashier-staff"
+    };
+
+    private string _currentRoleBadgeClass => _currentRoleType switch
+    {
+        RoleType.ChainAdmin => "chain-badge",
+        RoleType.BranchManager => "branch-badge",
+        RoleType.WarehouseKeeper => "warehouse-badge",
+        RoleType.OrderCoordinator => "coordinator-badge",
+        _ => "staff-badge"
+    };
+
+    private string _roleShortTitle => _currentRoleType switch
+    {
+        RoleType.ChainAdmin => "Quản Lý Chuỗi",
+        RoleType.BranchManager => "QL Chi Nhánh Q10",
+        RoleType.WarehouseKeeper => "Thủ Kho",
+        RoleType.OrderCoordinator => "Điều Phối Viên",
+        _ => "Nhân viên"
+    };
+
+    private string _scopeSubtitle => _currentRoleType switch
+    {
+        RoleType.ChainAdmin => "Toàn bộ 9 chi nhánh",
+        RoleType.BranchManager => "Cửa hàng trưởng",
+        RoleType.WarehouseKeeper => "Quản lý tồn & Nhập kho",
+        RoleType.OrderCoordinator => "Điều phối bưu tá & Đổi trả",
+        _ => "Ca trực tại quầy POS"
+    };
+
+    private string _branchScopeText => _currentRoleType switch
+    {
+        RoleType.ChainAdmin => "Phạm vi: Toàn chuỗi (9 chi nhánh)",
+        RoleType.BranchManager => "Phạm vi: Cơ sở QF Quận 10",
+        RoleType.WarehouseKeeper => "Phạm vi: Kho hàng & Cảnh báo tồn",
+        RoleType.OrderCoordinator => "Phạm vi: Đơn trực tuyến & Đổi trả bưu phẩm",
+        _ => "Điểm bán: Quầy Thu Ngân 01"
+    };
+
+    private string _avatarLetters = "AD";
+    private string _profileName = "Nguyễn Văn An (Admin)";
+    private string _profileSub = "Toàn quyền hệ thống QF";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SignalRService.StartAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                var staff = await JS.InvokeAsync<string?>("localStorage.getItem", "staffName");
+
+                if (!string.IsNullOrEmpty(role))
+                {
+                    var displayName = !string.IsNullOrWhiteSpace(staff) ? staff : "Quản trị viên";
+                    var initials = displayName.Length >= 2 ? displayName.Substring(0, 2).ToUpper() : "QF";
+
+                    if (role.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("kho", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _currentRoleType = RoleType.WarehouseKeeper;
+                        _avatarLetters = "TK";
+                        _profileName = displayName;
+                        _profileSub = "Thủ kho hệ thống QF";
+                    }
+                    else if (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _currentRoleType = RoleType.BranchManager;
+                        _avatarLetters = "QL";
+                        _profileName = displayName;
+                        _profileSub = "Cửa hàng trưởng chi nhánh QF";
+                    }
+                    else if (role.Contains("Order Coordinator", StringComparison.OrdinalIgnoreCase) ||
+                             role.Contains("Điều phối", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _currentRoleType = RoleType.OrderCoordinator;
+                        _avatarLetters = "DP";
+                        _profileName = displayName;
+                        _profileSub = "Điều phối viên giao vận & đổi trả";
+                    }
+                    else if (role.Contains("ThuNgan", StringComparison.OrdinalIgnoreCase) || 
+                             role.Contains("Thu ngân", StringComparison.OrdinalIgnoreCase) ||
+                             role.Contains("Nhân viên", StringComparison.OrdinalIgnoreCase) ||
+                             role.Contains("bán hàng", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _currentRoleType = RoleType.CashierStaff;
+                        _avatarLetters = "NV";
+                        _profileName = displayName;
+                        _profileSub = "Nhân viên làm việc tại quầy POS";
+                    }
+                    else
+                    {
+                        _currentRoleType = RoleType.ChainAdmin;
+                        _avatarLetters = initials;
+                        _profileName = displayName;
+                        _profileSub = "Quản lý chuỗi toàn hệ thống QF";
+                    }
+                }
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private string GetBrandHomeUrl() => _currentRoleType switch
+    {
+        RoleType.WarehouseKeeper => "/warehouse",
+        RoleType.CashierStaff => "/pos",
+        _ => "/admin/dashboard"
+    };
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await AuthStateService.ClearAuthAsync();
+        }
+        catch { }
+        Navigation.NavigateTo("/login");
+    }
+}

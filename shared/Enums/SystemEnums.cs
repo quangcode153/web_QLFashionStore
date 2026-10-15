@@ -5,12 +5,14 @@ public enum UserRole
     AdminChuoi,
     QuanLyChiNhanh,
     NhanVienBanHang,
-    KhachHang
+    KhachHang,
+    OrderCoordinator
 }
 
 public enum OrderStatus
 {
     ChoXuLy,
+    DangGiaoHang,
     DaHoanThanh,
     DaHuy
 }
@@ -22,6 +24,13 @@ public static class OrderStatusHelper
         { "ChoXuLy", "Chờ xử lý" },
         { "Chờ xử lý", "Chờ xử lý" },
         { "Cho_Xu_Ly", "Chờ xử lý" },
+        { "DangGiaoHang", "Đang giao hàng" },
+        { "Đang giao hàng", "Đang giao hàng" },
+        { "Dang_Giao_Hang", "Đang giao hàng" },
+        { "DangGiao", "Đang giao hàng" },
+        { "Đang giao", "Đang giao hàng" },
+        { "Shipping", "Đang giao hàng" },
+        { "Delivering", "Đang giao hàng" },
         { "DaHoanThanh", "Đã hoàn thành" },
         { "Đã hoàn thành", "Đã hoàn thành" },
         { "Da_Hoan_Thanh", "Đã hoàn thành" },
@@ -38,10 +47,17 @@ public static class OrderStatusHelper
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
-        return ValidStatusMap.TryGetValue(input.Trim(), out normalizedDbStatus!);
+        if (ValidStatusMap.TryGetValue(input.Trim(), out var matched))
+        {
+            normalizedDbStatus = matched;
+            return true;
+        }
+
+        normalizedDbStatus = string.Empty;
+        return false;
     }
 
-    public static string GetAllowedStatusString() => "Chờ xử lý (ChoXuLy), Đã hoàn thành (DaHoanThanh), Đã hủy (DaHuy)";
+    public static string GetAllowedStatusString() => "Chờ xử lý (ChoXuLy), Đang giao hàng (DangGiaoHang), Đã hoàn thành (DaHoanThanh), Đã hủy (DaHuy)";
 }
 
 public enum InventoryChangeReason
@@ -49,5 +65,6 @@ public enum InventoryChangeReason
     BAN_HANG,
     NHAP_HANG,
     TRA_HANG,
+    TRA_HANG_LOI,
     DIEU_CHINH
 }

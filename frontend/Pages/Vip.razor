@@ -1,0 +1,317 @@
+@page "/vip"
+@namespace Frontend.Pages
+@inject NavigationManager Navigation
+
+<PageTitle>Đặc quyền thành viên VIP | QF Fashion</PageTitle>
+
+<div class="vip-page-container">
+    <div class="yame-container">
+        <!-- Breadcrumb -->
+        <nav class="vip-breadcrumb" aria-label="Đường dẫn">
+            <a href="/" class="bc-link">Trang chủ</a>
+            <span class="bc-sep">/</span>
+            <span class="bc-curr">Đặc quyền VIP 2026</span>
+        </nav>
+
+        <!-- Header -->
+        <div class="vip-header">
+            <span class="vip-badge-pill">CHƯƠNG TRÌNH KHÁCH HÀNG THÂN THIẾT</span>
+            <h1 class="vip-title">ĐẶC QUYỀN HỘI VIÊN VIP QF</h1>
+            <p class="vip-subtitle">Mỗi đơn hàng đều được tích lũy điểm ví và nâng hạng chiết khấu trọn đời không giới hạn</p>
+        </div>
+
+        <!-- 4 VIP Cards Grid -->
+        <div class="vip-tiers-grid">
+            <!-- Member -->
+            <div class="tier-card member-tier">
+                <div class="tier-header">
+                    <span class="tier-level">HẠNG KHỞI ĐẦU</span>
+                    <h3 class="tier-name">MEMBER</h3>
+                    <div class="tier-threshold">Chi tiêu: 0 ₫</div>
+                </div>
+                <div class="tier-benefits">
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Tích lũy <strong>1% điểm ví</strong> trên mỗi hóa đơn</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Miễn phí giao hàng cho đơn từ 50.000 ₫</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Đổi hàng miễn phí trong 14 ngày</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Silver -->
+            <div class="tier-card silver-tier">
+                <div class="tier-header">
+                    <span class="tier-level">HẠNG BẠC</span>
+                    <h3 class="tier-name">SILVER</h3>
+                    <div class="tier-threshold">Tích lũy: Từ 2.000.000 ₫</div>
+                </div>
+                <div class="tier-benefits">
+                    <div class="benefit-row highlight">
+                        <span class="check-icon">✓</span>
+                        <span>Giảm trực tiếp <strong>5%</strong> trên mọi đơn hàng</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Tích lũy <strong>2% điểm ví</strong></span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Voucher sinh nhật <strong>50.000 ₫</strong></span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Bảo hành may vá 365 ngày miễn phí</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gold -->
+            <div class="tier-card gold-tier popular">
+                <div class="popular-ribbon">PHỔ BIẾN NHẤT</div>
+                <div class="tier-header">
+                    <span class="tier-level">HẠNG VÀNG</span>
+                    <h3 class="tier-name">GOLD</h3>
+                    <div class="tier-threshold">Tích lũy: Từ 5.000.000 ₫</div>
+                </div>
+                <div class="tier-benefits">
+                    <div class="benefit-row highlight">
+                        <span class="check-icon">✓</span>
+                        <span>Giảm trực tiếp <strong>10%</strong> trên mọi đơn hàng</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Tích lũy <strong>3% điểm ví</strong> (Hệ số 1.5x)</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Voucher sinh nhật <strong>100.000 ₫</strong></span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Ưu tiên giao hàng hỏa tốc trong 2 giờ</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diamond -->
+            <div class="tier-card diamond-tier">
+                <div class="tier-header">
+                    <span class="tier-level">HẠNG KIM CƯƠNG</span>
+                    <h3 class="tier-name">DIAMOND</h3>
+                    <div class="tier-threshold">Tích lũy: Từ 10.000.000 ₫</div>
+                </div>
+                <div class="tier-benefits">
+                    <div class="benefit-row highlight">
+                        <span class="check-icon">✓</span>
+                        <span>Giảm trực tiếp <strong>15%</strong> trọn đời</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Tích lũy <strong>5% điểm ví</strong> (Hệ số 2.0x)</span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Quà sinh nhật cao cấp trị giá <strong>200.000 ₫</strong></span>
+                    </div>
+                    <div class="benefit-row">
+                        <span class="check-icon">✓</span>
+                        <span>Trải nghiệm BST mới trước 3 ngày mở bán</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call to Actions -->
+        <div class="vip-action-section">
+            <h3 class="action-heading">KIỂM TRA HẠNG THẺ HIỆN TẠI CỦA BẠN</h3>
+            <p class="action-desc">Đăng nhập tài khoản để xem điểm thưởng, ưu đãi cá nhân và mã QR tích điểm tại quầy.</p>
+            <div class="action-btn-row">
+                <a href="/profile" class="btn-check-vip">XEM HỒ SƠ VIP CỦA TÔI</a>
+                <a href="/catalog" class="btn-shop-now">MUA SẮM TÍCH ĐIỂM NGAY</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .vip-page-container {
+        padding: 2rem 0 5rem 0;
+        background-color: #FFFFFF;
+        min-height: 80vh;
+    }
+    .vip-breadcrumb {
+        margin-bottom: 2rem;
+        font-size: 0.85rem;
+        color: #64748B;
+    }
+    .vip-header {
+        margin-bottom: 3.5rem;
+    }
+    .vip-badge-pill {
+        display: inline-block;
+        background: #000000;
+        color: #FFFFFF;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        margin-bottom: 0.75rem;
+    }
+    .vip-title {
+        font-family: var(--font-display);
+        font-size: 2.2rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0F172A;
+        margin-bottom: 0.5rem;
+    }
+    .vip-subtitle {
+        font-size: 0.95rem;
+        color: #64748B;
+        max-width: 600px;
+    }
+    .vip-tiers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3.5rem;
+    }
+    .tier-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 4px;
+        padding: 2rem 1.5rem;
+        box-shadow: none;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        transition: border-color 0.2s ease;
+    }
+    .tier-card:hover {
+        border-color: #000000;
+    }
+    .tier-card.popular {
+        border-color: #000000;
+        border-width: 2px;
+    }
+    .popular-ribbon {
+        position: absolute;
+        top: -12px;
+        right: 16px;
+        background: #000000;
+        color: #FFFFFF;
+        font-size: 0.68rem;
+        font-weight: 800;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+    }
+    .tier-header {
+        border-bottom: 1px solid #F1F5F9;
+        padding-bottom: 1.25rem;
+        margin-bottom: 1.25rem;
+        text-align: center;
+    }
+    .tier-level {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #64748B;
+        letter-spacing: 0.05em;
+    }
+    .tier-name {
+        font-family: var(--font-display);
+        font-size: 1.6rem;
+        font-weight: 900;
+        color: #0F172A;
+        margin: 0.25rem 0;
+    }
+    .tier-threshold {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #E11D48;
+    }
+    .tier-benefits {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .benefit-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-start;
+        font-size: 0.85rem;
+        color: #475569;
+        line-height: 1.4;
+    }
+    .benefit-row.highlight {
+        color: #0F172A;
+        font-weight: 600;
+    }
+    .check-icon {
+        color: #10B981;
+        font-weight: 800;
+    }
+    .vip-action-section {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    .action-heading {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 0.5rem;
+    }
+    .action-desc {
+        font-size: 0.88rem;
+        color: #64748B;
+        margin-bottom: 1.5rem;
+    }
+    .action-btn-row {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .btn-check-vip {
+        background: #000000;
+        color: #FFFFFF !important;
+        padding: 0.75rem 1.75rem;
+        border-radius: 4px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+    }
+    .btn-check-vip:hover {
+        background: #27272A;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+    .btn-shop-now {
+        background: transparent;
+        color: #0F172A !important;
+        border: 1px solid #000000;
+        padding: 0.75rem 1.75rem;
+        border-radius: 4px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none !important;
+        transition: all 0.2s ease;
+    }
+    .btn-shop-now:hover {
+        background: #F1F5F9;
+    }
+</style>

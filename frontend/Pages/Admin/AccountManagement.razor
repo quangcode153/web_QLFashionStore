@@ -1,0 +1,1123 @@
+@page "/admin/accounts"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject IJSRuntime JS
+
+<PageTitle>Quản lý tài khoản & Phân quyền | QF Store Admin</PageTitle>
+
+<div class="accounts-page-container">
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">QUẢN LÝ TÀI KHOẢN & PHÂN QUYỀN HỆ THỐNG</h2>
+            <p class="page-subtitle">
+                @if (_isMultiBranchAdmin)
+                {
+                    <span>Admin chuỗi: Toàn quyền cấp tài khoản Quản lý chi nhánh và Nhân viên cho các cơ sở</span>
+                }
+                else
+                {
+                    <span>Quản lý chi nhánh: Cấp và quản lý tài khoản Nhân viên của chi nhánh phụ trách</span>
+                }
+            </p>
+        </div>
+        <div class="header-actions">
+            <a href="/admin/customers" class="btn-nav-customers" title="Chuyển sang Quản lý tài khoản khách hàng">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <span>Tài khoản khách hàng & VIP &rarr;</span>
+            </a>
+            <button class="btn-primary-action" @onclick="OpenCreateModal" title="Thêm tài khoản mới" aria-label="Thêm tài khoản mới">
+                <span class="plus-char">+</span>
+                <span>@(_isMultiBranchAdmin ? "Cấp tài khoản mới" : "Thêm nhân viên chi nhánh")</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Bảng danh sách tài khoản -->
+    <div class="card">
+        <div class="card-header-row">
+            <span class="table-count">Tổng số: <strong>@FilteredAccounts.Count</strong> tài khoản</span>
+            <div class="filter-tabs">
+                <button class="tab-btn @(_selectedRoleFilter == null ? "active" : "")" @onclick="() => FilterRole(null)">
+                    Tất cả
+                </button>
+                @if (_isMultiBranchAdmin)
+                {
+                    <button class="tab-btn @(_selectedRoleFilter == RoleConstants.QuanLyChiNhanh ? "active" : "")" 
+                            @onclick="() => FilterRole(RoleConstants.QuanLyChiNhanh)">
+                        Quản lý chi nhánh
+                    </button>
+                }
+                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.ThuKho ? "active" : "")" 
+                        @onclick="() => FilterRole(RoleConstants.ThuKho)">
+                    Thủ kho
+                </button>
+                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.NhanVien ? "active" : "")" 
+                        @onclick="() => FilterRole(RoleConstants.NhanVien)">
+                    Nhân viên & Thu ngân
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Mã TK</th>
+                        <th>Tên đăng nhập</th>
+                        <th>Họ tên nhân viên</th>
+                        <th>Chi nhánh / Cơ sở</th>
+                        <th>Vai trò hệ thống</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_isLoading)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4">Đang tải dữ liệu...</td>
+                        </tr>
+                    }
+                    else if (FilteredAccounts.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">Không tìm thấy tài khoản nào phù hợp bộ lọc.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var acc in FilteredAccounts)
+                        {
+                            <tr>
+                                <td><strong>#TK-@acc.MaTaiKhoan</strong></td>
+                                <td><span class="username-pill">@acc.TenDangNhap</span></td>
+                                <td><strong>@acc.TenNhanVien</strong></td>
+                                <td>
+                                    <span class="branch-pill @(acc.IsOnlineWarehouse ? "branch-online" : "")">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
+                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                            <circle cx="12" cy="10" r="3"></circle>
+                                        </svg>
+                                        @(acc.IsOnlineWarehouse ? "Kho Tổng Online QF Tân Bình" : (string.IsNullOrEmpty(acc.ChiNhanh) ? (acc.TenChiNhanh ?? "Toàn hệ thống") : acc.ChiNhanh))
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="role-tag @GetRoleCss(acc.VaiTro)">
+                                        @if (acc.VaiTro == RoleConstants.ThuKho)
+                                        {
+                                            @(acc.IsOnlineWarehouse || acc.LoaiThuKho == "ONLINE" ? "Thủ kho Online (Kho Tổng)" : "Thủ kho Chi nhánh")
+                                        }
+                                        else
+                                        {
+                                            @acc.VaiTro
+                                        }
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="status-badge @(acc.DangHoatDong ? "status-active" : "status-locked")">
+                                        @(acc.DangHoatDong ? "Đang hoạt động" : "Đã khóa")
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    @if ((acc.VaiTro == RoleConstants.AdminChuoi || acc.VaiTro == RoleConstants.QuanLyHeThong) && !_isMultiBranchAdmin)
+                                    {
+                                        <span class="text-muted text-sm">Không thể sửa</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-action-toggle @(acc.DangHoatDong ? "btn-lock" : "btn-unlock")"
+                                                @onclick="() => HandleToggleStatus(acc.MaTaiKhoan)"
+                                                title="@(acc.DangHoatDong ? "Khóa tài khoản này" : "Mở khóa tài khoản này")">
+                                            @(acc.DangHoatDong ? "Khóa" : "Kích hoạt")
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Thêm Tài Khoản Mới -->
+@if (_showCreateModal)
+{
+    <div class="modal-overlay" @onclick="CloseCreateModal">
+        <div class="modal-card" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>Thêm tài khoản nhân sự mới</h3>
+                <button type="button" class="btn-close" @onclick="CloseCreateModal" title="Đóng">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            
+            <EditForm Model="@_createModel" OnValidSubmit="HandleCreateAccount">
+                @if (!string.IsNullOrEmpty(_modalError))
+                {
+                    <div class="modal-alert-error">
+                        @_modalError
+                    </div>
+                }
+
+                <div class="modal-body">
+                    <!-- Chọn Vai trò -->
+                    <div class="form-group">
+                        <label class="form-label">Vai trò tài khoản <span class="required">*</span></label>
+                        <select class="form-control" @bind="_createModel.VaiTro" @bind:after="OnRoleChanged" required>
+                            @if (_isMultiBranchAdmin)
+                            {
+                                <option value="@RoleConstants.QuanLyChiNhanh">Quản lý chi nhánh</option>
+                                <option value="@RoleConstants.ThuKho">Thủ kho</option>
+                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng</option>
+                                <option value="@RoleConstants.ThuNgan">Thu ngân</option>
+                            }
+                            else
+                            {
+                                <option value="@RoleConstants.ThuKho">Thủ kho chi nhánh</option>
+                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng</option>
+                                <option value="@RoleConstants.ThuNgan">Thu ngân</option>
+                            }
+                        </select>
+                        <small class="form-hint">
+                            @if (_isMultiBranchAdmin)
+                            {
+                                <span>Admin Chuỗi có toàn quyền phân công nhân sự tại bất kỳ chi nhánh hoặc kho tổng nào.</span>
+                            }
+                            else
+                            {
+                                <span>Quản lý chi nhánh chỉ được phép cấp tài khoản nhân sự cho cơ sở của mình.</span>
+                            }
+                        </small>
+                    </div>
+
+                    <!-- Phân loại Thủ kho (Online vs Chi nhánh) -->
+                    @if (_createModel.VaiTro == RoleConstants.ThuKho)
+                    {
+                        <div class="form-group highlight-box">
+                            <label class="form-label">Phân loại thủ kho <span class="required">*</span></label>
+                            @if (_isMultiBranchAdmin)
+                            {
+                                <div class="radio-group-container">
+                                    <label class="radio-option">
+                                        <input type="radio" name="loaiThuKho" value="ONLINE" 
+                                               checked="@(_createModel.LoaiThuKho == "ONLINE")" 
+                                               @onchange='() => SelectWarehouseKeeperType("ONLINE")' />
+                                        <div class="radio-text">
+                                            <strong>Thủ kho Online (Kho Tổng QF)</strong>
+                                            <span>Quản lý xuất nhập hàng cho kênh mua sắm trực tuyến website</span>
+                                        </div>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="loaiThuKho" value="CHI_NHANH" 
+                                               checked="@(_createModel.LoaiThuKho == "CHI_NHANH")" 
+                                               @onchange='() => SelectWarehouseKeeperType("CHI_NHANH")' />
+                                        <div class="radio-text">
+                                            <strong>Thủ kho Chi nhánh</strong>
+                                            <span>Quản lý kho hàng tại cửa hàng/chi nhánh bán lẻ cụ thể</span>
+                                        </div>
+                                    </label>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="static-branch-notice">
+                                    <span class="badge-branch-scoped">Thủ kho chi nhánh cơ sở</span>
+                                    <p>Tài khoản này sẽ phụ trách kho hàng của chi nhánh <strong>@(_userBranchName ?? _createModel.ChiNhanh)</strong>.</p>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <!-- Lựa chọn Chi nhánh -->
+                    <div class="form-group">
+                        <label class="form-label">
+                            @if (_createModel.VaiTro == RoleConstants.QuanLyChiNhanh)
+                            {
+                                <span>Chi nhánh phân công quản lý <span class="required">*</span></span>
+                            }
+                            else if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                            {
+                                <span>Kho hàng phụ trách</span>
+                            }
+                            else
+                            {
+                                <span>Chi nhánh làm việc <span class="required">*</span></span>
+                            }
+                        </label>
+
+                        @if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                        {
+                            <input type="text" class="form-control" value="Kho Tổng QF Tân Bình (TP.HCM) - Kho Online" readonly disabled />
+                        }
+                        else if (_isMultiBranchAdmin)
+                        {
+                            <select class="form-control" @bind="_createModel.MaChiNhanh" @bind:after="OnBranchSelected" required>
+                                @foreach (var branch in GetSelectableBranches())
+                                {
+                                    <option value="@branch.MaChiNhanh">@branch.TenChiNhanh</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <input type="text" class="form-control" value="@(_userBranchName ?? _createModel.ChiNhanh)" readonly disabled />
+                        }
+                        
+                        <small class="form-hint">
+                            @if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                            {
+                                <span>Kho trung tâm phục vụ xử lý và vận chuyển đơn đặt hàng trên Web.</span>
+                            }
+                            else if (_isMultiBranchAdmin)
+                            {
+                                <span>Chọn chi nhánh cụ thể mà nhân sự sẽ công tác và chịu trách nhiệm.</span>
+                            }
+                            else
+                            {
+                                <span>Nhân sự được khóa cố định vào chi nhánh hiện tại của bạn.</span>
+                            }
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tên nhân viên <span class="required">*</span></label>
+                        <input type="text" class="form-control" placeholder="Họ và tên nhân sự (vd: Hoàng Thị Mai)" @bind="_createModel.TenNhanVien" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Số điện thoại</label>
+                        <input type="tel" class="form-control" placeholder="Số điện thoại liên hệ (vd: 0904445555)" @bind="_createModel.DienThoai" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tên đăng nhập <span class="required">*</span></label>
+                        <input type="text" class="form-control" placeholder="Tên đăng nhập (vd: thukho_q10, cashier_hn)" @bind="_createModel.TenDangNhap" required />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Mật khẩu khởi tạo <span class="required">*</span></label>
+                        <input type="password" class="form-control" placeholder="Tối thiểu 6 ký tự" @bind="_createModel.MatKhau" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" @onclick="CloseCreateModal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                        @(_isSubmitting ? "Đang xử lý..." : "Xác nhận tạo tài khoản")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<style>
+    .accounts-page-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .page-title {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .page-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 4px 0 0 0;
+    }
+
+    .btn-primary-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: #0f172a;
+        color: #ffffff;
+        border: 1px solid #0f172a;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-primary-action:hover {
+        background: #1e293b;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2);
+    }
+
+    .btn-primary-action:active {
+        transform: translateY(0);
+        scale: 0.98;
+    }
+
+    .plus-char {
+        font-size: 1.4rem;
+        font-weight: 300;
+        line-height: 1;
+        margin-top: -2px;
+    }
+
+    .btn-nav-customers {
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #334155;
+        transition: all 0.15s ease;
+    }
+
+    .btn-nav-customers:hover {
+        background: #f8fafc;
+        border-color: #0f172a;
+        color: #0f172a;
+    }
+
+    .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .table-count {
+        font-size: 0.9rem;
+        color: #475569;
+    }
+
+    .filter-tabs {
+        display: flex;
+        gap: 8px;
+    }
+
+    .tab-btn {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .tab-btn.active, .tab-btn:hover {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 600;
+        color: #475569;
+        text-align: left;
+    }
+
+    .admin-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .username-pill {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: var(--font-mono, monospace);
+    }
+
+    .branch-pill {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.8rem;
+        color: #334155;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .branch-pill.branch-online {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #1e40af;
+        font-weight: 600;
+    }
+
+    .role-tag {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .role-admin { background: #fee2e2; color: #b91c1c; }
+    .role-manager { background: #fef3c7; color: #b45309; }
+    .role-staff { background: #dbeafe; color: #1d4ed8; }
+    .role-warehouse { background: #f3e8ff; color: #7e22ce; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-active { background: #dcfce7; color: #15803d; }
+    .status-locked { background: #fee2e2; color: #b91c1c; }
+
+    .btn-action-toggle {
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-lock { background: #fee2e2; color: #dc2626; }
+    .btn-lock:hover { background: #fca5a5; }
+
+    .btn-unlock { background: #dcfce7; color: #16a34a; }
+    .btn-unlock:hover { background: #bbf7d0; }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15, 23, 42, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-card {
+        background: #ffffff;
+        width: 100%;
+        max-width: 540px;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .btn-close {
+        background: transparent;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.15s ease;
+    }
+
+    .btn-close:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .modal-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        max-height: 75vh;
+        overflow-y: auto;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 20px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .modal-alert-error {
+        margin: 14px 20px 0 20px;
+        padding: 10px;
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        border-radius: 4px;
+        color: #b91c1c;
+        font-size: 0.85rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .highlight-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px;
+    }
+
+    .radio-group-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 6px;
+    }
+
+    .radio-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        transition: all 0.15s ease;
+    }
+
+    .radio-option:hover {
+        border-color: #94a3b8;
+    }
+
+    .radio-option input[type="radio"] {
+        margin-top: 3px;
+    }
+
+    .radio-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .radio-text strong {
+        font-size: 0.85rem;
+        color: #0f172a;
+    }
+
+    .radio-text span {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .static-branch-notice {
+        padding: 6px 0;
+    }
+
+    .badge-branch-scoped {
+        display: inline-block;
+        padding: 3px 8px;
+        background: #e0e7ff;
+        color: #3730a3;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 4px;
+        margin-bottom: 4px;
+    }
+
+    .static-branch-notice p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: #475569;
+    }
+
+    .form-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .required { color: #dc2626; }
+
+    .form-hint {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-top: 2px;
+        line-height: 1.35;
+    }
+
+    .form-control {
+        width: 100%;
+        height: 38px;
+        padding: 6px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+
+    .form-control:disabled, .form-control[readonly] {
+        background-color: #f1f5f9;
+        cursor: not-allowed;
+        color: #475569;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary { background: #0f172a; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #1e293b; }
+
+    .btn-outline { background: white; border: 1px solid #cbd5e1; color: #0f172a; }
+    .btn-outline:hover { background: #f8fafc; }
+</style>
+
+@code {
+    private List<AccountSummaryDto> _accounts = new();
+    private List<BranchDto> _branches = new();
+    private string? _selectedRoleFilter = null;
+    private bool _isLoading = true;
+    private bool _isMultiBranchAdmin = true;
+    private bool _showCreateModal = false;
+    private bool _isSubmitting = false;
+    private string? _modalError = null;
+
+    private int? _userBranchId = null;
+    private string? _userBranchName = null;
+
+    private readonly List<BranchDto> _defaultFallbackBranches = new()
+    {
+        new BranchDto { MaChiNhanh = 1, TenChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)", DiaChi = "Sư Vạn Hạnh, Q.10, TP.HCM" },
+        new BranchDto { MaChiNhanh = 2, TenChiNhanh = "QF Quang Trung (Q. Gò Vấp, TP.HCM)", DiaChi = "Quang Trung, Q. Gò Vấp, TP.HCM" },
+        new BranchDto { MaChiNhanh = 3, TenChiNhanh = "QF Lê Văn Sỹ (Q. Phú Nhuận, TP.HCM)", DiaChi = "Lê Văn Sỹ, Q. Phú Nhuận, TP.HCM" },
+        new BranchDto { MaChiNhanh = 4, TenChiNhanh = "QF Cầu Giấy (Q. Cầu Giấy, Hà Nội)", DiaChi = "Cầu Giấy, Q. Cầu Giấy, Hà Nội" },
+        new BranchDto { MaChiNhanh = 5, TenChiNhanh = "QF Chùa Bộc (Q. Đống Đa, Hà Nội)", DiaChi = "Chùa Bộc, Q. Đống Đa, Hà Nội" },
+        new BranchDto { MaChiNhanh = 6, TenChiNhanh = "QF Lê Duẩn (Q. Thanh Khê, Đà Nẵng)", DiaChi = "Lê Duẩn, Q. Thanh Khê, Đà Nẵng" },
+        new BranchDto { MaChiNhanh = 7, TenChiNhanh = "QF Ninh Kiều (Q. Ninh Kiều, Cần Thơ)", DiaChi = "Ninh Kiều, Q. Ninh Kiều, Cần Thơ" },
+        new BranchDto { MaChiNhanh = 8, TenChiNhanh = "QF Ba Mươi Tháng Tư (TP. Biên Hòa, Đồng Nai)", DiaChi = "30/4, TP. Biên Hòa, Đồng Nai" },
+        new BranchDto { MaChiNhanh = 9, TenChiNhanh = "Kho Tổng QF Tân Bình (TP.HCM)", DiaChi = "Tân Bình, TP.HCM", IsOnlineWarehouse = true }
+    };
+
+    private CreateStaffAccountDto _createModel = new() 
+    { 
+        VaiTro = RoleConstants.QuanLyChiNhanh,
+        LoaiThuKho = "CHI_NHANH",
+        MaChiNhanh = 1,
+        ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)"
+    };
+
+    private List<AccountSummaryDto> FilteredAccounts => string.IsNullOrEmpty(_selectedRoleFilter)
+        ? _accounts
+        : _selectedRoleFilter == RoleConstants.ThuKho
+            ? _accounts.Where(x => x.VaiTro == RoleConstants.ThuKho).ToList()
+            : (_selectedRoleFilter == RoleConstants.NhanVien || _selectedRoleFilter == RoleConstants.NhanVienBanHang)
+                ? _accounts.Where(x => RoleConstants.IsGeneralStaff(x.VaiTro) && x.VaiTro != RoleConstants.ThuKho).ToList()
+                : _accounts.Where(x => x.VaiTro == _selectedRoleFilter).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserRole();
+        await LoadBranches();
+        await LoadAccounts();
+    }
+
+    private async Task LoadUserRole()
+    {
+        try
+        {
+            var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            if (string.IsNullOrEmpty(role))
+            {
+                _isMultiBranchAdmin = true;
+            }
+            else if (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) && !role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase))
+            {
+                _isMultiBranchAdmin = false;
+            }
+            else
+            {
+                _isMultiBranchAdmin = true;
+            }
+
+            var bIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+            if (int.TryParse(bIdStr, out var bId))
+            {
+                _userBranchId = bId;
+            }
+            _userBranchName = await JS.InvokeAsync<string?>("localStorage.getItem", "branchName");
+        }
+        catch
+        {
+            _isMultiBranchAdmin = true;
+        }
+    }
+
+    private async Task LoadBranches()
+    {
+        try
+        {
+            var apiBranches = await AdminApi.GetBranchesAsync();
+            if (apiBranches != null && apiBranches.Any())
+            {
+                _branches = apiBranches;
+                return;
+            }
+        }
+        catch { }
+
+        _branches = _defaultFallbackBranches;
+    }
+
+    private async Task LoadAccounts()
+    {
+        _isLoading = true;
+        try
+        {
+            var list = await AdminApi.GetAccountsAsync();
+            if (list != null && list.Any())
+            {
+                _accounts = list;
+            }
+            else
+            {
+                _accounts = GetDefaultDemoAccounts();
+            }
+        }
+        catch (Exception)
+        {
+            _accounts = GetDefaultDemoAccounts();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private List<BranchDto> GetSelectableBranches()
+    {
+        return _branches.Where(b => !b.IsOnlineWarehouse).ToList();
+    }
+
+    private List<AccountSummaryDto> GetDefaultDemoAccounts()
+    {
+        return new List<AccountSummaryDto>
+        {
+            new AccountSummaryDto
+            {
+                MaTaiKhoan = 1,
+                TenDangNhap = "admin",
+                MaNhanVien = 1,
+                TenNhanVien = "Nguyễn Văn An",
+                DienThoai = "0901111111",
+                VaiTro = RoleConstants.AdminChuoi,
+                ChiNhanh = "Toàn hệ thống (Hội sở)",
+                DangHoatDong = true
+            },
+            new AccountSummaryDto
+            {
+                MaTaiKhoan = 2,
+                TenDangNhap = "manager_q10",
+                MaNhanVien = 2,
+                TenNhanVien = "Hoàng Thị Mai",
+                DienThoai = "0904445555",
+                VaiTro = RoleConstants.QuanLyChiNhanh,
+                MaChiNhanh = 1,
+                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
+                DangHoatDong = true
+            },
+            new AccountSummaryDto
+            {
+                MaTaiKhoan = 3,
+                TenDangNhap = "thukho_online",
+                MaNhanVien = 3,
+                TenNhanVien = "Phạm Đình Kho",
+                DienThoai = "0907778888",
+                VaiTro = RoleConstants.ThuKho,
+                LoaiThuKho = "ONLINE",
+                MaChiNhanh = 9,
+                ChiNhanh = "Kho Tổng QF Tân Bình (TP.HCM)",
+                IsOnlineWarehouse = true,
+                DangHoatDong = true
+            },
+            new AccountSummaryDto
+            {
+                MaTaiKhoan = 4,
+                TenDangNhap = "thukho_q10",
+                MaNhanVien = 4,
+                TenNhanVien = "Lê Văn Lưu",
+                DienThoai = "0906663333",
+                VaiTro = RoleConstants.ThuKho,
+                LoaiThuKho = "CHI_NHANH",
+                MaChiNhanh = 1,
+                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
+                IsOnlineWarehouse = false,
+                DangHoatDong = true
+            },
+            new AccountSummaryDto
+            {
+                MaTaiKhoan = 5,
+                TenDangNhap = "cashier01",
+                MaNhanVien = 5,
+                TenNhanVien = "Trần Thị Bích",
+                DienThoai = "0902222222",
+                VaiTro = RoleConstants.NhanVien,
+                MaChiNhanh = 1,
+                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
+                DangHoatDong = true
+            }
+        };
+    }
+
+    private void FilterRole(string? role)
+    {
+        _selectedRoleFilter = role;
+    }
+
+    private void OpenCreateModal()
+    {
+        var defaultBranch = _branches.FirstOrDefault(b => !b.IsOnlineWarehouse) ?? _branches.FirstOrDefault();
+        var defaultBranchId = defaultBranch?.MaChiNhanh ?? 1;
+        var defaultBranchName = defaultBranch?.TenChiNhanh ?? "QF Sư Vạn Hạnh (Q.10, TP.HCM)";
+
+        if (!_isMultiBranchAdmin && _userBranchId.HasValue)
+        {
+            defaultBranchId = _userBranchId.Value;
+            defaultBranchName = _userBranchName ?? defaultBranchName;
+        }
+
+        _createModel = new CreateStaffAccountDto
+        {
+            VaiTro = _isMultiBranchAdmin ? RoleConstants.QuanLyChiNhanh : RoleConstants.NhanVien,
+            LoaiThuKho = "CHI_NHANH",
+            MaChiNhanh = defaultBranchId,
+            ChiNhanh = defaultBranchName
+        };
+        _modalError = null;
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateModal()
+    {
+        _showCreateModal = false;
+    }
+
+    private void OnRoleChanged()
+    {
+        if (_createModel.VaiTro == RoleConstants.ThuKho)
+        {
+            if (_isMultiBranchAdmin)
+            {
+                SelectWarehouseKeeperType(_createModel.LoaiThuKho ?? "ONLINE");
+            }
+            else
+            {
+                SelectWarehouseKeeperType("CHI_NHANH");
+            }
+        }
+        else
+        {
+            if (!_isMultiBranchAdmin && _userBranchId.HasValue)
+            {
+                _createModel.MaChiNhanh = _userBranchId.Value;
+                _createModel.ChiNhanh = _userBranchName ?? "Chi nhánh hiện tại";
+            }
+            else
+            {
+                var branch = _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh) 
+                          ?? _branches.FirstOrDefault(b => !b.IsOnlineWarehouse);
+                if (branch != null)
+                {
+                    _createModel.MaChiNhanh = branch.MaChiNhanh;
+                    _createModel.ChiNhanh = branch.TenChiNhanh;
+                }
+            }
+        }
+    }
+
+    private void SelectWarehouseKeeperType(string loai)
+    {
+        _createModel.LoaiThuKho = loai;
+        if (loai == "ONLINE")
+        {
+            var onlineBranch = _branches.FirstOrDefault(b => b.IsOnlineWarehouse);
+            _createModel.MaChiNhanh = onlineBranch?.MaChiNhanh ?? 9;
+            _createModel.ChiNhanh = onlineBranch?.TenChiNhanh ?? "Kho Tổng QF Tân Bình (TP.HCM)";
+        }
+        else
+        {
+            if (!_isMultiBranchAdmin && _userBranchId.HasValue)
+            {
+                _createModel.MaChiNhanh = _userBranchId.Value;
+                _createModel.ChiNhanh = _userBranchName ?? "Chi nhánh hiện tại";
+            }
+            else
+            {
+                var retail = _branches.FirstOrDefault(b => !b.IsOnlineWarehouse);
+                if (retail != null)
+                {
+                    _createModel.MaChiNhanh = retail.MaChiNhanh;
+                    _createModel.ChiNhanh = retail.TenChiNhanh;
+                }
+            }
+        }
+    }
+
+    private void OnBranchSelected()
+    {
+        var branch = _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh);
+        if (branch != null)
+        {
+            _createModel.ChiNhanh = branch.TenChiNhanh;
+        }
+    }
+
+    private async Task HandleCreateAccount()
+    {
+        _isSubmitting = true;
+        _modalError = null;
+
+        if (string.IsNullOrWhiteSpace(_createModel.ChiNhanh) && _createModel.MaChiNhanh.HasValue)
+        {
+            var branch = _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh);
+            _createModel.ChiNhanh = branch?.TenChiNhanh;
+        }
+
+        try
+        {
+            var res = await AdminApi.CreateStaffAccountAsync(_createModel);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã tạo tài khoản [{_createModel.VaiTro}] {_createModel.TenDangNhap} thành công!");
+                CloseCreateModal();
+                await LoadAccounts();
+                return;
+            }
+            else
+            {
+                _modalError = res.Message;
+                _isSubmitting = false;
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            _modalError = ex.Message;
+        }
+
+        // Mô phỏng tạo tài khoản thành công ngay trên frontend (chế độ demo/offline)
+        var isOnline = _createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE";
+        var newAcc = new AccountSummaryDto
+        {
+            MaTaiKhoan = _accounts.Count > 0 ? _accounts.Max(a => a.MaTaiKhoan) + 1 : 1,
+            TenDangNhap = _createModel.TenDangNhap,
+            TenNhanVien = _createModel.TenNhanVien,
+            DienThoai = _createModel.DienThoai,
+            VaiTro = _createModel.VaiTro,
+            LoaiThuKho = _createModel.LoaiThuKho,
+            MaChiNhanh = _createModel.MaChiNhanh,
+            ChiNhanh = _createModel.ChiNhanh,
+            IsOnlineWarehouse = isOnline,
+            DangHoatDong = true
+        };
+        _accounts.Insert(0, newAcc);
+        Toast.ShowSuccess($"Đã tạo tài khoản [{_createModel.VaiTro}] {_createModel.TenDangNhap} thành công!");
+        CloseCreateModal();
+        _isSubmitting = false;
+    }
+
+    private async Task HandleToggleStatus(int accountId)
+    {
+        var acc = _accounts.FirstOrDefault(x => x.MaTaiKhoan == accountId);
+        if (acc != null)
+        {
+            try
+            {
+                await AdminApi.ToggleAccountStatusAsync(accountId);
+            }
+            catch { }
+            acc.DangHoatDong = !acc.DangHoatDong;
+            Toast.ShowSuccess($"Đã {(acc.DangHoatDong ? "kích hoạt" : "khóa")} tài khoản {acc.TenDangNhap}!");
+        }
+    }
+
+    private string GetRoleCss(string role)
+    {
+        return role switch
+        {
+            RoleConstants.AdminChuoi or RoleConstants.QuanLyHeThong => "role-admin",
+            RoleConstants.QuanLyChiNhanh => "role-manager",
+            RoleConstants.ThuKho => "role-warehouse",
+            _ => "role-staff"
+        };
+    }
+}

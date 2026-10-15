@@ -2,7 +2,14 @@
   <Folder Name="/backend/">
     <Project Path="backend/Backend.csproj" />
   </Folder>
+  <Folder Name="/frontend/">
+    <Project Path="frontend/Frontend.csproj" />
+  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Backend.Tests/Backend.Tests.csproj" />
+    <Project Path="tests/Frontend.Tests/Frontend.Tests.csproj" />
   </Folder>
 </Solution>

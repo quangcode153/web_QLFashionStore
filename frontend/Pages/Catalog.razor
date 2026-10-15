@@ -1,0 +1,1924 @@
+@page "/catalog"
+@page "/"
+@namespace Frontend.Pages
+@inject ICatalogApiClient CatalogApi
+@inject ICartService CartService
+@inject IToastService Toast
+@inject NavigationManager NavManager
+@implements IDisposable
+
+<div class="catalog-page-container">
+@if (!IsDedicatedCategoryView)
+    {
+        <!-- =========================================================================
+             1. HERO ASYMMETRIC BANNER (SCREENSHOT 1: WORK TO WEEKEND / MẶC ĐẸP ĐI LÀM TAN TẦM ĐI QUẨY)
+             ========================================================================= -->
+        <section class="yame-hero-section">
+            <div class="hero-split-container">
+                <!-- Left Side: Editorial Model Photography -->
+                <div class="hero-media-panel">
+                    <img src="@(string.IsNullOrEmpty(CurrentBanner.HinhAnh) ? "images/hero-model.jpg" : CurrentBanner.HinhAnh)" 
+                         alt="@CurrentBanner.TieuDe" 
+                         class="hero-media-img" 
+                         onerror="this.onerror=null;this.src='images/hero-model.jpg';" />
+
+                    @if (!string.IsNullOrWhiteSpace(CurrentBanner.NhanBadge))
+                    {
+                        var badgeWords = CurrentBanner.NhanBadge.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        <div class="hero-stamp-badge">
+                            @if (badgeWords.Length >= 3)
+                            {
+                                <span class="stamp-sub">@badgeWords[0]</span>
+                                <span class="stamp-main">@badgeWords[1]</span>
+                                <span class="stamp-sub">@string.Join(" ", badgeWords.Skip(2))</span>
+                            }
+                            else
+                            {
+                                <span class="stamp-main">@CurrentBanner.NhanBadge</span>
+                            }
+                        </div>
+                    }
+
+                    <!-- Carousel Controls (Left Side Overlay) -->
+                    @if (Banners.Count() > 1)
+                    {
+                        <div class="hero-carousel-nav">
+                            <button type="button" class="carousel-arrow-btn prev-btn" @onclick="PrevBanner" aria-label="Banner trước">
+                                ‹
+                            </button>
+                            <button type="button" class="carousel-arrow-btn next-btn" @onclick="NextBanner" aria-label="Banner kế tiếp">
+                                ›
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <!-- Right Side: Dark Slate Charcoal Statement Panel -->
+                <div class="hero-statement-panel">
+                    <div class="hero-statement-content">
+                        <h1 class="hero-headline">
+                            @((MarkupString)CurrentBanner.TieuDe.Replace("\n", "<br />"))
+                        </h1>
+
+                        @if (!string.IsNullOrWhiteSpace(CurrentBanner.PhuDe) || !string.IsNullOrWhiteSpace(CurrentBanner.GiaNoiBat))
+                        {
+                            <div class="hero-deal-block">
+                                @if (!string.IsNullOrWhiteSpace(CurrentBanner.PhuDe))
+                                {
+                                    <div class="deal-header">
+                                        <span class="deal-dash"></span>
+                                        <span class="deal-tagline">@CurrentBanner.PhuDe</span>
+                                        <span class="deal-dash"></span>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(CurrentBanner.GiaNoiBat))
+                                {
+                                    <div class="deal-price-spot">
+                                        <span class="deal-price-value">@CurrentBanner.GiaNoiBat.Replace("K", "").Replace("k", "").Replace("đ", "").Replace("₫", "").Trim()</span><span class="deal-price-unit">K</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <div class="hero-cta-wrapper">
+                            @if (!string.IsNullOrWhiteSpace(CurrentBanner.NutChinhText))
+                            {
+                                <a href="@(string.IsNullOrEmpty(CurrentBanner.NutChinhLink) ? "#product-catalog" : CurrentBanner.NutChinhLink)" class="hero-btn-cta">
+                                    @CurrentBanner.NutChinhText
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        <polyline points="12 5 19 12 12 19"></polyline>
+                                    </svg>
+                                </a>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(CurrentBanner.NutPhuText))
+                            {
+                                @if (CurrentBanner.NutPhuLink == "#ai-advisor")
+                                {
+                                    <button type="button" class="hero-btn-sub-cta" @onclick="ToggleAiModal" title="Mở trợ lý gợi ý phối đồ & tư vấn size">
+                                        @CurrentBanner.NutPhuText
+                                    </button>
+                                }
+                                else
+                                {
+                                    <a href="@(string.IsNullOrEmpty(CurrentBanner.NutPhuLink) ? "/catalog?category=jean" : CurrentBanner.NutPhuLink)" class="hero-btn-sub-cta">
+                                        @CurrentBanner.NutPhuText
+                                    </a>
+                                }
+                            }
+                        </div>
+
+                        <!-- Dots Carousel Indicators -->
+                        @if (Banners.Count() > 1)
+                        {
+                            <div class="hero-carousel-dots">
+                                @for (int i = 0; i < Banners.Count(); i++)
+                                {
+                                    var idx = i;
+                                    <button type="button" 
+                                            class="carousel-dot @(idx == _currentBannerIndex ? "active" : "")" 
+                                            @onclick="() => SelectBanner(idx)"
+                                            aria-label="@($"Chuyển banner {idx + 1}")"></button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floating Size Support Widget (Hỗ trợ chọn size chuẩn phom QF) -->
+            <div class="yame-ai-size-floating" @onclick="ToggleAiModal" title="Hỗ trợ chọn size">
+                <div class="ai-advisor-badge">
+                    <span class="ai-badge-title">Hỗ trợ chọn size</span>
+                    <button type="button" class="ai-badge-btn">Gợi ý nhanh</button>
+                </div>
+                <div class="ai-avatar-wrapper size-advisor-avatar-wrapper">
+                    <div class="size-avatar-icon-btn">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================================
+             2. CONTINUOUS TICKER / RUNNING MARQUEE BAR (SCREENSHOT 2: BLACK REPEATING RIBBON)
+             ========================================================================= -->
+        <section class="yame-marquee-strip" aria-label="QF Cam kết uy tín">
+            <div class="marquee-track">
+                <div class="marquee-group">
+                    <span class="marquee-item">BẢO HÀNH 365 NGÀY</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">MIỄN PHÍ SHIP*</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">14 NGÀY ĐỔI TRẢ LINH HOẠT</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">BẢO HÀNH 365 NGÀY</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">MIỄN PHÍ SHIP*</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">VẢI BỀN - MỀM - TÔN DÁNG</span>
+                    <span class="marquee-sep">•</span>
+                </div>
+                <div class="marquee-group" aria-hidden="true">
+                    <span class="marquee-item">BẢO HÀNH 365 NGÀY</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">MIỄN PHÍ SHIP*</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">14 NGÀY ĐỔI TRẢ LINH HOẠT</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">BẢO HÀNH 365 NGÀY</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">MIỄN PHÍ SHIP*</span>
+                    <span class="marquee-sep">•</span>
+                    <span class="marquee-item">VẢI BỀN - MỀM - TÔN DÁNG</span>
+                    <span class="marquee-sep">•</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================================
+             3. SECTION TITLE & CATEGORY PILL TABS (SCREENSHOT 2: YAME.VN - THỜI TRANG NAM...)
+             ========================================================================= -->
+        <div id="product-catalog" class="section-title-wrapper" style="padding-top: 3rem; margin-bottom: 1.5rem;">
+            <h2 class="yame-section-heading">QF - THỜI TRANG BỀN, MỀM, KHÔNG LỖI MỐT</h2>
+        </div>
+
+        <!-- Category Filter Pills (Áo, Quần, Phụ kiện) -->
+        <div class="yame-pill-nav">
+            <button type="button" 
+                    class="pill-tab-btn @(!Query.CategoryId.HasValue ? "active" : "")"
+                    @onclick="() => SelectCategory(null)">
+                Tất cả
+            </button>
+            <button type="button" 
+                    class="pill-tab-btn @(IsCategoryPillActive("ao") ? "active" : "")"
+                    @onclick='() => SelectQuickPill("ao")'>
+                Áo
+            </button>
+            <button type="button" 
+                    class="pill-tab-btn @(IsCategoryPillActive("quan") ? "active" : "")"
+                    @onclick='() => SelectQuickPill("quan")'>
+                Quần
+            </button>
+            <button type="button" 
+                    class="pill-tab-btn @(IsCategoryPillActive("phukien") ? "active" : "")"
+                    @onclick='() => SelectQuickPill("phukien")'>
+                Phụ kiện
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- =========================================================================
+             DEDICATED CATEGORY / COLLECTION HEADER (SCREENSHOT: TRANG CHỦ > TÊN DANH MỤC)
+             ========================================================================= -->
+        <div class="dedicated-category-header" style="padding-top: 1.5rem; margin-bottom: 1.75rem;">
+            <nav class="dedicated-breadcrumb" aria-label="Đường dẫn" style="font-size: 0.85rem; color: #64748B; margin-bottom: 0.75rem;">
+                <a href="/" style="color: #64748B; text-decoration: none;" @onclick="NavigateToCleanHome" @onclick:preventDefault="true">Trang chủ</a>
+                <span style="margin: 0 0.5rem; color: #CBD5E1;">&gt;</span>
+                <span style="color: #0F172A; font-weight: 600;">@GetActiveCollectionTitle()</span>
+            </nav>
+            <h1 class="dedicated-category-title" style="font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; letter-spacing: -0.025em; color: #0F172A; margin: 0;">
+                @GetActiveCollectionTitle()
+            </h1>
+        </div>
+
+        <!-- Floating Size Support Widget (available on dedicated collection too) -->
+        <div class="yame-ai-size-floating" @onclick="ToggleAiModal" title="Hỗ trợ chọn size">
+            <div class="ai-advisor-badge">
+                <span class="ai-badge-title">Hỗ trợ chọn size</span>
+                <button type="button" class="ai-badge-btn">Gợi ý nhanh</button>
+            </div>
+            <div class="ai-avatar-wrapper size-advisor-avatar-wrapper">
+                <div class="size-avatar-icon-btn">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    }
+
+
+    <div class="catalog-main-layout @(IsDedicatedCategoryView ? "is-dedicated" : "")">
+        @if (!IsDedicatedCategoryView)
+        {
+            <!-- SIDEBAR FILTERS (Chỉ hiển thị cho Trang chủ / Catalog tổng hợp) -->
+            <aside class="catalog-sidebar">
+                <div class="filter-header">
+                    <h3>Bộ Lọc Sản Phẩm</h3>
+                    <button type="button" class="btn-reset-filters" @onclick="ResetFilters">Đặt lại</button>
+                </div>
+
+                <!-- DANH MỤC -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Danh Mục</h4>
+                    <div class="filter-options">
+                        <button type="button" 
+                                class="filter-chip @(!Query.CategoryId.HasValue ? "active" : "")" 
+                                @onclick="() => SelectCategory(null)">
+                            Tất cả
+                        </button>
+                        @foreach (var opt in GetAvailableCategoryOptions().Where(o => o.CategoryId.HasValue))
+                        {
+                            <button type="button" 
+                                    class="filter-chip @(Query.CategoryId == opt.CategoryId ? "active" : "")" 
+                                    @onclick="() => SelectCategory(opt.CategoryId)">
+                                @opt.Name.Replace("— ", "")
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <!-- THƯƠNG HIỆU -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Thương Hiệu</h4>
+                    <div class="filter-options">
+                        <button type="button" 
+                                class="filter-chip @(!Query.BrandId.HasValue ? "active" : "")" 
+                                @onclick="() => SelectBrand(null)">
+                            Tất cả
+                        </button>
+                        @foreach (var brand in Brands)
+                        {
+                            <button type="button" 
+                                    class="filter-chip @(Query.BrandId == brand.MaThuongHieu ? "active" : "")" 
+                                    @onclick="() => SelectBrand(brand.MaThuongHieu)">
+                                @brand.TenThuongHieu
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <!-- KHOẢNG GIÁ -->
+                <div class="filter-group">
+                    <h4 class="filter-group-title">Khoảng Giá</h4>
+                    <div class="price-filter-inputs">
+                        <input type="number" class="price-input" placeholder="Từ" @bind="Query.MinPrice" />
+                        <span>—</span>
+                        <input type="number" class="price-input" placeholder="Đến" @bind="Query.MaxPrice" />
+                    </div>
+                    <button type="button" class="btn-apply-filters" @onclick="ApplyFilters">Áp dụng giá</button>
+                </div>
+            </aside>
+        }
+
+        <!-- MAIN PRODUCT SECTION -->
+        <main class="catalog-content @(IsDedicatedCategoryView ? "is-dedicated-content" : "")">
+            @if (IsDedicatedCategoryView)
+            {
+                <!-- DEDICATED HORIZONTAL TOOLBAR 100% REAL DATABASE DATA (SCOPED TO CURRENT HEADER BRANCH) -->
+                <div class="dedicated-horizontal-toolbar">
+                    <div class="dedicated-filter-tags">
+                        <span class="filter-lead">Bộ lọc:</span>
+
+                        <!-- 1. Danh mục sản phẩm (Được giới hạn theo chuyên mục Header đã chọn) -->
+                        <div class="filter-dropdown-wrapper">
+                            <button type="button" 
+                                    class="filter-tag-chip @(ActiveDropdown == "cat" ? "active-open" : "") @(HasActiveCategoryFilter ? "has-val" : "")" 
+                                    @onclick='() => ToggleDropdown("cat")'>
+                                @GetSelectedCategoryChipLabel()
+                                <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            @if (ActiveDropdown == "cat")
+                            {
+                                <div class="filter-dropdown-menu">
+                                    <div class="dropdown-header-row">
+                                        <span class="dropdown-selected-count">Chọn danh mục</span>
+                                        <button type="button" class="dropdown-reset-btn" @onclick="ResetToBranchDefault">Tất cả</button>
+                                    </div>
+                                    <div class="dropdown-options-list">
+                                        @foreach (var opt in GetAvailableCategoryOptions())
+                                        {
+                                            <label class="dropdown-option-item" @onclick="() => SelectCategoryOption(opt)">
+                                                <input type="radio" name="cat_filter" checked="@(IsActiveCategoryOption(opt))" />
+                                                <span class="option-label @(IsActiveCategoryOption(opt) ? "selected-underline" : "")">
+                                                    @opt.Name
+                                                </span>
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Kiểu sản phẩm (Chuyên mục chuẩn YaMe) -->
+                        <div class="filter-dropdown-wrapper">
+                            <button type="button" 
+                                    class="filter-tag-chip @(ActiveDropdown == "kieu" ? "active-open" : "") @(_selectedKieuFilters.Any() ? "has-val" : "")" 
+                                    @onclick='() => ToggleDropdown("kieu")'>
+                                Kiểu sản phẩm
+                                <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            @if (ActiveDropdown == "kieu")
+                            {
+                                <div class="filter-dropdown-menu">
+                                    <div class="dropdown-header-row">
+                                        <span class="dropdown-selected-count">Đã chọn @_selectedKieuFilters.Count</span>
+                                        <button type="button" class="dropdown-reset-btn" @onclick="ResetKieuFilters">Đặt lại</button>
+                                    </div>
+                                    <div class="dropdown-options-list">
+                                        @foreach (var kieu in GetAvailableKieuOptions())
+                                        {
+                                            <label class="dropdown-option-item">
+                                                <input type="checkbox" checked="@(_selectedKieuFilters.Contains(kieu.Name))" @onchange="(e) => ToggleKieuFilter(kieu.Name, (bool)e.Value!)" />
+                                                <span class="option-label">@kieu.Label</span>
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- 2. Thương hiệu (Từ CSDL) -->
+                        <div class="filter-dropdown-wrapper">
+                            <button type="button" 
+                                    class="filter-tag-chip @(ActiveDropdown == "brand" ? "active-open" : "") @(Query.BrandId.HasValue ? "has-val" : "")" 
+                                    @onclick='() => ToggleDropdown("brand")'>
+                                @(Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId)?.TenThuongHieu ?? "Thương hiệu")
+                                <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            @if (ActiveDropdown == "brand")
+                            {
+                                <div class="filter-dropdown-menu">
+                                    <div class="dropdown-header-row">
+                                        <span class="dropdown-selected-count">Chọn thương hiệu</span>
+                                        @if (Query.BrandId.HasValue)
+                                        {
+                                            <button type="button" class="dropdown-reset-btn" @onclick="() => SelectBrandFilter(null)">Tất cả</button>
+                                        }
+                                    </div>
+                                    <div class="dropdown-options-list">
+                                        <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(null)">
+                                            <input type="radio" name="brand_filter" checked="@(!Query.BrandId.HasValue)" />
+                                            <span class="option-label">Tất cả thương hiệu</span>
+                                        </label>
+                                        @foreach (var b in Brands)
+                                        {
+                                            <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(b.MaThuongHieu)">
+                                                <input type="radio" name="brand_filter" checked="@(Query.BrandId == b.MaThuongHieu)" />
+                                                <span class="option-label @(Query.BrandId == b.MaThuongHieu ? "selected-underline" : "")">
+                                                    @b.TenThuongHieu
+                                                </span>
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- 3. Mức giá (Theo SQL MinPrice / MaxPrice) -->
+                        <div class="filter-dropdown-wrapper">
+                            <button type="button" 
+                                    class="filter-tag-chip @(ActiveDropdown == "price" ? "active-open" : "") @(Query.MinPrice.HasValue || Query.MaxPrice.HasValue ? "has-val" : "")" 
+                                    @onclick='() => ToggleDropdown("price")'>
+                                @GetPriceFilterLabel()
+                                <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            @if (ActiveDropdown == "price")
+                            {
+                                <div class="filter-dropdown-menu">
+                                    <div class="dropdown-header-row">
+                                        <span class="dropdown-selected-count">Khoảng giá</span>
+                                        @if (Query.MinPrice.HasValue || Query.MaxPrice.HasValue)
+                                        {
+                                            <button type="button" class="dropdown-reset-btn" @onclick="() => SetPriceFilter(null, null)">Đặt lại</button>
+                                        }
+                                    </div>
+                                    <div class="dropdown-options-list">
+                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(null, null)">
+                                            <input type="radio" name="price_range" checked="@(!Query.MinPrice.HasValue && !Query.MaxPrice.HasValue)" />
+                                            <span class="option-label">Tất cả mức giá</span>
+                                        </label>
+                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(null, 200000)">
+                                            <input type="radio" name="price_range" checked="@(Query.MaxPrice == 200000 && !Query.MinPrice.HasValue)" />
+                                            <span class="option-label">Dưới 200.000 ₫</span>
+                                        </label>
+                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(200000, 350000)">
+                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 200000 && Query.MaxPrice == 350000)" />
+                                            <span class="option-label">200.000 ₫ - 350.000 ₫</span>
+                                        </label>
+                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(350000, 500000)">
+                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 350000 && Query.MaxPrice == 500000)" />
+                                            <span class="option-label">350.000 ₫ - 500.000 ₫</span>
+                                        </label>
+                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(500000, null)">
+                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 500000 && !Query.MaxPrice.HasValue)" />
+                                            <span class="option-label">Trên 500.000 ₫</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- 4. Tình trạng hàng tồn kho -->
+                        <div class="filter-dropdown-wrapper">
+                            <button type="button" 
+                                    class="filter-tag-chip @(ActiveDropdown == "stock" ? "active-open" : "") @(_onlyInStock ? "has-val" : "")" 
+                                    @onclick='() => ToggleDropdown("stock")'>
+                                @(_onlyInStock ? "Chỉ còn hàng" : "Kho hàng")
+                                <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            </button>
+                            @if (ActiveDropdown == "stock")
+                            {
+                                <div class="filter-dropdown-menu">
+                                    <div class="dropdown-options-list">
+                                        <label class="dropdown-option-item" @onclick="() => SetStockFilter(false)">
+                                            <input type="radio" name="stock_filter" checked="@(!_onlyInStock)" />
+                                            <span class="option-label">Tất cả sản phẩm</span>
+                                        </label>
+                                        <label class="dropdown-option-item" @onclick="() => SetStockFilter(true)">
+                                            <input type="radio" name="stock_filter" checked="@(_onlyInStock)" />
+                                            <span class="option-label">Chỉ sản phẩm còn hàng</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="dedicated-sort-wrap">
+                        <label for="dedicated-sort-select" class="sort-lead">Sắp xếp theo:</label>
+                        <select id="dedicated-sort-select" class="sort-select" @bind="CurrentSort" @bind:after="OnSortChanged">
+                            <option value="newest">Ngày (từ mới đến cũ)</option>
+                            <option value="price_asc">Giá: Thấp đến Cao</option>
+                            <option value="price_desc">Giá: Cao đến Thấp</option>
+                        </select>
+                        <span class="product-count-summary dedicated-count-val"><strong>@(PagedResult?.TotalCount ?? 0) sản phẩm</strong></span>
+                    </div>
+                </div>
+
+                @if (_hasActiveFilters)
+                {
+                    <!-- ACTIVE FILTER CHIPS (DỮ LIỆU THẬT) -->
+                    <div class="active-horizontal-chips-bar">
+                        <div class="active-chips-list">
+                            @if (HasActiveCategoryFilter)
+                            {
+                                <span class="active-chip-pill">
+                                    Danh mục: @GetSelectedCategoryChipLabel()
+                                    <button type="button" class="chip-remove-btn" @onclick="ResetToBranchDefault">✕</button>
+                                </span>
+                            }
+                            @foreach (var kieu in _selectedKieuFilters.ToList())
+                            {
+                                var kieuName = kieu;
+                                <span class="active-chip-pill">
+                                    Kiểu : @kieuName
+                                    <button type="button" class="chip-remove-btn" @onclick="() => RemoveKieuFilter(kieuName)">✕</button>
+                                </span>
+                            }
+                            @if (Query.BrandId.HasValue)
+                            {
+                                <span class="active-chip-pill">
+                                    Thương hiệu: @(Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId)?.TenThuongHieu)
+                                    <button type="button" class="chip-remove-btn" @onclick="() => SelectBrandFilter(null)">✕</button>
+                                </span>
+                            }
+                            @if (Query.MinPrice.HasValue || Query.MaxPrice.HasValue)
+                            {
+                                <span class="active-chip-pill">
+                                    Giá: @GetPriceFilterLabel()
+                                    <button type="button" class="chip-remove-btn" @onclick="() => SetPriceFilter(null, null)">✕</button>
+                                </span>
+                            }
+                            @if (_onlyInStock)
+                            {
+                                <span class="active-chip-pill">
+                                    Còn hàng
+                                    <button type="button" class="chip-remove-btn" @onclick="() => SetStockFilter(false)">✕</button>
+                                </span>
+                            }
+                            <button type="button" class="clear-all-chips-btn" style="text-decoration: none !important; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 9999px; padding: 0.25rem 0.75rem; font-size: 0.82rem; font-weight: 500; color: #64748B;" @onclick="ClearAllHorizontalFilters">Đặt lại tất cả</button>
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(ActiveDropdown))
+                {
+                    <div class="filter-dropdown-backdrop" @onclick="CloseAllDropdowns"></div>
+                }
+            }
+            else
+            {
+                <!-- TOP BAR: COUNT & SORT (Cho Trang Chủ) -->
+                <div class="catalog-top-bar">
+                    <div class="product-count-summary">
+                        <span>Tìm thấy <strong>@(PagedResult?.TotalCount ?? 0) sản phẩm</strong></span>
+                    </div>
+
+                    <div class="sort-selector-wrapper">
+                        <label for="sort-select">Sắp xếp:</label>
+                        <select id="sort-select" class="sort-select" @bind="CurrentSort" @bind:after="OnSortChanged">
+                            <option value="newest">Mới nhất</option>
+                            <option value="price_asc">Giá: Thấp đến Cao</option>
+                            <option value="price_desc">Giá: Cao đến Thấp</option>
+                        </select>
+                    </div>
+                </div>
+            }
+
+            <!-- PRODUCT GRID OR EMPTY STATE -->
+            @if (IsLoading || PagedResult == null)
+            {
+                <div class="luxury-loading-container">
+                    <div class="luxury-loading-header">
+                        <div class="luxury-spinner-ring"></div>
+                        <div class="luxury-loading-text-group">
+                            <h4 class="luxury-loading-title">QF FASHION</h4>
+                            <p class="luxury-loading-subtitle">Đang tải dữ liệu sản phẩm QF...</p>
+                        </div>
+                    </div>
+
+                    <div class="product-grid skeleton-grid">
+                        @for (int s = 0; s < 8; s++)
+                        {
+                            <div class="skeleton-card">
+                                <div class="skeleton-img shimmer"></div>
+                                <div class="skeleton-info">
+                                    <div class="skeleton-line skeleton-brand shimmer"></div>
+                                    <div class="skeleton-line skeleton-title shimmer"></div>
+                                    <div class="skeleton-line skeleton-price shimmer"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else if (!PagedResult.Items.Any())
+            {
+                <div class="catalog-empty">
+                    <div class="empty-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </div>
+                    <p class="empty-text">Không tìm thấy sản phẩm phù hợp</p>
+                    <button type="button" class="btn-reset-filters" @onclick="ResetFilters">Xóa bộ lọc để xem tất cả</button>
+                </div>
+            }
+            else
+            {
+                @if (_hasActiveFilters && !DisplayedProducts.Any())
+                {
+                    <div class="catalog-empty">
+                        <div class="empty-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                        </div>
+                        <p class="empty-text">Không tìm thấy sản phẩm nào khớp với các lựa chọn lọc</p>
+                        <button type="button" class="btn-reset-filters" @onclick="ClearAllHorizontalFilters">Đặt lại bộ lọc để xem tất cả</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="product-grid">
+                        @foreach (var item in DisplayedProducts)
+                        {
+                            <ProductCard Product="@item" OnAddToCart="@HandleAddToCart" />
+                        }
+                    </div>
+                }
+
+                <!-- PAGINATION BAR -->
+                @if (PagedResult.TotalPages > 1)
+                {
+                    <div class="pagination-bar">
+                        <button type="button" 
+                                class="page-nav-btn prev" 
+                                disabled="@(!PagedResult.HasPreviousPage)" 
+                                @onclick="() => ChangePage(PagedResult.PageNumber - 1)">
+                            ← Trước
+                        </button>
+
+                        <div class="page-numbers">
+                            @for (int p = 1; p <= PagedResult.TotalPages; p++)
+                            {
+                                var pageIdx = p;
+                                <button type="button" 
+                                        class="page-btn @(pageIdx == PagedResult.PageNumber ? "active" : "")" 
+                                        @onclick="() => ChangePage(pageIdx)">
+                                    @pageIdx
+                                </button>
+                            }
+                        </div>
+
+                        <button type="button" 
+                                class="page-nav-btn next" 
+                                disabled="@(!PagedResult.HasNextPage)" 
+                                @onclick="() => ChangePage(PagedResult.PageNumber + 1)">
+                            Sau →
+                        </button>
+                    </div>
+                }
+            }
+        </main>
+    </div>
+
+    @if (!IsDedicatedCategoryView)
+    {
+        <!-- =========================================================================
+             4. SECONDARY CURATED COLLECTIONS (SƠ MI CHO NGƯỜI LƯỜI ỦI & QUẦN TÂY LƯNG THUN ẨN)
+             ========================================================================= -->
+        <section class="yame-collections-section">
+            <div class="collection-dual-banner">
+                <div class="dual-banner-card banner-somi">
+                    <div class="dual-banner-content">
+                        <span class="dual-sub">BST ĐẶC BIỆT</span>
+                        <h3 class="dual-title">SƠ MI DÀNH CHO NGƯỜI LƯỜI ỦI</h3>
+                        <p class="dual-desc">Chất liệu sợi Modal mềm mịn tự nhiên, giặt phơi thẳng ngay, không cần ủi tốn thời gian.</p>
+                        <a href="/catalog?search=so mi" class="dual-btn">Khám phá ngay</a>
+                    </div>
+                </div>
+
+                <div class="dual-banner-card banner-quantay">
+                    <div class="dual-banner-content">
+                        <span class="dual-sub">THIẾT KẾ ĐỘT PHÁ</span>
+                        <h3 class="dual-title">QUẦN TÂY LƯNG THUN ẨN CO GIÃN</h3>
+                        <p class="dual-desc">Tự động co giãn vòng bụng theo từng cử động, đứng ngồi cực kỳ thoải mái mà vẫn giữ trọn nét lịch thiệp.</p>
+                        <a href="/catalog?search=quan tay" class="dual-btn">Xem chi tiết</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================================
+             5. BRAND COMMITMENT PILLARS (TRIẾT LÝ VỊ NHÂN SINH)
+             ========================================================================= -->
+        <section class="yame-pillars-section">
+            <div class="pillars-header">
+                <span class="pillars-sub">TRIẾT LÝ VỊ NHÂN SINH TẠI QF</span>
+                <h2 class="pillars-main-title">CAM KẾT 4 CHUẨN MỰC THỜI TRANG</h2>
+            </div>
+            <div class="pillars-grid">
+                <div class="pillar-box">
+                    <div class="pillar-number">01</div>
+                    <h4 class="pillar-box-title">MẶC BỀN</h4>
+                    <p class="pillar-box-desc">Sợi bông dài Compact kết hợp dệt mật độ cao. Giữ form nguyên vẹn sau hơn 100 lần giặt.</p>
+                </div>
+                <div class="pillar-box">
+                    <div class="pillar-number">02</div>
+                    <h4 class="pillar-box-title">MẶC MỀM</h4>
+                    <p class="pillar-box-desc">Xử lý làm mềm bề mặt vải với công nghệ Bio-Polish. Chạm vào êm ái, thân thiện làn da.</p>
+                </div>
+                <div class="pillar-box">
+                    <div class="pillar-number">03</div>
+                    <h4 class="pillar-box-title">KHÔNG LỖI MỐT</h4>
+                    <p class="pillar-box-desc">Ngôn ngữ thiết kế tối giản, bảng màu nam tính vượt thời gian, dễ dàng phối trang phục.</p>
+                </div>
+                <div class="pillar-box">
+                    <div class="pillar-number">04</div>
+                    <h4 class="pillar-box-title">BẢO HÀNH 365 NGÀY</h4>
+                    <p class="pillar-box-desc">Bảo hành đường may, cúc áo, khóa kéo trong suốt 1 năm. Không cần giữ hóa đơn phiền hà.</p>
+                </div>
+            </div>
+        </section>
+    }
+</div>
+
+<!-- =========================================================================
+     5b. QUICK SIZE SELECTOR MODAL (CHỌN SIZE NHANH TRỰC TIẾP TỪ THẺ SẢN PHẨM)
+     ========================================================================= -->
+@if (_isQuickSizeOpen && _quickSelectProduct != null)
+{
+    <div class="quick-size-backdrop" @onclick="CloseQuickSize">
+        <div class="quick-size-card" @onclick:stopPropagation="true">
+            <div class="quick-size-header">
+                <div class="quick-size-product-meta">
+                    <img class="quick-size-img" 
+                         src="@(string.IsNullOrEmpty(_quickSelectProduct.AnhDaiDien) ? "/images/no-image.svg" : _quickSelectProduct.AnhDaiDien)" 
+                         alt="@_quickSelectProduct.TenSanPham" 
+                         onerror="this.onerror=null;this.src='/images/no-image.svg';" />
+                    <div class="quick-size-info">
+                        <span class="quick-size-badge">CHỌN SIZE NHANH</span>
+                        <h4 class="quick-size-title">@_quickSelectProduct.TenSanPham</h4>
+                        <span class="quick-size-price">@_quickSelectProduct.GiaThapNhat.ToString("N0") ₫</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-quick-size" @onclick="CloseQuickSize" aria-label="Đóng">✕</button>
+            </div>
+
+            <div class="quick-size-body">
+                @if (GetQuickColors().Count() > 1)
+                {
+                    <div class="quick-option-row">
+                        <span class="quick-option-label">Màu sắc: <strong>@_selectedQuickColor</strong></span>
+                        <div class="quick-color-pills">
+                            @foreach (var color in GetQuickColors())
+                            {
+                                <button type="button" 
+                                        class="quick-color-btn @(_selectedQuickColor == color ? "selected" : "")" 
+                                        @onclick="() => SelectQuickColor(color)">
+                                    @color
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="quick-option-row">
+                    <div class="quick-size-title-row">
+                        <span class="quick-option-label">Kích cỡ (Size):</span>
+                        <span class="quick-size-hint">Chạm size để thêm ngay vào giỏ</span>
+                    </div>
+                    <div class="quick-size-grid">
+                        @foreach (var variant in GetQuickVariantsForSelectedColor())
+                        {
+                            var inStock = variant.SoLuongTon > 0;
+                            <button type="button" 
+                                    class="quick-size-pill @(inStock ? "in-stock" : "out-of-stock")" 
+                                    disabled="@(!inStock)" 
+                                    @onclick="() => SelectQuickSizeAndAdd(variant)">
+                                <span class="size-val">@variant.KichCo</span>
+                                <span class="size-stock">@(inStock ? $"Còn {variant.SoLuongTon}" : "Hết hàng")</span>
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="quick-size-footer">
+                <a href="/product/@_quickSelectProduct.MaSanPham" class="quick-view-full-link" @onclick="CloseQuickSize">
+                    Xem bảng thông số & chi tiết sản phẩm →
+                </a>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =========================================================================
+     6. INTERACTIVE AI SIZE CONSULTANT MODAL
+     ========================================================================= -->
+@if (IsAiModalOpen)
+{
+    <div class="ai-modal-backdrop" @onclick="ToggleAiModal">
+        <div class="ai-modal-card" @onclick:stopPropagation="true">
+            <div class="ai-modal-header">
+                <div class="ai-header-left">
+                    <div class="size-avatar-thumb">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h4 class="ai-modal-title">Hỗ Trợ Chọn Size</h4>
+                        <span class="ai-modal-subtitle">Gợi ý kích cỡ vừa vặn theo vóc dáng & phom mẫu QF</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="ToggleAiModal" aria-label="Đóng">✕</button>
+            </div>
+
+            <div class="ai-modal-body">
+                @if (ComputedSizeResult == null)
+                {
+                    <p class="ai-prompt-text">
+                        Nhập số đo chiều cao và cân nặng của bạn, hệ thống sẽ phân tích bảng thông số kỹ thuật phom dáng QF (F1 - F5) và đề xuất size vừa vặn nhất:
+                    </p>
+
+                    <div class="ai-form-group">
+                        <label class="ai-form-label">Chiều cao của bạn (cm):</label>
+                        <div class="ai-input-with-unit">
+                            <input type="number" class="ai-input" @bind="UserHeight" placeholder="Ví dụ: 172" min="140" max="210" />
+                            <span class="ai-input-unit">cm</span>
+                        </div>
+                    </div>
+
+                    <div class="ai-form-group">
+                        <label class="ai-form-label">Cân nặng của bạn (kg):</label>
+                        <div class="ai-input-with-unit">
+                            <input type="number" class="ai-input" @bind="UserWeight" placeholder="Ví dụ: 68" min="40" max="130" />
+                            <span class="ai-input-unit">kg</span>
+                        </div>
+                    </div>
+
+                    <div class="ai-form-group">
+                        <label class="ai-form-label">Gu phom dáng mong muốn:</label>
+                        <select class="ai-select" @bind="UserFitPreference">
+                            <option value="F2">Phom Ôm Vừa (F2 - Bodyfit tôn cơ bắp)</option>
+                            <option value="F3" selected>Phom Tiêu Chuẩn (F3 - Regular fit thoải mái)</option>
+                            <option value="F4">Phom Rộng Rãi (F4 - Relaxed rộng thoáng)</option>
+                            <option value="F5">Phom Hộp Streetwear (F5 - Boxy phong cách)</option>
+                        </select>
+                    </div>
+
+                    <button type="button" class="btn-calc-size" @onclick="CalculateSizeRecommendation">
+                        Xem Gợi Ý Size Chuẩn Xác
+                    </button>
+                }
+                else
+                {
+                    <div class="ai-result-card">
+                        <div class="ai-result-badge">KẾT QUẢ PHÂN TÍCH CHUẨN FORM</div>
+                        <div class="ai-result-size-display">
+                            SIZE ĐỀ XUẤT: <span class="highlight-size">@ComputedSizeResult.RecommendedSize</span>
+                        </div>
+                        <p class="ai-result-desc">@ComputedSizeResult.Advice</p>
+
+                        <div class="ai-specs-box">
+                            <div class="spec-row">
+                                <span>Phom dáng tối ưu:</span>
+                                <strong>@ComputedSizeResult.FitName</strong>
+                            </div>
+                            <div class="spec-row">
+                                <span>Độ co giãn khuyên dùng:</span>
+                                <strong>Co giãn 4 chiều (Spandex Blend)</strong>
+                            </div>
+                            <div class="spec-row">
+                                <span>Cam kết vừa vặn:</span>
+                                <strong>Đổi size miễn phí trong 14 ngày</strong>
+                            </div>
+                        </div>
+
+                        <div class="ai-result-actions">
+                            <button type="button" class="btn-recalc" @onclick="ResetAiCalculator">Tính lại số đo</button>
+                            <button type="button" class="btn-shop-size" @onclick="ShopRecommendedSize">
+                                Chọn Mua Size @ComputedSizeResult.RecommendedSize
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "category")]
+    public string? CategoryQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "categoryId")]
+    public int? CategoryIdQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? SearchQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "sale")]
+    public bool? SaleQuery { get; set; }
+
+    private ProductQueryParameters Query = new() { PageNumber = 1, PageSize = 12, SortBy = "newest" };
+    private PagedResult<ProductListItemDto>? PagedResult;
+    private IEnumerable<CategoryDto> Categories = Enumerable.Empty<CategoryDto>();
+    private IEnumerable<BrandDto> Brands = Enumerable.Empty<BrandDto>();
+    private IEnumerable<BannerDto> Banners = Enumerable.Empty<BannerDto>();
+    private int _currentBannerIndex = 0;
+    private System.Threading.Timer? _bannerAutoplayTimer;
+
+    private BannerDto CurrentBanner
+    {
+        get
+        {
+            var list = Banners.ToList();
+            if (list.Count == 0)
+            {
+                return new BannerDto
+                {
+                    TieuDe = "MẶC ĐẸP ĐI LÀM\nTAN TẦM ĐI QUẨY",
+                    PhuDe = "MUA 2 GIẢM 25%",
+                    GiaNoiBat = "208K",
+                    NhanBadge = "WORK TO WEEKEND",
+                    HinhAnh = "images/hero-model.jpg",
+                    NutChinhText = "XEM BỘ SƯU TẬP MỞ BÁN",
+                    NutChinhLink = "#product-catalog",
+                    NutPhuText = "Đặc quyền VIP 2026",
+                    NutPhuLink = "/vip"
+                };
+            }
+            if (_currentBannerIndex < 0 || _currentBannerIndex >= list.Count)
+            {
+                _currentBannerIndex = 0;
+            }
+            return list[_currentBannerIndex];
+        }
+    }
+
+    private void StartBannerAutoplay()
+    {
+        _bannerAutoplayTimer?.Dispose();
+        _bannerAutoplayTimer = new System.Threading.Timer(async _ =>
+        {
+            var count = Banners.Count();
+            if (count > 1)
+            {
+                await InvokeAsync(() =>
+                {
+                    _currentBannerIndex = (_currentBannerIndex + 1) % count;
+                    StateHasChanged();
+                });
+            }
+        }, null, 4500, 4500);
+    }
+
+    private void NextBanner()
+    {
+        var count = Banners.Count();
+        if (count > 1)
+        {
+            _currentBannerIndex = (_currentBannerIndex + 1) % count;
+            StartBannerAutoplay();
+        }
+    }
+
+    private void PrevBanner()
+    {
+        var count = Banners.Count();
+        if (count > 1)
+        {
+            _currentBannerIndex = (_currentBannerIndex - 1 + count) % count;
+            StartBannerAutoplay();
+        }
+    }
+
+    private void SelectBanner(int index)
+    {
+        _currentBannerIndex = index;
+        StartBannerAutoplay();
+    }
+
+    private bool IsLoading = true;
+    private bool _metadataLoaded = false;
+    private string? _lastAppliedCategoryQuery;
+    private int? _lastAppliedCategoryIdQuery;
+    private string? _lastAppliedSearchQuery;
+    private bool? _lastAppliedSaleQuery;
+
+
+
+    private string CurrentSort
+    {
+        get => Query.SortBy ?? "newest";
+        set => Query.SortBy = value;
+    }
+
+    private bool IsDedicatedCategoryView
+    {
+        get
+        {
+            var uri = NavManager != null ? NavManager.ToAbsoluteUri(NavManager.Uri) : null;
+            if (uri != null && uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query))
+            {
+                return false;
+            }
+
+            return !string.IsNullOrWhiteSpace(CategoryQuery) ||
+                   CategoryIdQuery.HasValue ||
+                   !string.IsNullOrWhiteSpace(SearchQuery) ||
+                   SaleQuery == true ||
+                   (uri != null && uri.AbsolutePath.Contains("/catalog") && !string.IsNullOrEmpty(uri.Query));
+        }
+    }
+
+    private string GetActiveCollectionTitle()
+    {
+        if (SaleQuery == true)
+        {
+            var activeOpt = GetActiveOption();
+            if (activeOpt != null && !activeOpt.IsParentAll)
+            {
+                return $"SALE - {activeOpt.Name}";
+            }
+            return "Sản Phẩm Khuyến Mãi (SALE)";
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            return $"Kết quả tìm kiếm cho: \"{SearchQuery}\"";
+        }
+
+        var opt = GetActiveOption();
+        if (opt != null)
+        {
+            if (opt.IsParentAll)
+            {
+                return CurrentBranch switch
+                {
+                    CatalogBranch.Shirt => "Bộ Sưu Tập Áo",
+                    CatalogBranch.Pant => "Bộ Sưu Tập Quần",
+                    CatalogBranch.Jean => "Bộ Sưu Tập Đồ Jean",
+                    CatalogBranch.Accessory => "Bộ Sưu Tập Phụ Kiện",
+                    _ => "Bộ Sưu Tập Sản Phẩm"
+                };
+            }
+            return opt.Name;
+        }
+
+        if (Query.CategoryId.HasValue)
+        {
+            var cat = Categories.FirstOrDefault(c => c.MaDanhMuc == Query.CategoryId.Value);
+            if (cat != null)
+            {
+                return cat.TenDanhMuc;
+            }
+        }
+
+        return "Bộ Sưu Tập Sản Phẩm";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        NavManager.LocationChanged += HandleLocationChanged;
+        await LoadMetadataAsync();
+        _metadataLoaded = true;
+        ApplyUrlParameters();
+        await LoadProductsAsync();
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var uri = NavManager.ToAbsoluteUri(e.Location);
+        if (uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query))
+        {
+            ResetInternalHomeState();
+            _ = InvokeAsync(async () =>
+            {
+                await LoadProductsAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private void ResetInternalHomeState()
+    {
+        Query.CategoryId = null;
+        Query.BrandId = null;
+        Query.MinPrice = null;
+        Query.MaxPrice = null;
+        Query.Search = null;
+        Query.PageNumber = 1;
+        Query.SortBy = "newest";
+        _onlyInStock = false;
+        ActiveDropdown = null;
+
+        CategoryQuery = null;
+        CategoryIdQuery = null;
+        SearchQuery = null;
+        SaleQuery = null;
+        _lastAppliedCategoryQuery = null;
+        _lastAppliedCategoryIdQuery = null;
+        _lastAppliedSearchQuery = null;
+        _lastAppliedSaleQuery = null;
+    }
+
+    private void NavigateToCleanHome()
+    {
+        ResetInternalHomeState();
+        var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        if (uri.AbsolutePath == "/" && string.IsNullOrEmpty(uri.Query))
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await LoadProductsAsync();
+                StateHasChanged();
+            });
+        }
+        else
+        {
+            NavManager.NavigateTo("/");
+        }
+    }
+
+    public void Dispose()
+    {
+        NavManager.LocationChanged -= HandleLocationChanged;
+        _bannerAutoplayTimer?.Dispose();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_metadataLoaded) return;
+
+        bool hasUrlQueryChanged = 
+            CategoryQuery != _lastAppliedCategoryQuery ||
+            CategoryIdQuery != _lastAppliedCategoryIdQuery ||
+            SearchQuery != _lastAppliedSearchQuery ||
+            SaleQuery != _lastAppliedSaleQuery;
+
+        if (hasUrlQueryChanged)
+        {
+            ApplyUrlParameters();
+            await LoadProductsAsync();
+        }
+    }
+
+    private void ApplyUrlParameters()
+    {
+        _lastAppliedCategoryQuery = CategoryQuery;
+        _lastAppliedCategoryIdQuery = CategoryIdQuery;
+        _lastAppliedSearchQuery = SearchQuery;
+        _lastAppliedSaleQuery = SaleQuery;
+
+        Query.PageNumber = 1;
+        Query.CategoryId = null;
+        Query.Search = null;
+
+        if (CategoryIdQuery.HasValue)
+        {
+            Query.CategoryId = CategoryIdQuery.Value;
+        }
+        else if (!string.IsNullOrWhiteSpace(CategoryQuery))
+        {
+            var slug = CategoryQuery.Trim().ToLowerInvariant();
+            var opt = GetActiveOption();
+
+            // 1. Nếu có Categories nạp từ API (hoặc mock test), ưu tiên tra cứu theo tên danh mục
+            CategoryDto? matchedCat = null;
+            if (Categories != null && Categories.Any())
+            {
+                if (slug == "ao" || slug == "shirt")
+                    matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Áo Nam", StringComparison.OrdinalIgnoreCase))
+                               ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Contains("Áo", StringComparison.OrdinalIgnoreCase));
+                else if (slug == "quan" || slug == "pant")
+                    matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Quần Nam", StringComparison.OrdinalIgnoreCase))
+                               ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Contains("Quần", StringComparison.OrdinalIgnoreCase));
+                else if (slug == "phukien" || slug == "accessory")
+                    matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Phụ Kiện", StringComparison.OrdinalIgnoreCase))
+                               ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Contains("Phụ Kiện", StringComparison.OrdinalIgnoreCase));
+                else if (slug == "jean" || slug == "jeans")
+                    matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Contains("Jean", StringComparison.OrdinalIgnoreCase));
+                else
+                    matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Equals(opt?.Name, StringComparison.OrdinalIgnoreCase))
+                               ?? Categories.FirstOrDefault(c => c.TenDanhMuc.ToLowerInvariant() == slug)
+                               ?? Categories.FirstOrDefault(c => c.TenDanhMuc.ToLowerInvariant().Contains(slug));
+            }
+
+            if (matchedCat != null)
+            {
+                Query.CategoryId = matchedCat.MaDanhMuc;
+                Query.Search = opt?.Keyword;
+            }
+            // 2. Tra cứu CategoryId từ CategoryFilterOption đã được cấu hình chuẩn xác
+            else if (opt?.CategoryId.HasValue == true)
+            {
+                Query.CategoryId = opt.CategoryId.Value;
+                Query.Search = opt.Keyword;
+            }
+            // 3. Map trực tiếp các nhánh slug danh mục cha cốt lõi
+            else if (slug == "ao" || slug == "shirt")
+            {
+                Query.CategoryId = 4; // Áo Nam
+                Query.Search = null;
+            }
+            else if (slug == "quan" || slug == "pant")
+            {
+                Query.CategoryId = 5; // Quần Nam
+                Query.Search = null;
+            }
+            else if (slug == "phukien" || slug == "accessory")
+            {
+                Query.CategoryId = 3; // Phụ kiện
+                Query.Search = null;
+            }
+            else if (slug == "jean" || slug == "jeans")
+            {
+                Query.CategoryId = 13; // Quần Jeans Nam
+                Query.Search = null;
+            }
+            else
+            {
+                Query.CategoryId = slug.Contains("unknown") ? -999 : null;
+                Query.Search = opt?.Keyword;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            Query.Search = SearchQuery;
+        }
+    }
+
+    private async Task LoadMetadataAsync()
+    {
+        try
+        {
+            var catTask = CatalogApi.GetCategoriesAsync();
+            var brandTask = CatalogApi.GetBrandsAsync();
+            var bannerTask = CatalogApi.GetActiveBannersAsync();
+            await Task.WhenAll(catTask, brandTask, bannerTask);
+            Categories = (await catTask) ?? Enumerable.Empty<CategoryDto>();
+            Brands = (await brandTask) ?? Enumerable.Empty<BrandDto>();
+            Banners = (await bannerTask) ?? Enumerable.Empty<BannerDto>();
+            if (Banners != null && Banners.Any())
+            {
+                StartBannerAutoplay();
+            }
+        }
+        catch
+        {
+            Categories = Enumerable.Empty<CategoryDto>();
+            Brands = Enumerable.Empty<BrandDto>();
+            Banners = Enumerable.Empty<BannerDto>();
+        }
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        IsLoading = true;
+        StateHasChanged();
+        try
+        {
+            var queryCopy = new ProductQueryParameters
+            {
+                PageNumber = Query.PageNumber,
+                PageSize = Query.PageSize,
+                Search = Query.Search,
+                CategoryId = Query.CategoryId,
+                BrandId = Query.BrandId,
+                MinPrice = Query.MinPrice,
+                MaxPrice = Query.MaxPrice,
+                SortBy = Query.SortBy
+            };
+
+            PagedResult = await CatalogApi.GetProductsAsync(queryCopy);
+        }
+        catch
+        {
+            // Tự động thử lại (Retry) 1 lần sau 200ms nếu gặp gián đoạn mạng tạm thời
+            try
+            {
+                await Task.Delay(200);
+                var retryQuery = new ProductQueryParameters
+                {
+                    PageNumber = Query.PageNumber,
+                    PageSize = Query.PageSize,
+                    Search = Query.Search,
+                    CategoryId = Query.CategoryId,
+                    BrandId = Query.BrandId,
+                    MinPrice = Query.MinPrice,
+                    MaxPrice = Query.MaxPrice,
+                    SortBy = Query.SortBy
+                };
+                PagedResult = await CatalogApi.GetProductsAsync(retryQuery);
+            }
+            catch
+            {
+                PagedResult = new PagedResult<ProductListItemDto>(new List<ProductListItemDto>(), 0, Query.PageNumber, Query.PageSize);
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChangePage(int page)
+    {
+        if (page < 1 || (PagedResult != null && page > PagedResult.TotalPages)) return;
+        Query.PageNumber = page;
+        await LoadProductsAsync();
+    }
+
+    private async Task SelectCategory(int? catId)
+    {
+        Query.CategoryId = catId;
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    private async Task SelectBrand(int? brandId)
+    {
+        Query.BrandId = brandId;
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (Query.MinPrice.HasValue && Query.MaxPrice.HasValue && Query.MinPrice.Value > Query.MaxPrice.Value)
+        {
+            Toast.ShowWarning("Khoảng giá không hợp lệ (Giá tối thiểu không được lớn hơn giá tối đa).");
+            return;
+        }
+
+        if ((Query.MinPrice.HasValue && Query.MinPrice.Value < 0) || (Query.MaxPrice.HasValue && Query.MaxPrice.Value < 0))
+        {
+            Toast.ShowWarning("Khoảng giá không hợp lệ (Giá không được là số âm).");
+            return;
+        }
+
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    private async Task ResetFilters()
+    {
+        Query.CategoryId = null;
+        Query.BrandId = null;
+        Query.MinPrice = null;
+        Query.MaxPrice = null;
+        Query.Search = null;
+        Query.PageNumber = 1;
+        Query.SortBy = "newest";
+
+        CategoryQuery = null;
+        CategoryIdQuery = null;
+        SearchQuery = null;
+        SaleQuery = null;
+        _lastAppliedCategoryQuery = null;
+        _lastAppliedCategoryIdQuery = null;
+        _lastAppliedSearchQuery = null;
+        _lastAppliedSaleQuery = null;
+
+        var currentUri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        if (!string.IsNullOrEmpty(currentUri.Query))
+        {
+            NavManager.NavigateTo(currentUri.AbsolutePath, replace: true);
+        }
+
+        if (!Categories.Any() || !Brands.Any())
+        {
+            await LoadMetadataAsync();
+        }
+
+        await LoadProductsAsync();
+        StateHasChanged();
+    }
+
+    private async Task OnSortChanged()
+    {
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    /* Quick Size Selector State */
+    private ProductListItemDto? _quickSelectProduct;
+    private List<ProductVariantDto> _quickSelectVariants = new();
+    private bool _isQuickSizeOpen = false;
+    private string? _selectedQuickColor;
+
+    private async Task HandleAddToCart(ProductListItemDto product)
+    {
+        if (product == null) return;
+        try
+        {
+            var variants = (await CatalogApi.GetProductVariantsAsync(product.MaSanPham))?.ToList() ?? new();
+            if (!variants.Any())
+            {
+                NavManager.NavigateTo($"/product/{product.MaSanPham}");
+                return;
+            }
+
+            // Kiểm tra xem sản phẩm có nhiều size khác nhau không
+            var distinctSizes = variants.Select(v => v.KichCo).Distinct().ToList();
+            if (distinctSizes.Count <= 1)
+            {
+                // Chỉ có 1 size (Freesize hoặc phụ kiện ví/thắt lưng/balo): Thêm ngay biến thể còn hàng
+                var singleVariant = variants.FirstOrDefault(v => v.SoLuongTon > 0) ?? variants.First();
+                await AddVariantToCart(product, singleVariant);
+                return;
+            }
+
+            // Có nhiều size: Mở thanh chọn size nhanh để khách tự chọn đúng size
+            _quickSelectProduct = product;
+            _quickSelectVariants = variants;
+            var availableColor = variants.FirstOrDefault(v => v.SoLuongTon > 0)?.MauSac ?? variants.First().MauSac;
+            _selectedQuickColor = availableColor;
+            _isQuickSizeOpen = true;
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Không thể tải danh sách size: {ex.Message}");
+        }
+    }
+
+    private void SelectQuickColor(string color)
+    {
+        _selectedQuickColor = color;
+    }
+
+    private IEnumerable<string> GetQuickColors()
+    {
+        return _quickSelectVariants.Select(v => v.MauSac).Distinct();
+    }
+
+    private IEnumerable<ProductVariantDto> GetQuickVariantsForSelectedColor()
+    {
+        if (string.IsNullOrEmpty(_selectedQuickColor))
+            return _quickSelectVariants;
+        return _quickSelectVariants.Where(v => v.MauSac == _selectedQuickColor);
+    }
+
+    private async Task SelectQuickSizeAndAdd(ProductVariantDto variant)
+    {
+        if (variant == null || variant.SoLuongTon <= 0 || _quickSelectProduct == null) return;
+
+        await AddVariantToCart(_quickSelectProduct, variant);
+        _isQuickSizeOpen = false;
+    }
+
+    private async Task AddVariantToCart(ProductListItemDto product, ProductVariantDto variant)
+    {
+        await CartService.AddItemAsync(new CartItemDto
+        {
+            MaSanPham = product.MaSanPham,
+            TenSanPham = product.TenSanPham,
+            HinhAnh = !string.IsNullOrEmpty(variant.HinhAnh) ? variant.HinhAnh : product.AnhDaiDien,
+            MaBienThe = variant.MaBienThe,
+            MaSKU = variant.MaSku,
+            MauSac = variant.MauSac,
+            KichCo = variant.KichCo,
+            DonGia = variant.GiaBan > 0 ? variant.GiaBan : product.GiaThapNhat,
+            SoLuong = 1,
+            SoLuongTon = variant.SoLuongTon
+        });
+        CartService.SetDrawerOpen(true);
+        Toast.ShowSuccess($"Đã thêm '{product.TenSanPham}' ({variant.MauSac} / Size {variant.KichCo}) vào giỏ hàng!");
+    }
+
+    private void CloseQuickSize()
+    {
+        _isQuickSizeOpen = false;
+        _quickSelectProduct = null;
+        _quickSelectVariants.Clear();
+    }
+
+    /* AI Size Consultant & Quick Pills */
+    private bool IsAiModalOpen = false;
+    private int UserHeight = 172;
+    private int UserWeight = 68;
+    private string UserFitPreference = "F3";
+    private SizeRecommendation? ComputedSizeResult;
+
+    public class SizeRecommendation
+    {
+        public string RecommendedSize { get; set; } = "L";
+        public string FitName { get; set; } = "Phom Vừa Vặn F3";
+        public string Advice { get; set; } = string.Empty;
+    }
+
+    private void ToggleAiModal()
+    {
+        IsAiModalOpen = !IsAiModalOpen;
+        if (!IsAiModalOpen) ComputedSizeResult = null;
+    }
+
+    private void CalculateSizeRecommendation()
+    {
+        if (UserHeight <= 0 || UserWeight <= 0)
+        {
+            Toast.ShowWarning("Vui lòng nhập chiều cao và cân nặng hợp lệ.");
+            return;
+        }
+
+        string size = "M";
+        if (UserWeight < 55) size = "S";
+        else if (UserWeight <= 64) size = "M";
+        else if (UserWeight <= 74) size = "L";
+        else if (UserWeight <= 85) size = "XL";
+        else size = "2XL";
+
+        if (UserHeight > 178 && size == "M") size = "L";
+        if (UserHeight > 182 && size == "L") size = "XL";
+
+        string fitName = UserFitPreference switch
+        {
+            "F2" => "Phom Ôm Vừa (F2 - Bodyfit)",
+            "F4" => "Phom Rộng Thoáng (F4 - Relaxed Fit)",
+            "F5" => "Phom Hộp Rộng (F5 - Boxy Streetwear)",
+            _ => "Phom Tiêu Chuẩn (F3 - Regular Fit)"
+        };
+
+        ComputedSizeResult = new SizeRecommendation
+        {
+            RecommendedSize = size,
+            FitName = fitName,
+            Advice = $"Với chiều cao {UserHeight}cm và cân nặng {UserWeight}kg theo gu {fitName}, Size {size} sẽ giúp bạn tôn dáng bờ vai, cử động thoải mái và không bị căng chật vùng ngực hay eo."
+        };
+    }
+
+    private void ResetAiCalculator()
+    {
+        ComputedSizeResult = null;
+    }
+
+    private void ShopRecommendedSize()
+    {
+        IsAiModalOpen = false;
+        Toast.ShowSuccess($"Stylist AI đã gợi ý chuẩn Size {ComputedSizeResult?.RecommendedSize}!");
+    }
+
+    private bool IsCategoryPillActive(string pillType)
+    {
+        if (!Query.CategoryId.HasValue) return false;
+        var cat = Categories.FirstOrDefault(c => c.MaDanhMuc == Query.CategoryId.Value);
+        if (cat == null) return false;
+        var lower = cat.TenDanhMuc.ToLower();
+        return pillType switch
+        {
+            "ao" => lower.Contains("áo") || lower.Contains("ao"),
+            "quan" => lower.Contains("quần") || lower.Contains("quan"),
+            "phukien" => lower.Contains("phụ kiện") || lower.Contains("phu kien"),
+            _ => false
+        };
+    }
+
+    private async Task SelectQuickPill(string pillType)
+    {
+        var targetCat = Categories.FirstOrDefault(c =>
+        {
+            var lower = c.TenDanhMuc.ToLower();
+            return pillType switch
+            {
+                "ao" => lower.Contains("áo") || lower.Contains("ao"),
+                "quan" => lower.Contains("quần") || lower.Contains("quan"),
+                "phukien" => lower.Contains("phụ kiện") || lower.Contains("phu kien"),
+                _ => false
+            };
+        });
+
+        if (targetCat != null)
+        {
+            await SelectCategory(targetCat.MaDanhMuc);
+        }
+        else
+        {
+            await SelectCategory(null);
+        }
+    }
+
+    // =========================================================================
+    // HỆ THỐNG PHÂN CẤP DANH MỤC & BỘ LỌC CHUYÊN SÂU (SCOPED TO HEADER BRANCH)
+    // =========================================================================
+
+    public enum CatalogBranch
+    {
+        All,
+        Shirt,
+        Pant,
+        Jean,
+        Accessory,
+        Sale
+    }
+
+    public class CategoryFilterOption
+    {
+        public string Slug { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public int? CategoryId { get; set; }
+        public string? Keyword { get; set; }
+        public bool IsParentAll { get; set; }
+    }
+
+    private CatalogBranch CurrentBranch
+    {
+        get
+        {
+            if (SaleQuery == true) return CatalogBranch.Sale;
+
+            var slug = (CategoryQuery ?? string.Empty).Trim().ToLowerInvariant();
+            if (!string.IsNullOrEmpty(slug))
+            {
+                if (slug.StartsWith("phukien") || slug.Contains("that-lung") || slug == "vo" || slug.Contains("gang") || slug.Contains("balo") || slug.Contains("vi") || slug.Contains("non") || slug.Contains("tui"))
+                {
+                    return CatalogBranch.Accessory;
+                }
+
+                if (slug.StartsWith("jean") || slug.Contains("jeans"))
+                {
+                    return CatalogBranch.Jean;
+                }
+
+                if (slug.StartsWith("quan") || slug.Contains("kaki") || slug.Contains("tay") || slug.Contains("short") || slug.Contains("lot") || slug.Contains("dai"))
+                {
+                    return CatalogBranch.Pant;
+                }
+
+                if (slug.StartsWith("ao") || slug.Contains("so-mi") || slug.Contains("polo") || slug.Contains("thun") || slug.Contains("tanktop") || slug.Contains("khoac"))
+                {
+                    return CatalogBranch.Shirt;
+                }
+            }
+
+            if (CategoryIdQuery.HasValue)
+            {
+                var catId = CategoryIdQuery.Value;
+                if (catId == 3 || catId == 9 || catId == 10) return CatalogBranch.Accessory;
+                if (catId == 13 || catId == 16) return CatalogBranch.Jean;
+                if (catId == 5 || catId == 7 || catId == 14) return CatalogBranch.Pant;
+                if (catId == 4 || catId == 6 || catId == 11 || catId == 12 || catId == 15) return CatalogBranch.Shirt;
+            }
+
+            if (Query.CategoryId.HasValue)
+            {
+                var catId = Query.CategoryId.Value;
+                if (catId == 3 || catId == 9 || catId == 10) return CatalogBranch.Accessory;
+                if (catId == 13 || catId == 16) return CatalogBranch.Jean;
+                if (catId == 5 || catId == 7 || catId == 14) return CatalogBranch.Pant;
+                if (catId == 4 || catId == 6 || catId == 11 || catId == 12 || catId == 15) return CatalogBranch.Shirt;
+            }
+
+            return CatalogBranch.All;
+        }
+    }
+
+    private string GetBranchParentSlug() => CurrentBranch switch
+    {
+        CatalogBranch.Shirt => "ao",
+        CatalogBranch.Pant => "quan",
+        CatalogBranch.Jean => "jean",
+        CatalogBranch.Accessory => "phukien",
+        CatalogBranch.Sale => "sale",
+        _ => ""
+    };
+
+    private IEnumerable<CategoryFilterOption> GetAvailableCategoryOptions()
+    {
+        return CurrentBranch switch
+        {
+            CatalogBranch.Pant => new List<CategoryFilterOption>
+            {
+                new() { Slug = "quan", Name = "Tất cả Quần", CategoryId = 5, IsParentAll = true },
+                new() { Slug = "quan-tay", Name = "Quần Tây Lịch Lãm", CategoryId = 16 },
+                new() { Slug = "quan-jeans", Name = "Quần Jeans", CategoryId = 13 },
+                new() { Slug = "quan-dai", Name = "Quần Kaki / Chinos", CategoryId = 14 },
+                new() { Slug = "quan-short", Name = "Đồ Bộ & Thể Thao", CategoryId = 8 }
+            },
+            CatalogBranch.Shirt => new List<CategoryFilterOption>
+            {
+                new() { Slug = "ao", Name = "Tất cả Áo", CategoryId = 4, IsParentAll = true },
+                new() { Slug = "ao-thun", Name = "Áo Thun & Polo", CategoryId = 11 },
+                new() { Slug = "ao-so-mi", Name = "Áo Sơ Mi Không Nhăn", CategoryId = 12 },
+                new() { Slug = "ao-khoac", Name = "Áo Khoác Dù / Bomber", CategoryId = 15 },
+                new() { Slug = "ao-hoodie", Name = "Áo Hoodie & Sweater", CategoryId = 17 }
+            },
+            CatalogBranch.Jean => new List<CategoryFilterOption>
+            {
+                new() { Slug = "jean", Name = "Tất cả Đồ Jean", CategoryId = 13, IsParentAll = true },
+                new() { Slug = "quan-jeans", Name = "Quần Jeans", CategoryId = 13 }
+            },
+            CatalogBranch.Accessory => new List<CategoryFilterOption>
+            {
+                new() { Slug = "phukien", Name = "Tất cả Phụ Kiện", CategoryId = 3, IsParentAll = true },
+                new() { Slug = "that-lung", Name = "Thắt Lưng & Ví Da", CategoryId = 10 },
+                new() { Slug = "balo", Name = "Balo & Túi Xách Thời Trang", CategoryId = 9 }
+            },
+            CatalogBranch.Sale => new List<CategoryFilterOption>
+            {
+                new() { Slug = "sale", Name = "Tất cả Deal SALE", IsParentAll = true },
+                new() { Slug = "sale-quan-ao", Name = "Sale Quần Áo", CategoryId = 1 },
+                new() { Slug = "sale-phu-kien", Name = "Sale Phụ Kiện", CategoryId = 3 }
+            },
+            _ => new List<CategoryFilterOption>
+            {
+                new() { Slug = "", Name = "Tất cả danh mục", IsParentAll = true },
+                new() { Slug = "ao", Name = "Áo (Tất cả)", CategoryId = 4 },
+                new() { Slug = "ao-thun", Name = "— Áo Thun & Polo", CategoryId = 11 },
+                new() { Slug = "ao-so-mi", Name = "— Áo Sơ Mi Không Nhăn", CategoryId = 12 },
+                new() { Slug = "ao-khoac", Name = "— Áo Khoác", CategoryId = 15 },
+                new() { Slug = "ao-hoodie", Name = "— Áo Hoodie & Sweater", CategoryId = 17 },
+                new() { Slug = "quan", Name = "Quần (Tất cả)", CategoryId = 5 },
+                new() { Slug = "quan-jeans", Name = "— Quần Jeans", CategoryId = 13 },
+                new() { Slug = "quan-dai", Name = "— Quần Kaki / Chinos", CategoryId = 14 },
+                new() { Slug = "quan-tay", Name = "— Quần Tây", CategoryId = 16 },
+                new() { Slug = "quan-short", Name = "— Đồ Bộ & Thể Thao", CategoryId = 8 },
+                new() { Slug = "phukien", Name = "Phụ Kiện (Tất cả)", CategoryId = 3 },
+                new() { Slug = "that-lung", Name = "— Thắt Lưng & Ví Da", CategoryId = 10 },
+                new() { Slug = "balo", Name = "— Balo & Túi Xách", CategoryId = 9 }
+            }
+        };
+    }
+
+    private CategoryFilterOption? GetActiveOption()
+    {
+        var slug = (CategoryQuery ?? string.Empty).Trim().ToLowerInvariant();
+        var options = GetAvailableCategoryOptions().ToList();
+        if (string.IsNullOrEmpty(slug))
+        {
+            return options.FirstOrDefault(o => o.IsParentAll);
+        }
+        var matched = options.FirstOrDefault(o => o.Slug == slug);
+        if (matched != null) return matched;
+        return options.FirstOrDefault(o => o.IsParentAll);
+    }
+
+    private bool IsActiveCategoryOption(CategoryFilterOption opt)
+    {
+        var active = GetActiveOption();
+        if (active == null) return opt.IsParentAll;
+        return opt.Slug == active.Slug;
+    }
+
+    private string GetSelectedCategoryChipLabel()
+    {
+        var active = GetActiveOption();
+        if (active != null)
+        {
+            return active.Name.Replace("— ", "");
+        }
+        return "Danh mục";
+    }
+
+    private bool HasActiveCategoryFilter
+    {
+        get
+        {
+            var active = GetActiveOption();
+            return active != null && !active.IsParentAll;
+        }
+    }
+
+    private string? ActiveDropdown = null;
+    private bool _onlyInStock = false;
+
+    private void ToggleDropdown(string key)
+    {
+        ActiveDropdown = (ActiveDropdown == key) ? null : key;
+    }
+
+    private void CloseAllDropdowns()
+    {
+        ActiveDropdown = null;
+    }
+
+    private void SelectCategoryOption(CategoryFilterOption opt)
+    {
+        ActiveDropdown = null;
+        if (opt.IsParentAll)
+        {
+            var parentSlug = GetBranchParentSlug();
+            if (CurrentBranch == CatalogBranch.Sale)
+            {
+                NavManager.NavigateTo("/catalog?sale=true");
+            }
+            else if (!string.IsNullOrEmpty(parentSlug))
+            {
+                NavManager.NavigateTo($"/catalog?category={parentSlug}");
+            }
+            else
+            {
+                NavManager.NavigateTo("/catalog");
+            }
+        }
+        else
+        {
+            if (CurrentBranch == CatalogBranch.Sale)
+            {
+                NavManager.NavigateTo($"/catalog?sale=true&category={opt.Slug}");
+            }
+            else
+            {
+                NavManager.NavigateTo($"/catalog?category={opt.Slug}");
+            }
+        }
+    }
+
+    private void ResetToBranchDefault()
+    {
+        ActiveDropdown = null;
+        _selectedKieuFilters.Clear();
+        var parentSlug = GetBranchParentSlug();
+        if (CurrentBranch == CatalogBranch.Sale)
+        {
+            NavManager.NavigateTo("/catalog?sale=true");
+        }
+        else if (!string.IsNullOrEmpty(parentSlug))
+        {
+            NavManager.NavigateTo($"/catalog?category={parentSlug}");
+        }
+        else
+        {
+            NavManager.NavigateTo("/catalog");
+        }
+    }
+
+    private async Task SelectBrandFilter(int? brandId)
+    {
+        ActiveDropdown = null;
+        await SelectBrand(brandId);
+    }
+
+    private string GetPriceFilterLabel()
+    {
+        if (Query.MinPrice.HasValue && Query.MaxPrice.HasValue)
+            return $"{Query.MinPrice.Value:N0} - {Query.MaxPrice.Value:N0} ₫";
+        if (Query.MaxPrice.HasValue)
+            return $"Dưới {Query.MaxPrice.Value:N0} ₫";
+        if (Query.MinPrice.HasValue)
+            return $"Trên {Query.MinPrice.Value:N0} ₫";
+        return "Mức giá";
+    }
+
+    private async Task SetPriceFilter(decimal? min, decimal? max)
+    {
+        Query.MinPrice = min;
+        Query.MaxPrice = max;
+        Query.PageNumber = 1;
+        ActiveDropdown = null;
+        await LoadProductsAsync();
+    }
+
+    private void SetStockFilter(bool onlyInStock)
+    {
+        _onlyInStock = onlyInStock;
+        ActiveDropdown = null;
+    }
+
+    private List<string> _selectedKieuFilters = new();
+
+    public class KieuOption
+    {
+        public string Name { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+
+    private IEnumerable<KieuOption> GetAvailableKieuOptions()
+    {
+        return new List<KieuOption>
+        {
+            new() { Name = "Quần Tây Loose Fit", Label = "Quần Tây Loose Fit (1)" },
+            new() { Name = "Quần Tây Regular Fit", Label = "Quần Tây Regular Fit (4)" },
+            new() { Name = "Quần Tây Slim Fit", Label = "Quần Tây Slim Fit (20)" }
+        };
+    }
+
+    private void ToggleKieuFilter(string name, bool isChecked)
+    {
+        if (isChecked && !_selectedKieuFilters.Contains(name))
+            _selectedKieuFilters.Add(name);
+        else if (!isChecked)
+            _selectedKieuFilters.Remove(name);
+    }
+
+    private Task RemoveKieuFilter(string name)
+    {
+        _selectedKieuFilters.Remove(name);
+        return Task.CompletedTask;
+    }
+
+    private Task ResetKieuFilters()
+    {
+        _selectedKieuFilters.Clear();
+        return Task.CompletedTask;
+    }
+
+    private bool _hasActiveFilters => HasActiveCategoryFilter || _selectedKieuFilters.Any() || Query.BrandId.HasValue || Query.MinPrice.HasValue || Query.MaxPrice.HasValue || _onlyInStock;
+
+    private void ClearAllHorizontalFilters()
+    {
+        Query.BrandId = null;
+        Query.MinPrice = null;
+        Query.MaxPrice = null;
+        _onlyInStock = false;
+        _selectedKieuFilters.Clear();
+        ActiveDropdown = null;
+        ResetToBranchDefault();
+    }
+
+    private IEnumerable<ProductListItemDto> DisplayedProducts
+    {
+        get
+        {
+            if (PagedResult == null || PagedResult.Items == null)
+                return Enumerable.Empty<ProductListItemDto>();
+
+            if (_onlyInStock)
+                return PagedResult.Items.Where(p => p.TongTonKho > 0);
+
+            return PagedResult.Items;
+        }
+    }
+}
+

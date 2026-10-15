@@ -1,0 +1,257 @@
+@page "/stores"
+@namespace Frontend.Pages
+@inject NavigationManager Navigation
+
+<PageTitle>Hệ thống cửa hàng | QF Fashion</PageTitle>
+
+<div class="stores-page-container">
+    <div class="yame-container">
+        <!-- Breadcrumb -->
+        <nav class="stores-breadcrumb" aria-label="Đường dẫn">
+            <a href="/" class="bc-link">Trang chủ</a>
+            <span class="bc-sep">›</span>
+            <span class="bc-curr">Hệ thống cửa hàng</span>
+        </nav>
+
+        <!-- Header -->
+        <div class="stores-header">
+            <h1 class="stores-title">HỆ THỐNG CỬA HÀNG QF FASHION</h1>
+            <p class="stores-subtitle">Hơn 40 chi nhánh toàn quốc • Mở cửa 8:30 - 22:00 mỗi ngày</p>
+        </div>
+
+        <!-- Filter Cities (Minimalist Clean Tab Bar) -->
+        <div class="stores-filter-bar">
+            @foreach (var city in _cities)
+            {
+                <button type="button" 
+                        class="city-chip @(_selectedCity == city ? "active" : "")"
+                        @onclick="() => _selectedCity = city">
+                    @city
+                </button>
+            }
+        </div>
+
+        <!-- Store List (Hoàn toàn tự nhiên, không khung viền hộp) -->
+        <div class="stores-grid">
+            @foreach (var store in FilteredStores)
+            {
+                <div class="store-item">
+                    <div class="store-meta-header">
+                        <span class="store-city-label">@store.City</span>
+                        <h3 class="store-name">@store.Name</h3>
+                    </div>
+                    
+                    <div class="store-info-row">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                        <span>@store.Address</span>
+                    </div>
+
+                    <div class="store-info-row">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>8:30 - 22:00 (Mỗi ngày)</span>
+                    </div>
+
+                    <div class="store-info-row">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <span>Hotline: <strong>@store.Phone</strong></span>
+                    </div>
+
+                    <div class="store-actions">
+                        <a href="https://maps.google.com/?q=@Uri.EscapeDataString(store.Address)" target="_blank" rel="noopener noreferrer" class="btn-store-map">
+                            Chỉ đường Maps →
+                        </a>
+                        <a href="tel:@store.Phone.Replace(" ", "")" class="btn-store-call">
+                            Gọi cửa hàng
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .stores-page-container {
+        padding: 2rem 0 5rem 0;
+        background-color: #FFFFFF;
+        min-height: 80vh;
+    }
+    .stores-breadcrumb {
+        font-size: 0.85rem;
+        color: #64748B;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .bc-link {
+        color: #64748B;
+        text-decoration: none;
+    }
+    .bc-link:hover {
+        color: #0F172A;
+    }
+    .bc-sep {
+        color: #94A3B8;
+        font-size: 0.85rem;
+    }
+    .bc-curr {
+        color: #0F172A;
+        font-weight: 500;
+    }
+
+    .stores-header {
+        margin-bottom: 2.5rem;
+    }
+    .stores-title {
+        font-family: var(--font-display);
+        font-size: 2.2rem;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        color: #0F172A;
+        margin-bottom: 0.5rem;
+    }
+    .stores-subtitle {
+        font-size: 0.95rem;
+        color: #64748B;
+    }
+
+    .stores-filter-bar {
+        display: flex;
+        gap: 1.25rem;
+        flex-wrap: wrap;
+        margin-bottom: 3rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .city-chip {
+        background: transparent;
+        border: none;
+        padding: 0.4rem 0;
+        font-size: 0.92rem;
+        font-weight: 500;
+        color: #64748B;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+    .city-chip:hover {
+        color: #0F172A;
+    }
+    .city-chip.active {
+        color: #0F172A;
+        font-weight: 700;
+    }
+    .city-chip.active::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: #000000;
+    }
+
+    /* Store Grid (Tự nhiên, không viền khung hộp) */
+    .stores-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 3rem 2.5rem;
+    }
+    .store-item {
+        background: transparent;
+        border-bottom: 1px solid #F1F5F9;
+        padding-bottom: 2rem;
+        display: flex;
+        flex-direction: column;
+    }
+    .store-meta-header {
+        margin-bottom: 1rem;
+    }
+    .store-city-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #94A3B8;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .store-name {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin: 0;
+    }
+    .store-info-row {
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+        font-size: 0.9rem;
+        color: #475569;
+        margin-bottom: 0.65rem;
+        line-height: 1.5;
+    }
+    .store-info-row svg {
+        flex-shrink: 0;
+        color: #64748B;
+        margin-top: 2px;
+    }
+    .store-actions {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 1rem;
+        padding-top: 0.75rem;
+    }
+    .btn-store-map {
+        color: #0F172A !important;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: underline !important;
+        transition: color 0.15s ease;
+    }
+    .btn-store-map:hover {
+        color: #E11D48 !important;
+    }
+    .btn-store-call {
+        color: #64748B !important;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-decoration: none !important;
+        transition: color 0.15s ease;
+    }
+    .btn-store-call:hover {
+        color: #0F172A !important;
+    }
+</style>
+
+@code {
+    private string _selectedCity = "Tất cả";
+    private readonly List<string> _cities = new() { "Tất cả", "TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Cần Thơ", "Biên Hòa" };
+
+    private record StoreInfo(string Name, string City, string Address, string Phone);
+
+    private readonly List<StoreInfo> _allStores = new()
+    {
+        new("QF Lê Văn Sỹ", "TP. Hồ Chí Minh", "190 Lê Văn Sỹ, Phường 10, Quận Phú Nhuận, TP.HCM", "028 7307 1440"),
+        new("QF Quang Trung", "TP. Hồ Chí Minh", "504 Quang Trung, Phường 10, Quận Gò Vấp, TP.HCM", "028 7307 1441"),
+        new("QF Sư Vạn Hạnh", "TP. Hồ Chí Minh", "770F Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM", "028 7307 1442"),
+        new("QF Huỳnh Tấn Phát", "TP. Hồ Chí Minh", "40 Huỳnh Tấn Phát, Tân Thuận Tây, Quận 7, TP.HCM", "028 7307 1443"),
+        new("QF Cầu Giấy", "Hà Nội", "216 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội", "024 7307 1450"),
+        new("QF Chùa Bộc", "Hà Nội", "112 Chùa Bộc, Phường Quang Trung, Quận Đống Đa, Hà Nội", "024 7307 1451"),
+        new("QF Lê Duẩn", "Đà Nẵng", "322 Lê Duẩn, Phường Tân Chính, Quận Thanh Khê, Đà Nẵng", "0236 730 1440"),
+        new("QF 3 Tháng 2", "Cần Thơ", "45 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Cần Thơ", "0292 730 1440"),
+        new("QF Đồng Khởi", "Biên Hòa", "283 Đồng Khởi, Phường Tân Mai, TP. Biên Hòa, Đồng Nai", "0251 730 1440")
+    };
+
+    private IEnumerable<StoreInfo> FilteredStores =>
+        _selectedCity == "Tất cả" ? _allStores : _allStores.Where(s => s.City == _selectedCity);
+}

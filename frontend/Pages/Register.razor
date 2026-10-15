@@ -1,0 +1,359 @@
+@page "/register"
+@namespace Frontend.Pages
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject NavigationManager Navigation
+
+<PageTitle>Đăng ký tài khoản thành viên | QF Noir</PageTitle>
+
+<div class="register-page-container">
+    <div class="register-card">
+        <!-- Logo Brand -->
+        <div class="register-brand-header">
+            <a href="/" class="qf-brand-lockup" aria-label="QF Noir" style="justify-content: center; margin-bottom: 1.25rem;">
+                <img src="images/logo.png" alt="QF Noir" class="qf-emblem-img" style="height: 48px;" />
+                <div class="qf-brand-divider" style="height: 38px;"></div>
+                <div class="qf-brand-title-wrap">
+                    <span class="qf-brand-name" style="font-size: 1.7rem;">QF NOIR</span>
+                </div>
+            </a>
+            <h1 class="register-title">ĐĂNG KÝ TÀI KHOẢN</h1>
+            <p class="register-subtitle">Trở thành thành viên QF Noir để tích điểm và nhận nhiều ưu đãi độc quyền</p>
+        </div>
+
+        <EditForm Model="@_registerModel" OnValidSubmit="HandleRegister">
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert-error" role="alert">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>@_errorMessage</span>
+                </div>
+            }
+
+            <div class="form-group">
+                <label for="fullName" class="form-label">Họ và tên <span class="required">*</span></label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <input type="text" id="fullName" class="form-control" placeholder="Nhập họ và tên đầy đủ" @bind="_registerModel.TenKhachHang" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="username" class="form-label">Tên đăng nhập <span class="required">*</span></label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="8.5" cy="7" r="4"></circle>
+                        <polyline points="17 11 19 13 23 9"></polyline>
+                    </svg>
+                    <input type="text" id="username" class="form-control" placeholder="Tên đăng nhập (viết liền không dấu)" @bind="_registerModel.TenDangNhap" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="phone" class="form-label">Số điện thoại <span class="required">*</span></label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                    <input type="tel" id="phone" class="form-control" placeholder="Số điện thoại dùng để tích điểm VIP" @bind="_registerModel.DienThoai" required />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email" class="form-label">Email (Tùy chọn)</label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <input type="email" id="email" class="form-control" placeholder="Địa chỉ email nhận khuyến mãi" @bind="_registerModel.Email" />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password" class="form-label">Mật khẩu <span class="required">*</span></label>
+                <div class="input-with-icon">
+                    <svg class="field-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <input type="@(_showPassword ? "text" : "password")" id="password" class="form-control" placeholder="Mật khẩu tối thiểu 6 ký tự" @bind="_registerModel.MatKhau" required />
+                    <button type="button" class="btn-toggle-eye" @onclick="() => _showPassword = !_showPassword" tabindex="-1">
+                        @if (_showPassword)
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                        }
+                        else
+                        {
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        }
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-register-submit" disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <span class="btn-spinner"></span>
+                    <span>ĐANG ĐĂNG KÝ...</span>
+                }
+                else
+                {
+                    <span>TẠO TÀI KHOẢN THÀNH VIÊN</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="register-footer-links">
+            <p class="login-prompt">
+                Đã có tài khoản? 
+                <a href="@(string.IsNullOrEmpty(ReturnUrl) ? "/login" : $"/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}")" class="login-link">Đăng nhập ngay</a>
+            </p>
+            <div class="back-home-box">
+                <a href="/" class="back-home-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Quay về Trang chủ
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .register-page-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2.5rem 1.5rem;
+        background-color: #FFFFFF;
+    }
+
+    .register-card {
+        width: 100%;
+        max-width: 440px;
+        background: transparent;
+        border: none;
+        padding: 1rem 0;
+    }
+
+    .register-brand-header {
+        text-align: center;
+        margin-bottom: 1.75rem;
+    }
+
+    .register-logo-fallback .brand-text {
+        font-family: var(--font-display);
+        font-size: 1.6rem;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        color: #000000;
+        display: block;
+        margin-bottom: 1rem;
+        text-decoration: none;
+    }
+
+    .brand-tld { color: #E11D48; }
+
+    .register-title {
+        font-family: var(--font-display);
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        color: #0F172A;
+        margin-bottom: 0.35rem;
+    }
+
+    .register-subtitle {
+        font-size: 0.85rem;
+        color: #64748B;
+        line-height: 1.4;
+    }
+
+    .alert-error {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #FEF2F2;
+        border: 1px solid #FCA5A5;
+        color: #DC2626;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.15rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 0.4rem;
+    }
+
+    .required { color: #E11D48; }
+
+    .input-with-icon {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .field-icon {
+        position: absolute;
+        left: 12px;
+        color: #94A3B8;
+        pointer-events: none;
+    }
+
+    .form-control {
+        width: 100%;
+        height: 44px;
+        padding: 0.5rem 2.5rem 0.5rem 2.6rem;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        color: #0F172A;
+        background-color: #FFFFFF;
+        transition: border-color 0.2s ease;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #0F172A;
+    }
+
+    .btn-toggle-eye {
+        position: absolute;
+        right: 12px;
+        background: transparent;
+        border: none;
+        color: #94A3B8;
+        cursor: pointer;
+        padding: 0;
+    }
+
+    .btn-register-submit {
+        width: 100%;
+        height: 48px;
+        background: #0F172A;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 1.5rem;
+        transition: background-color 0.2s ease;
+    }
+
+    .btn-register-submit:hover:not(:disabled) {
+        background: #1E293B;
+    }
+
+    .btn-register-submit:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+    }
+
+    .register-footer-links {
+        margin-top: 1.75rem;
+        text-align: center;
+        padding-top: 1.25rem;
+        border-top: 1px solid #F1F5F9;
+    }
+
+    .login-prompt {
+        font-size: 0.85rem;
+        color: #64748B;
+        margin-bottom: 0.75rem;
+    }
+
+    .login-link {
+        color: #0F172A;
+        font-weight: 700;
+        text-decoration: none;
+        margin-left: 4px;
+    }
+
+    .login-link:hover {
+        text-decoration: underline;
+    }
+
+    .back-home-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        color: #64748B;
+        text-decoration: none;
+    }
+
+    .back-home-link:hover {
+        color: #0F172A;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private global::Shared.DTOs.Auth.RegisterCustomerDto _registerModel = new();
+    private bool _showPassword;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleRegister()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_registerModel.Email))
+            {
+                _registerModel.Email = null;
+            }
+
+            var res = await AdminApi.RegisterCustomerAsync(_registerModel);
+            if (res.Success)
+            {
+                Toast.ShowSuccess("Đăng ký tài khoản thành viên thành công! Vui lòng đăng nhập.");
+                var loginUrl = string.IsNullOrEmpty(ReturnUrl) ? "/login" : $"/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+                Navigation.NavigateTo(loginUrl);
+            }
+            else
+            {
+                _errorMessage = res.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Lỗi kết nối máy chủ: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

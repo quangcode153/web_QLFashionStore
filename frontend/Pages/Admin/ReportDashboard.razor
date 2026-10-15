@@ -1,0 +1,1428 @@
+@page "/admin"
+@page "/admin/dashboard"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<div class="report-dashboard-container">
+    <div class="dashboard-header">
+        <div>
+            <h2 class="dashboard-title">BÁO CÁO & TỔNG QUAN</h2>
+            <p class="dashboard-subtitle">Theo dõi doanh thu, hiệu suất bán hàng và phân tích xu hướng</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn btn-outline btn-refresh" @onclick="RefreshData" disabled="@_isLoading" title="Tải lại số liệu báo cáo mới nhất">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="@(_isLoading ? "spin-refresh" : "")">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span>@(_isLoading ? "Đang đồng bộ..." : "Làm mới dữ liệu")</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPIs Summary Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Doanh thu gần nhất</div>
+            <div class="kpi-value">@(LatestRevenue.ToString("N0")) đ</div>
+            <div class="kpi-sub">Tổng số đơn: @LatestOrderCount</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Tổng doanh thu kỳ</div>
+            <div class="kpi-value text-success">@(TotalPeriodRevenue.ToString("N0")) đ</div>
+            <div class="kpi-sub">@_dailyRevenues.Count ngày ghi nhận</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Sản phẩm bán chạy nhất</div>
+            <div class="kpi-value" style="font-size: 1.1rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                @(_topSelling.FirstOrDefault()?.TenSanPham ?? "Chưa có dữ liệu")
+            </div>
+            <div class="kpi-sub">Đã bán: @(_topSelling.FirstOrDefault()?.TongSoLuongDaBan ?? 0) sản phẩm</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Tổng tiền chiết khấu</div>
+            <div class="kpi-value text-danger">@(TotalPeriodDiscount.ToString("N0")) đ</div>
+            <div class="kpi-sub">Voucher & Khách VIP</div>
+        </div>
+    </div>
+
+    <!-- KHU VỰC TRA CỨU: TRA CỨU 1 NGÀY & KHOẢNG THỜI GIAN -->
+    <div class="search-section-grid">
+        <!-- 1. TRA CỨU DỮ LIỆU CỦA 1 NGÀY CỤ THỂ -->
+        <div class="range-filter-card single-date-card">
+            <div class="card-title-row">
+                <h4 class="card-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Tra cứu dữ liệu 1 ngày cụ thể
+                </h4>
+                <span class="badge-tag">Theo ngày</span>
+            </div>
+            <p class="card-desc">Chọn một ngày trong quá khứ để xem số đơn, tiền hàng và doanh thu thực tế</p>
+
+            <div class="filter-controls single-date-controls">
+                <div class="form-group flex-grow">
+                    <label>Chọn ngày cần xem:</label>
+                    <input type="date" class="form-control" @bind="_singleDate" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+                <button class="btn btn-primary btn-search-single" @onclick="FetchSingleDateReport" disabled="@_isSearchingSingle">
+                    @if (_isSearchingSingle)
+                    {
+                        <span>Đang tìm...</span>
+                    }
+                    else
+                    {
+                        <span>Tra cứu ngày này</span>
+                    }
+                </button>
+            </div>
+
+            <!-- Quick Day Shortcuts -->
+            <div class="quick-chips">
+                <span class="quick-chip-label">Chọn nhanh:</span>
+                <button type="button" class="chip-btn" @onclick="() => SetSingleDate(DateTime.Today)">Hôm nay</button>
+                <button type="button" class="chip-btn" @onclick="() => SetSingleDate(DateTime.Today.AddDays(-1))">Hôm qua</button>
+                <button type="button" class="chip-btn" @onclick="() => SetSingleDate(DateTime.Today.AddDays(-2))">Hôm kia</button>
+                <button type="button" class="chip-btn" @onclick="() => SetSingleDate(DateTime.Today.AddDays(-7))">7 ngày trước</button>
+            </div>
+
+            @if (_singleDateSearched)
+            {
+                <div class="single-date-result-box">
+                    <div class="result-header">
+                        <span class="result-date-badge">Kết quả ngày: <strong>@_singleDate.ToString("dd/MM/yyyy")</strong></span>
+                    </div>
+                    @if (_singleDateReport != null && (_singleDateReport.TongSoDonHoanThanh > 0 || _singleDateReport.TongDoanhThuThuc > 0))
+                    {
+                        <div class="single-stats-grid">
+                            <div class="single-stat-item highlight">
+                                <span class="stat-lbl">Doanh thu thực</span>
+                                <span class="stat-val text-success">@_singleDateReport.TongDoanhThuThuc.ToString("N0") đ</span>
+                            </div>
+                            <div class="single-stat-item">
+                                <span class="stat-lbl">Số đơn hoàn thành</span>
+                                <span class="stat-val">@_singleDateReport.TongSoDonHoanThanh đơn</span>
+                            </div>
+                            <div class="single-stat-item">
+                                <span class="stat-lbl">Số khách mua</span>
+                                <span class="stat-val">@_singleDateReport.TongSoKhachHang khách</span>
+                            </div>
+                            <div class="single-stat-item">
+                                <span class="stat-lbl">Tổng tiền hàng</span>
+                                <span class="stat-val">@_singleDateReport.TongTienHang.ToString("N0") đ</span>
+                            </div>
+                            <div class="single-stat-item">
+                                <span class="stat-lbl">Khuyến mãi / Giảm</span>
+                                <span class="stat-val text-danger">-@_singleDateReport.TongTienKhuyenMai.ToString("N0") đ</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="single-empty-notice">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <span>Ngày <strong>@_singleDate.ToString("dd/MM/yyyy")</strong> chưa có đơn hàng hoàn thành hoặc phát sinh doanh thu.</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- 2. BỘ LỌC BÁO CÁO TÀI CHÍNH THEO KHOẢNG THỜI GIAN -->
+        <div class="range-filter-card">
+            <div class="card-title-row">
+                <h4 class="card-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 6px;">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Tra cứu theo khoảng thời gian
+                </h4>
+                <span class="badge-tag">Theo khoảng</span>
+            </div>
+            <p class="card-desc">Tổng hợp số liệu kinh doanh trong kỳ từ ngày bắt đầu đến ngày kết thúc</p>
+
+            <div class="filter-controls">
+                <div class="form-group">
+                    <label>Từ ngày:</label>
+                    <input type="date" class="form-control" @bind="_fromDate" />
+                </div>
+                <div class="form-group">
+                    <label>Đến ngày:</label>
+                    <input type="date" class="form-control" @bind="_toDate" />
+                </div>
+                <button class="btn btn-primary btn-apply-range" @onclick="FetchFinancialRangeReport">
+                    Xem báo cáo
+                </button>
+            </div>
+
+            @if (_financialReport != null)
+            {
+                <div class="range-result-box">
+                    <div class="range-stat">
+                        <span>Số đơn hoàn thành:</span>
+                        <strong>@_financialReport.TongSoDonHoanThanh</strong>
+                    </div>
+                    <div class="range-stat">
+                        <span>Số khách hàng:</span>
+                        <strong>@_financialReport.TongSoKhachHang</strong>
+                    </div>
+                    <div class="range-stat">
+                        <span>Tổng tiền hàng:</span>
+                        <strong>@_financialReport.TongTienHang.ToString("N0") đ</strong>
+                    </div>
+                    <div class="range-stat">
+                        <span>Tổng khuyến mãi:</span>
+                        <strong class="text-danger">-@_financialReport.TongTienKhuyenMai.ToString("N0") đ</strong>
+                    </div>
+                    <div class="range-stat highlight">
+                        <span>Doanh thu thực tế:</span>
+                        <strong class="text-success">@_financialReport.TongDoanhThuThuc.ToString("N0") đ</strong>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Phân Khu 2 Cột: Bảng Doanh Thu Hàng Ngày (Được gom gọn) & Bảng Top Bán Chạy -->
+    <div class="dashboard-tables-grid">
+        <!-- Bảng Doanh thu theo ngày (Gom lại, cuộn lên dần, chỉ hiện ngày gần nhất) -->
+        <div class="table-card compact-revenue-card">
+            <div class="table-card-topbar">
+                <div>
+                    <h4 class="card-title">Doanh Thu Theo Ngày</h4>
+                    <p class="card-subtitle-small">
+                        Hiển thị @(DisplayedDailyRevenues.Count) / @(_dailyRevenues.Count) ngày ghi nhận
+                    </p>
+                </div>
+
+                <!-- Thanh lọc số ngày gần nhất (Pill buttons) -->
+                <div class="pill-group">
+                    <button type="button" class="pill-btn @(_daysLimit == 7 ? "active" : "")" @onclick="() => SetDaysLimit(7)">7 ngày</button>
+                    <button type="button" class="pill-btn @(_daysLimit == 14 ? "active" : "")" @onclick="() => SetDaysLimit(14)">14 ngày</button>
+                    <button type="button" class="pill-btn @(_daysLimit == 30 ? "active" : "")" @onclick="() => SetDaysLimit(30)">30 ngày</button>
+                    <button type="button" class="pill-btn @(_daysLimit == 0 ? "active" : "")" @onclick="() => SetDaysLimit(0)">Tất cả</button>
+                </div>
+            </div>
+
+            <!-- Ô tìm kiếm ngày nhanh trong bảng -->
+            <div class="table-quick-search-bar">
+                <div class="search-input-wrapper">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" class="quick-search-input" placeholder="Lọc nhanh ngày (vd: 08/10 hoặc 2026)..." @bind="_dailySearchText" @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_dailySearchText))
+                    {
+                        <button type="button" class="clear-search-btn" @onclick="() => _dailySearchText = string.Empty">×</button>
+                    }
+                </div>
+            </div>
+
+            <!-- Khung cuộn giới hạn chiều cao (Scroll container gom gọn, có sticky header) -->
+            <div class="table-scroll-container">
+                <table class="admin-table sticky-header-table">
+                    <thead>
+                        <tr>
+                            <th>Ngày bán</th>
+                            <th class="text-center">Số đơn</th>
+                            <th class="text-right">Tiền hàng</th>
+                            <th class="text-right">Giảm giá</th>
+                            <th class="text-right">Doanh thu thực</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (DisplayedDailyRevenues.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    Không tìm thấy dữ liệu ngày phù hợp
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var r in DisplayedDailyRevenues)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="date-cell">
+                                            <span class="date-main">@r.NgayBan.ToString("dd/MM/yyyy")</span>
+                                            <span class="date-weekday">@GetVietnameseDayOfWeek(r.NgayBan.DayOfWeek)</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="order-count-badge">@r.TongSoDon</span>
+                                    </td>
+                                    <td class="text-right">@r.TongTienHang.ToString("N0")</td>
+                                    <td class="text-right text-danger">@(r.TongTienGiam > 0 ? $"-{r.TongTienGiam:N0}" : "0")</td>
+                                    <td class="text-right font-weight-bold text-success">@r.DoanhThuThucTe.ToString("N0") đ</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-scroll-hint">
+                <span>↕ Kéo cuộn danh sách lên / xuống để xem thêm các ngày đã qua</span>
+            </div>
+        </div>
+
+        <!-- Bảng Top Sản Phẩm Bán Chạy -->
+        <div class="table-card">
+            <div class="table-card-topbar">
+                <div>
+                    <h4 class="card-title">Top Sản Phẩm Bán Chạy</h4>
+                    <p class="card-subtitle-small">Top 20 mặt hàng có doanh thu và số lượng bán cao nhất</p>
+                </div>
+            </div>
+            <div class="table-scroll-container">
+                <table class="admin-table sticky-header-table">
+                    <thead>
+                        <tr>
+                            <th>Tên sản phẩm</th>
+                            <th>Danh mục</th>
+                            <th class="text-center">Đã bán</th>
+                            <th class="text-right">Doanh thu mang lại</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_topSelling.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">Chưa có dữ liệu</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var p in _topSelling)
+                            {
+                                <tr>
+                                    <td class="font-weight-bold">@p.TenSanPham</td>
+                                    <td><span class="badge-category">@p.TenDanhMuc</span></td>
+                                    <td class="text-center font-weight-bold">@p.TongSoLuongDaBan</td>
+                                    <td class="text-right text-primary font-weight-bold">@p.TongDoanhThuMangLai.ToString("N0") đ</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHÂN KHU HIỆU SUẤT CHI NHÁNH & GIÁM SÁT KHO HÀNG ĐA ĐIỂM -->
+    <div class="branch-performance-section">
+        <div class="section-header-row">
+            <div>
+                <h3 class="section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 8px;">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    HIỆU SUẤT CHI NHÁNH & GIÁM SÁT KHO HÀNG ĐA ĐIỂM
+                </h3>
+                <p class="section-subtitle">Xác định chi nhánh dẫn đầu doanh số và theo dõi mức tồn kho từng điểm bán</p>
+            </div>
+            <div class="branch-summary-pills">
+                <span class="summary-pill">@_branchLeaderboard.Count điểm bán & kho</span>
+                <span class="summary-pill highlight">Đầu bảng: @(_branchLeaderboard.FirstOrDefault()?.TenChiNhanh ?? "Chưa có")</span>
+            </div>
+        </div>
+
+        <div class="branch-grids-two-col">
+            <!-- 1. BẢNG XẾP HẠNG DOANH SỐ CHI NHÁNH -->
+            <div class="table-card branch-leaderboard-card">
+                <div class="table-card-topbar">
+                    <div>
+                        <h4 class="card-title">Bảng Xếp Hạng Doanh Số Chi Nhánh</h4>
+                        <p class="card-subtitle-small">Xếp theo tổng doanh thu hoàn thành từ cao xuống thấp</p>
+                    </div>
+                </div>
+
+                <div class="table-scroll-container">
+                    <table class="admin-table sticky-header-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 55px;" class="text-center">Hạng</th>
+                                <th>Chi nhánh</th>
+                                <th class="text-center" style="width: 80px;">Số đơn</th>
+                                <th class="text-right">Doanh thu</th>
+                                <th style="width: 140px;">Tỷ lệ đóng góp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_branchLeaderboard.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-4">Chưa có dữ liệu doanh số chi nhánh</td></tr>
+                            }
+                            else
+                            {
+                                int rank = 1;
+                                @foreach (var b in _branchLeaderboard)
+                                {
+                                    <tr class="@(rank == 1 ? "top-branch-row" : "")">
+                                        <td class="text-center">
+                                            @if (rank == 1)
+                                            {
+                                                <span class="rank-badge rank-1" title="Hạng 1 - Doanh số cao nhất">1</span>
+                                            }
+                                            else if (rank == 2)
+                                            {
+                                                <span class="rank-badge rank-2">2</span>
+                                            }
+                                            else if (rank == 3)
+                                            {
+                                                <span class="rank-badge rank-3">3</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="rank-badge rank-normal">@rank</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="branch-name-box">
+                                                <span class="branch-name-text">@b.TenChiNhanh</span>
+                                                @if (b.IsOnlineWarehouse)
+                                                {
+                                                    <span class="badge-online">Kho Tổng Online</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge-store">Cửa hàng Offline</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="text-center tabular-nums font-weight-bold">@b.TongSoDon</td>
+                                        <td class="text-right text-success font-weight-bold tabular-nums">@b.TongDoanhThu.ToString("N0") đ</td>
+                                        <td>
+                                            <div class="contribution-box">
+                                                <div class="contribution-progress">
+                                                    <div class="contribution-bar" style="width: @Math.Min(b.TyLeDongGop, 100)%"></div>
+                                                </div>
+                                                <span class="contribution-label">@b.TyLeDongGop.ToString("0.1")%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    rank++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. GIÁM SÁT SẢN LƯỢNG TỒN KHO CHI NHÁNH -->
+            <div class="table-card branch-inventory-card">
+                <div class="table-card-topbar">
+                    <div>
+                        <h4 class="card-title">Giám Sát Sản Lượng & Tồn Kho Từng Kho</h4>
+                        <p class="card-subtitle-small">Theo dõi tổng mặt hàng, tồn kho và cảnh báo thiếu hàng</p>
+                    </div>
+                </div>
+
+                <div class="table-scroll-container">
+                    <table class="admin-table sticky-header-table">
+                        <thead>
+                            <tr>
+                                <th>Chi nhánh</th>
+                                <th class="text-center">Số SKU</th>
+                                <th class="text-center">Tổng tồn</th>
+                                <th class="text-center">Sắp hết</th>
+                                <th class="text-right">Giá trị tồn kho</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_branchInventorySummaries.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-4">Chưa có dữ liệu tồn kho chi nhánh</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var inv in _branchInventorySummaries)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="branch-name-box">
+                                                <span class="branch-name-text">@inv.TenChiNhanh</span>
+                                                @if (inv.IsOnlineWarehouse)
+                                                {
+                                                    <span class="badge-online">Kho Tổng Online</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td class="text-center tabular-nums">@inv.TongSoMatHang</td>
+                                        <td class="text-center tabular-nums font-weight-bold @(inv.TongSoLuongTon == 0 ? "text-danger" : "")">
+                                            @inv.TongSoLuongTon.ToString("N0")
+                                        </td>
+                                        <td class="text-center">
+                                            @if (inv.SoMatHangSapHet > 0)
+                                            {
+                                                <span class="badge-lowstock" title="Số mặt hàng có tồn kho <= 10">@inv.SoMatHangSapHet SKU</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-ok">Đầy đủ</span>
+                                            }
+                                        </td>
+                                        <td class="text-right tabular-nums text-primary font-weight-bold">
+                                            @inv.TongGiaTriTonKho.ToString("N0") đ
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .report-dashboard-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+
+    .btn-outline {
+        background-color: #ffffff;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+        background-color: #f8fafc;
+        border-color: #94a3b8;
+    }
+
+    .btn-outline:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background-color: #0f172a;
+        color: #ffffff;
+        border: 1px solid #0f172a;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background-color: #1e293b;
+        border-color: #1e293b;
+    }
+
+    .spin-refresh {
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .dashboard-title {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .dashboard-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 4px 0 0 0;
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .kpi-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+    }
+
+    .kpi-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 6px 0;
+    }
+
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    /* SEARCH SECTION GRID: 2 CỘT */
+    .search-section-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @@media (max-width: 992px) {
+        .search-section-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .range-filter-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+
+    .card-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 4px;
+    }
+
+    .card-title {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .card-desc {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 0 0 14px 0;
+    }
+
+    .badge-tag {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        background: #f1f5f9;
+        color: #475569;
+        border-radius: 12px;
+    }
+
+    .filter-controls {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .single-date-controls {
+        margin-bottom: 12px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .flex-grow {
+        flex: 1;
+        min-width: 160px;
+    }
+
+    .form-group label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .form-control:focus {
+        border-color: #0f172a;
+        outline: none;
+    }
+
+    /* QUICK CHIPS CHO 1 NGÀY */
+    .quick-chips {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+
+    .quick-chip-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .chip-btn {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #334155;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .chip-btn:hover {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    /* KẾT QUẢ TRA CỨU 1 NGÀY */
+    .single-date-result-box {
+        margin-top: 14px;
+        padding: 14px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .result-header {
+        margin-bottom: 12px;
+    }
+
+    .result-date-badge {
+        font-size: 0.85rem;
+        color: #1e293b;
+    }
+
+    .single-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px;
+    }
+
+    .single-stat-item {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .single-stat-item.highlight {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+    }
+
+    .stat-lbl {
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .stat-val {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .single-empty-notice {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        background: #ffffff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .range-result-box {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed #e2e8f0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .range-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .range-stat strong {
+        font-size: 1.05rem;
+        color: #0f172a;
+    }
+
+    .range-stat.highlight strong {
+        font-size: 1.2rem;
+    }
+
+    /* BẢNG GRID */
+    .dashboard-tables-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @@media (max-width: 992px) {
+        .dashboard-tables-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .table-card-topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .card-subtitle-small {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin: 2px 0 0 0;
+    }
+
+    /* PILL BUTTONS LỌC SỐ NGÀY */
+    .pill-group {
+        display: flex;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 6px;
+        gap: 2px;
+    }
+
+    .pill-btn {
+        background: transparent;
+        border: none;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .pill-btn:hover {
+        color: #0f172a;
+    }
+
+    .pill-btn.active {
+        background: #0f172a;
+        color: #ffffff;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    /* QUICK SEARCH BAR TRONG BẢNG */
+    .table-quick-search-bar {
+        margin-bottom: 10px;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-input-wrapper svg {
+        position: absolute;
+        left: 10px;
+        pointer-events: none;
+    }
+
+    .quick-search-input {
+        width: 100%;
+        padding: 6px 30px 6px 32px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        background: #f8fafc;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+    }
+
+    .quick-search-input:focus {
+        background: #ffffff;
+        border-color: #0f172a;
+        outline: none;
+    }
+
+    .clear-search-btn {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        font-size: 1rem;
+        color: #94a3b8;
+        cursor: pointer;
+        line-height: 1;
+        padding: 2px;
+    }
+
+    .clear-search-btn:hover {
+        color: #0f172a;
+    }
+
+    /* KHUNG CUỘN CÓ ĐỘ CAO CỐ ĐỊNH VÀ STICKY HEADER */
+    .table-scroll-container {
+        max-height: 380px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #f1f5f9;
+        border-radius: 6px;
+        /* Sleek scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8;
+    }
+
+    .sticky-header-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8fafc;
+        box-shadow: 0 1px 0 #e2e8f0;
+    }
+
+    .table-scroll-hint {
+        padding: 6px 4px 0 4px;
+        font-size: 0.72rem;
+        color: #94a3b8;
+        text-align: right;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.83rem;
+    }
+
+    .admin-table th {
+        padding: 9px 12px;
+        font-weight: 600;
+        color: #475569;
+        text-align: left;
+    }
+
+    .admin-table td {
+        padding: 9px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .admin-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .date-cell {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .date-main {
+        font-weight: 600;
+        color: #0f172a;
+    }
+
+    .date-weekday {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .order-count-badge {
+        display: inline-block;
+        padding: 1px 8px;
+        background: #f1f5f9;
+        color: #1e293b;
+        font-weight: 600;
+        border-radius: 10px;
+        font-size: 0.75rem;
+    }
+
+    .badge-category {
+        background: #f1f5f9;
+        color: #334155;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+
+    .py-4 {
+        padding-top: 16px !important;
+        padding-bottom: 16px !important;
+    }
+
+    .text-success { color: #10b981; }
+    .text-danger { color: #ef4444; }
+    .text-primary { color: #0284c7; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-muted { color: #94a3b8; }
+    .font-weight-bold { font-weight: 700; }
+
+    /* STYLES FOR BRANCH PERFORMANCE & WAREHOUSE OVERSIGHT */
+    .branch-performance-section {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: 10px;
+    }
+
+    .section-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #f1f5f9;
+    }
+
+    .section-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.01em;
+    }
+
+    .section-subtitle {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 3px 0 0 0;
+    }
+
+    .branch-summary-pills {
+        display: flex;
+        gap: 8px;
+    }
+
+    .summary-pill {
+        padding: 4px 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .summary-pill.highlight {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #166534;
+    }
+
+    .branch-grids-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @@media (max-width: 1024px) {
+        .branch-grids-two-col {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .rank-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 800;
+    }
+
+    .rank-1 {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: #ffffff;
+        box-shadow: 0 2px 4px rgba(217, 119, 6, 0.3);
+    }
+
+    .rank-2 {
+        background: #94a3b8;
+        color: #ffffff;
+    }
+
+    .rank-3 {
+        background: #b45309;
+        color: #ffffff;
+    }
+
+    .rank-normal {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .top-branch-row {
+        background: #fafaf9;
+    }
+
+    .branch-name-box {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .branch-name-text {
+        font-weight: 700;
+        color: #0f172a;
+        font-size: 0.85rem;
+    }
+
+    .badge-online {
+        display: inline-block;
+        align-self: flex-start;
+        padding: 1px 6px;
+        background: #ede9fe;
+        color: #7c3aed;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .badge-store {
+        display: inline-block;
+        align-self: flex-start;
+        padding: 1px 6px;
+        background: #f1f5f9;
+        color: #475569;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .contribution-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .contribution-progress {
+        flex: 1;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .contribution-bar {
+        height: 100%;
+        background: #10b981;
+        border-radius: 3px;
+    }
+
+    .contribution-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #334155;
+        min-width: 42px;
+        text-align: right;
+    }
+
+    .badge-lowstock {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #fef2f2;
+        color: #dc2626;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .badge-ok {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #ecfdf5;
+        color: #059669;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+</style>
+
+@code {
+    private List<DailyRevenueReportDto> _dailyRevenues = new();
+    private List<TopSellingProductDto> _topSelling = new();
+    private List<BranchSalesLeaderboardDto> _branchLeaderboard = new();
+    private List<BranchInventorySummaryDto> _branchInventorySummaries = new();
+    private FinancialRangeReportDto? _financialReport;
+    private bool _isLoading = false;
+
+    // Khoảng ngày
+    private DateTime _fromDate = DateTime.Today.AddDays(-30);
+    private DateTime _toDate = DateTime.Today;
+
+    // Tra cứu 1 ngày cụ thể
+    private DateTime _singleDate = DateTime.Today;
+    private FinancialRangeReportDto? _singleDateReport;
+    private bool _isSearchingSingle = false;
+    private bool _singleDateSearched = false;
+
+    // Gom gọn & Lọc bảng Doanh thu theo ngày
+    private int _daysLimit = 7; // Mặc định chỉ hiện 7 ngày gần nhất
+    private string _dailySearchText = string.Empty;
+
+    private decimal LatestRevenue => _dailyRevenues.OrderBy(x => x.NgayBan).LastOrDefault()?.DoanhThuThucTe ?? 0;
+    private int LatestOrderCount => _dailyRevenues.OrderBy(x => x.NgayBan).LastOrDefault()?.TongSoDon ?? 0;
+    private decimal TotalPeriodRevenue => _dailyRevenues.Sum(x => x.DoanhThuThucTe);
+    private decimal TotalPeriodDiscount => _dailyRevenues.Sum(x => x.TongTienGiam);
+
+    /// <summary>
+    /// Danh sách ngày đã gom gọn: sắp xếp ngày gần nhất lên trên cùng, giới hạn số ngày, và lọc theo text tìm kiếm
+    /// </summary>
+    private List<DailyRevenueReportDto> DisplayedDailyRevenues
+    {
+        get
+        {
+            var query = _dailyRevenues.OrderByDescending(x => x.NgayBan).AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_dailySearchText))
+            {
+                var term = _dailySearchText.Trim().ToLowerInvariant();
+                query = query.Where(x => 
+                    x.NgayBan.ToString("dd/MM/yyyy").Contains(term) ||
+                    x.NgayBan.ToString("yyyy-MM-dd").Contains(term) ||
+                    GetVietnameseDayOfWeek(x.NgayBan.DayOfWeek).ToLowerInvariant().Contains(term));
+            }
+            else if (_daysLimit > 0)
+            {
+                query = query.Take(_daysLimit);
+            }
+
+            return query.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                if (!string.IsNullOrEmpty(role))
+                {
+                    if (role.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("warehouse", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Toast.ShowWarning("Tài khoản Thủ kho không có quyền truy cập Quản trị chuỗi. Đang chuyển về module Kho.");
+                        Navigation.NavigateTo("/warehouse");
+                        return;
+                    }
+                    else if (role.Contains("ThuNgan", StringComparison.OrdinalIgnoreCase) ||
+                             role.Contains("bán hàng", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Toast.ShowWarning("Tài khoản Thu ngân không có quyền truy cập Quản trị chuỗi. Đang chuyển về quầy POS.");
+                        Navigation.NavigateTo("/pos");
+                        return;
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    private async Task LoadData()
+    {
+        _isLoading = true;
+        try
+        {
+            var revTask = AdminApi.GetDailyRevenueAsync();
+            var topTask = AdminApi.GetTopSellingProductsAsync(20);
+            var boardTask = AdminApi.GetBranchSalesLeaderboardAsync();
+            var invTask = AdminApi.GetBranchInventorySummaryAsync();
+
+            await Task.WhenAll(revTask, topTask, boardTask, invTask);
+
+            _dailyRevenues = await revTask ?? new();
+            _topSelling = await topTask ?? new();
+            _branchLeaderboard = await boardTask ?? new();
+            _branchInventorySummaries = await invTask ?? new();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải báo cáo: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        await LoadData();
+        Toast.ShowSuccess("Dữ liệu báo cáo đã được làm mới!");
+    }
+
+    private void SetDaysLimit(int limit)
+    {
+        _daysLimit = limit;
+    }
+
+    private async Task SetSingleDate(DateTime date)
+    {
+        _singleDate = date;
+        await FetchSingleDateReport();
+    }
+
+    private async Task FetchSingleDateReport()
+    {
+        _isSearchingSingle = true;
+        _singleDateSearched = true;
+        try
+        {
+            // Backend sp_BaoCaoDoanhThuTheoKhoangThoiGian hỗ trợ fromDate = toDate
+            _singleDateReport = await AdminApi.GetFinancialReportAsync(_singleDate, _singleDate);
+            if (_singleDateReport != null && (_singleDateReport.TongSoDonHoanThanh > 0 || _singleDateReport.TongDoanhThuThuc > 0))
+            {
+                Toast.ShowSuccess($"Đã tải dữ liệu ngày {_singleDate:dd/MM/yyyy}!");
+            }
+            else
+            {
+                Toast.ShowInfo($"Ngày {_singleDate:dd/MM/yyyy} không phát sinh đơn hàng.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tra cứu ngày: {ex.Message}");
+        }
+        finally
+        {
+            _isSearchingSingle = false;
+        }
+    }
+
+    private async Task FetchFinancialRangeReport()
+    {
+        try
+        {
+            _financialReport = await AdminApi.GetFinancialReportAsync(_fromDate, _toDate);
+            if (_financialReport != null)
+            {
+                Toast.ShowSuccess("Đã tính toán báo cáo tài chính thành công!");
+            }
+            else
+            {
+                Toast.ShowWarning("Không có dữ liệu trong khoảng thời gian này.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tra cứu: {ex.Message}");
+        }
+    }
+
+    private static string GetVietnameseDayOfWeek(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday => "Thứ 2",
+        DayOfWeek.Tuesday => "Thứ 3",
+        DayOfWeek.Wednesday => "Thứ 4",
+        DayOfWeek.Thursday => "Thứ 5",
+        DayOfWeek.Friday => "Thứ 6",
+        DayOfWeek.Saturday => "Thứ 7",
+        DayOfWeek.Sunday => "Chủ nhật",
+        _ => string.Empty
+    };
+}

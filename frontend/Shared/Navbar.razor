@@ -1,0 +1,563 @@
+@using global::Shared.Constants
+@using global::Shared.DTOs.Catalog
+@using Frontend.Components
+@using Frontend.Services
+@inject NavigationManager NavManager
+
+<header class="yame-header">
+    <div class="yame-container header-inner">
+        <!-- Brand Logo (Emblem + Divider + Name: QF NOIR) -->
+        <a href="/" class="header-logo qf-brand-lockup" aria-label="QF Noir Trang chủ" @onclick="NavigateToHome" @onclick:preventDefault="true">
+            <img src="images/logo.png" alt="QF Noir" class="qf-emblem-img" />
+            <div class="qf-brand-divider"></div>
+            <div class="qf-brand-title-wrap">
+                <span class="qf-brand-name">QF NOIR</span>
+            </div>
+        </a>
+
+        <!-- Main Navigation Links with Mega Dropdown -->
+        <nav class="header-nav">
+            <ul class="nav-list">
+                <!-- TRANG CHỦ -->
+                <li class="nav-item">
+                    <a href="/" class="nav-link" @onclick="NavigateToHome" @onclick:preventDefault="true">TRANG CHỦ</a>
+                </li>
+
+                <!-- SALE with Dropdown -->
+                <li class="nav-item has-dropdown">
+                    <a href="/catalog?sale=true" class="nav-link nav-link-sale">
+                        SALE
+                        <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/catalog?category=sale-quan-ao" class="dropdown-item">Sale Quần Áo</a>
+                        <a href="/catalog?category=sale-phu-kien" class="dropdown-item">Sale Phụ Kiện</a>
+                        <a href="/catalog?category=xa-kho" class="dropdown-item">Xả Kho Giá Sốc</a>
+                        <a href="/catalog?category=gia-dac-biet" class="dropdown-item">Giá Đặc Biệt</a>
+                        <a href="/catalog?category=flash-sale" class="dropdown-item">Deal Độc Quyền Online</a>
+                        <a href="/catalog?category=mo-ban" class="dropdown-item">Mở Bán Hàng Tuần</a>
+                        <a href="/catalog?category=xu-huong" class="dropdown-item">Sản Phẩm Bán Chạy</a>
+                        <a href="/catalog?category=signature" class="dropdown-item">Signature (Đặc Trưng)</a>
+                    </div>
+                </li>
+
+                <!-- ÁO with Dropdown -->
+                <li class="nav-item has-dropdown">
+                    <a href="/catalog?category=ao" class="nav-link">
+                        ÁO
+                        <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/catalog?category=ao-thun" class="dropdown-item">Áo Thun & Polo</a>
+                        <a href="/catalog?category=ao-so-mi" class="dropdown-item">Áo Sơ Mi Không Nhăn</a>
+                        <a href="/catalog?category=ao-khoac" class="dropdown-item">Áo Khoác Dù / Bomber</a>
+                        <a href="/catalog?category=ao-hoodie" class="dropdown-item">Áo Hoodie & Sweater</a>
+                    </div>
+                </li>
+
+                <!-- QUẦN with Dropdown -->
+                <li class="nav-item has-dropdown">
+                    <a href="/catalog?category=quan" class="nav-link">
+                        QUẦN
+                        <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/catalog?category=quan-tay" class="dropdown-item">Quần Tây Lịch Lãm</a>
+                        <a href="/catalog?category=quan-jeans" class="dropdown-item">Quần Jeans Cao Cấp</a>
+                        <a href="/catalog?category=quan-dai" class="dropdown-item">Quần Dài Kaki / Chinos</a>
+                        <a href="/catalog?category=quan-short" class="dropdown-item">Đồ Bộ & Thể Thao</a>
+                    </div>
+                </li>
+
+                <!-- JEAN with Dropdown -->
+                <li class="nav-item has-dropdown">
+                    <a href="/catalog?category=jean" class="nav-link">
+                        JEAN
+                        <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/catalog?category=jean" class="dropdown-item">Tất cả Đồ Jean</a>
+                        <a href="/catalog?category=quan-jeans" class="dropdown-item">Quần Jeans</a>
+                    </div>
+                </li>
+
+                <!-- PHỤ KIỆN with Dropdown -->
+                <li class="nav-item has-dropdown">
+                    <a href="/catalog?category=phukien" class="nav-link">
+                        PHỤ KIỆN
+                        <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </a>
+                    <div class="nav-dropdown-menu">
+                        <a href="/catalog?category=that-lung" class="dropdown-item">Thắt Lưng & Ví Da</a>
+                        <a href="/catalog?category=balo" class="dropdown-item">Balo & Túi Xách Thời Trang</a>
+                    </div>
+                </li>
+
+                <!-- CỬA HÀNG -->
+                <li class="nav-item">
+                    <a href="/stores" class="nav-link">CỬA HÀNG</a>
+                </li>
+
+                <!-- VIP -->
+                <li class="nav-item">
+                    <a href="/vip" class="nav-link nav-link-vip">VIP</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Right Utilities & Actions (Screenshot 1: Search, Account, Bag) -->
+        <div class="header-actions">
+            <!-- Search Trigger / Expandable Search Box with Live Auto-complete -->
+            <div class="header-search-wrap @(IsSearchExpanded ? "expanded" : "")">
+                <input type="text" 
+                       class="header-search-field" 
+                       placeholder="Tìm kiếm sản phẩm..." 
+                       value="@SearchText"
+                       @oninput="OnSearchInput"
+                       @onkeydown="HandleSearchKeyDown" />
+                @if (!string.IsNullOrEmpty(SearchText))
+                {
+                    <button type="button" class="header-search-clear-btn" @onclick="ClearSearch" title="Xóa tìm kiếm">✕</button>
+                }
+                <button type="button" class="header-icon-btn search-trigger" @onclick="ToggleSearch" aria-label="Tìm kiếm">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+
+                @if (_showSuggestions && _suggestedProducts.Any())
+                {
+                    <div class="search-suggestions-dropdown">
+                        <div class="suggestions-header">GỢI Ý TÌM KIẾM NHANH</div>
+                        @foreach (var prod in _suggestedProducts)
+                        {
+                            <a href="@($"/product/{prod.MaSanPham}")" class="suggestion-item" @onclick="CloseSuggestions">
+                                <img src="@(string.IsNullOrEmpty(prod.AnhDaiDien) ? "images/no-image.svg" : prod.AnhDaiDien)" 
+                                     alt="@prod.TenSanPham" 
+                                     class="suggestion-img" 
+                                     loading="lazy" 
+                                     decoding="async" 
+                                     onerror="this.onerror=null;this.src='images/no-image.svg';" />
+                                <div class="suggestion-info">
+                                    <span class="suggestion-name">@prod.TenSanPham</span>
+                                    <span class="suggestion-price">@(prod.GiaThapNhat.ToString("N0")) đ</span>
+                                </div>
+                            </a>
+                        }
+                        <div class="suggestions-footer" @onclick="ExecuteSearch">
+                            Xem tất cả kết quả cho "<strong>@SearchText</strong>" →
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- User Account / Role Links -->
+            <div class="user-account-dropdown">
+                @if (string.IsNullOrEmpty(CurrentUserRole))
+                {
+                    <a href="/login" class="header-icon-btn auth-link" title="Tài khoản / Đăng nhập">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span class="user-action-text visually-hidden-accessible">Đăng nhập</span>
+                    </a>
+                }
+                else if (CurrentUserRole == RoleConstants.AdminChuoi || 
+                         CurrentUserRole == RoleConstants.QuanLyHeThong || 
+                         CurrentUserRole.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="user-logged-badge admin-badge">
+                        <a href="/admin/dashboard" class="user-role-pill" title="Môi trường làm việc: Quản Lý Đa Chi Nhánh">
+                            <span class="role-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                            </span>
+                            <span class="user-action-text">Quản trị (Đa CN)</span>
+                        </a>
+                        <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutClick" title="Đăng xuất">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                }
+                else if (CurrentUserRole == RoleConstants.QuanLyChiNhanh || 
+                         CurrentUserRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="user-logged-badge branch-badge">
+                        <a href="/admin/orders" class="user-role-pill" title="Môi trường làm việc: Quản Lý Chi Nhánh (QF Q10)">
+                            <span class="role-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                </svg>
+                            </span>
+                            <span class="user-action-text">Quản lý chi nhánh</span>
+                        </a>
+                        <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutClick" title="Đăng xuất">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                }
+                else if (CurrentUserRole == RoleConstants.ThuKho ||
+                         CurrentUserRole.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                         CurrentUserRole.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="user-logged-badge warehouse-badge">
+                        <a href="/admin/warehouse" class="user-role-pill" title="Môi trường làm việc: Thủ kho - Quản lý tồn kho & Nhập hàng">
+                            <span class="role-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                </svg>
+                            </span>
+                            <span class="user-action-text">Thủ kho (Kho hàng)</span>
+                        </a>
+                        <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutClick" title="Đăng xuất">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                }
+                else if (CurrentUserRole == RoleConstants.NhanVien ||
+                         CurrentUserRole == RoleConstants.ThuNgan || 
+                         CurrentUserRole == RoleConstants.NhanVienBanHang || 
+                         CurrentUserRole.Contains("Nhân viên", StringComparison.OrdinalIgnoreCase) ||
+                         CurrentUserRole.Contains("bán hàng", StringComparison.OrdinalIgnoreCase) || 
+                         CurrentUserRole.Contains("Thu ngân", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="user-logged-badge pos-badge">
+                        <a href="/pos" class="user-role-pill" title="Môi trường làm việc: @(CurrentUserRole == RoleConstants.ThuNgan ? "Thu ngân POS" : "Nhân viên POS")">
+                            <span class="role-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                                </svg>
+                            </span>
+                            <span class="user-action-text">@(CurrentUserRole == RoleConstants.ThuNgan ? "Thu ngân POS" : "Nhân viên POS")</span>
+                        </a>
+                        <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutClick" title="Đăng xuất">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="user-logged-badge customer-badge">
+                        <a href="/profile" class="user-role-pill" title="Môi trường làm việc: Hồ sơ thành viên VIP">
+                            <span class="role-icon">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                            </span>
+                            <span class="user-action-text">@(string.IsNullOrEmpty(CurrentUserName) ? "Khách hàng" : CurrentUserName)</span>
+                        </a>
+                        <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutClick" title="Đăng xuất">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- Shopping Bag Icon (Exact Minimalist Tote Bag) -->
+            <a href="/cart" class="header-icon-btn cart-btn cart-bag-btn" aria-label="Giỏ hàng">
+                <span class="cart-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                </span>
+                @if (CartCount > 0)
+                {
+                    <span class="cart-badge cart-dot-badge">@CartCount</span>
+                }
+            </a>
+        </div>
+    </div>
+</header>
+
+<style>
+    .user-logged-badge {
+        display: inline-flex;
+        align-items: center;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 9999px;
+        padding: 3px 6px 3px 10px;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+    .user-logged-badge:hover {
+        border-color: #CBD5E1;
+        background: #F1F5F9;
+    }
+    .user-role-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        color: #0F172A;
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .user-role-pill .role-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+    }
+    .user-role-pill .role-icon svg {
+        display: block;
+    }
+    .btn-navbar-logout {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        color: #64748B;
+        cursor: pointer;
+        padding: 0;
+        transition: color 0.15s ease, background-color 0.15s ease;
+    }
+    .btn-navbar-logout:hover {
+        color: #EF4444;
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    /* Live Search Suggestions Dropdown Styles */
+    .header-search-clear-btn {
+        position: absolute;
+        right: 36px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: #94A3B8;
+        font-size: 0.75rem;
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
+        transition: color 0.15s ease;
+    }
+    .header-search-clear-btn:hover {
+        color: #0F172A;
+    }
+    .search-suggestions-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        width: 320px;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        overflow: hidden;
+        animation: fadeInDown 0.2s ease-out;
+    }
+    @@keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .suggestions-header {
+        padding: 8px 12px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        color: #64748B;
+        background: #F8FAFC;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        text-decoration: none;
+        color: #0F172A;
+        border-bottom: 1px solid #F8FAFC;
+        transition: background 0.15s ease;
+    }
+    .suggestion-item:hover {
+        background: #F1F5F9;
+    }
+    .suggestion-img {
+        width: 36px;
+        height: 44px;
+        object-fit: cover;
+        border-radius: 4px;
+        background: #F1F5F9;
+        flex-shrink: 0;
+    }
+    .suggestion-info {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        gap: 2px;
+    }
+    .suggestion-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #0F172A;
+    }
+    .suggestion-price {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #E11D48;
+    }
+    .suggestions-footer {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        color: #2563EB;
+        background: #F8FAFC;
+        cursor: pointer;
+        text-align: center;
+        font-weight: 600;
+        transition: background 0.15s ease;
+    }
+    .suggestions-footer:hover {
+        background: #EFF6FF;
+    }
+</style>
+
+@code {
+    [Parameter] public int CartCount { get; set; } = 0;
+    [Parameter] public string? CurrentUserRole { get; set; }
+    [Parameter] public string? CurrentUserName { get; set; }
+    [Parameter] public EventCallback OnLogout { get; set; }
+
+    [Inject] private ICatalogApiClient? CatalogApi { get; set; }
+
+    private bool IsSearchExpanded = false;
+    private string SearchText = string.Empty;
+    private bool _showSuggestions = false;
+    private List<ProductListItemDto> _suggestedProducts = new();
+    private System.Threading.CancellationTokenSource? _searchCts;
+
+    private async Task HandleLogoutClick()
+    {
+        if (OnLogout.HasDelegate)
+        {
+            await OnLogout.InvokeAsync();
+        }
+    }
+
+    private void ToggleSearch()
+    {
+        if (IsSearchExpanded && !string.IsNullOrWhiteSpace(SearchText))
+        {
+            ExecuteSearch();
+        }
+        else
+        {
+            IsSearchExpanded = !IsSearchExpanded;
+            if (!IsSearchExpanded)
+            {
+                _showSuggestions = false;
+            }
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        SearchText = e.Value?.ToString() ?? string.Empty;
+        if (CatalogApi == null || string.IsNullOrWhiteSpace(SearchText) || SearchText.Trim().Length < 2)
+        {
+            _suggestedProducts.Clear();
+            _showSuggestions = false;
+            return;
+        }
+
+        _searchCts?.Cancel();
+        _searchCts = new System.Threading.CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        try
+        {
+            await Task.Delay(250, token);
+            var result = await CatalogApi.GetProductsAsync(new ProductQueryParameters
+            {
+                Search = SearchText.Trim(),
+                PageSize = 4
+            });
+
+            if (!token.IsCancellationRequested && result?.Items != null)
+            {
+                _suggestedProducts = result.Items.ToList();
+                _showSuggestions = _suggestedProducts.Any();
+                StateHasChanged();
+            }
+        }
+        catch (TaskCanceledException) { }
+        catch { }
+    }
+
+    private void ClearSearch()
+    {
+        SearchText = string.Empty;
+        _suggestedProducts.Clear();
+        _showSuggestions = false;
+    }
+
+    private void CloseSuggestions()
+    {
+        _showSuggestions = false;
+    }
+
+    private void ExecuteSearch()
+    {
+        _showSuggestions = false;
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            NavManager.NavigateTo($"/catalog?search={Uri.EscapeDataString(SearchText.Trim())}");
+        }
+    }
+
+    private void HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            ExecuteSearch();
+        }
+        else if (e.Key == "Escape")
+        {
+            CloseSuggestions();
+        }
+    }
+
+    private void NavigateToHome()
+    {
+        NavManager.NavigateTo("/");
+    }
+}

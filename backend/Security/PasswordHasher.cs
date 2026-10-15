@@ -16,11 +16,22 @@ public class PasswordHasher : IPasswordHasher
     private const int Iterations = 10000;
     private readonly string _pepper;
 
-    public PasswordHasher(IConfiguration configuration)
+    public PasswordHasher(string pepper)
     {
-        _pepper = configuration["PASSWORD_PEPPER"] 
-            ?? configuration["JWT_SECRET_KEY"] 
-            ?? "FashionStore_Pepper_Secret_Key_Default_2026!";
+        if (string.IsNullOrWhiteSpace(pepper) || pepper.Length < 16)
+        {
+            throw new InvalidOperationException(
+                "LỖI BẢO MẬT NGHIÊM TRỌNG (Fail-Fast): Khóa bí mật PASSWORD_PEPPER chưa được cấu hình hoặc quá ngắn (< 16 ký tự).");
+        }
+        _pepper = pepper;
+    }
+
+    public PasswordHasher(IConfiguration configuration)
+        : this(Environment.GetEnvironmentVariable("PASSWORD_PEPPER") 
+            ?? configuration["PASSWORD_PEPPER"] 
+            ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
+            ?? configuration["JWT_SECRET_KEY"]!)
+    {
     }
 
     /// <summary>

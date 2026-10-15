@@ -1,0 +1,716 @@
+@page "/admin/feedback"
+@page "/admin/feedbacks"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject ISignalRNotificationService SignalRService
+@implements IDisposable
+
+<div class="feedback-admin-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">QUẢN LÝ KHIẾU NẠI & GÓP Ý</h2>
+            <p class="page-subtitle">Theo dõi, tiếp nhận và giải quyết phản hồi, khiếu nại dịch vụ từ khách hàng</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadFeedbacks" disabled="@_isLoading" title="Tải lại danh sách phản hồi">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="@(_isLoading ? "spin-refresh" : "")">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span>@(_isLoading ? "Đang tải..." : "Làm mới dữ liệu")</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Summary Pills -->
+    <div class="kpi-grid">
+        <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>
+            <div class="kpi-label">Tổng số phản hồi</div>
+            <div class="kpi-value">@_feedbacks.Count</div>
+            <div class="kpi-sub">Tất cả danh mục</div>
+        </div>
+        <div class="kpi-card text-danger @(_currentFilter == "Chưa xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Chưa xử lý"'>
+            <div class="kpi-label">Chưa xử lý</div>
+            <div class="kpi-value text-danger">@_feedbacks.Count(f => f.TrangThai == "Chưa xử lý")</div>
+            <div class="kpi-sub">Cần giải quyết ngay</div>
+        </div>
+        <div class="kpi-card text-primary @(_currentFilter == "Đang xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Đang xử lý"'>
+            <div class="kpi-label">Đang xử lý</div>
+            <div class="kpi-value text-primary">@_feedbacks.Count(f => f.TrangThai == "Đang xử lý")</div>
+            <div class="kpi-sub">Đang liên hệ khách</div>
+        </div>
+        <div class="kpi-card text-success @(_currentFilter == "Đã giải quyết" ? "active" : "")" @onclick='() => _currentFilter = "Đã giải quyết"'>
+            <div class="kpi-label">Đã giải quyết</div>
+            <div class="kpi-value text-success">@_feedbacks.Count(f => f.TrangThai == "Đã giải quyết")</div>
+            <div class="kpi-sub">Hoàn tất hỗ trợ</div>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <div class="filter-card">
+        <div class="filter-search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="search-input" placeholder="Tìm theo tên khách, SĐT, tiêu đề hoặc nội dung..." @bind="_searchText" @bind:event="oninput" />
+            @if (!string.IsNullOrEmpty(_searchText))
+            {
+                <button type="button" class="btn-clear" @onclick='() => _searchText = string.Empty'>×</button>
+            }
+        </div>
+
+        <div class="filter-tabs">
+            <button type="button" class="filter-tab @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>Tất cả</button>
+            <button type="button" class="filter-tab @(_currentFilter == "Chưa xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Chưa xử lý"'>Chưa xử lý</button>
+            <button type="button" class="filter-tab @(_currentFilter == "Đang xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Đang xử lý"'>Đang xử lý</button>
+            <button type="button" class="filter-tab @(_currentFilter == "Đã giải quyết" ? "active" : "")" @onclick='() => _currentFilter = "Đã giải quyết"'>Đã giải quyết</button>
+        </div>
+    </div>
+
+    <!-- Danh sách Tickets Khiếu nại / Góp ý -->
+    <div class="feedback-list-container">
+        @if (_isLoading)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Đang tải danh sách khiếu nại & góp ý...</p>
+            </div>
+        }
+        else if (!FilteredFeedbacks.Any())
+        {
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <p class="empty-title">Không tìm thấy phản hồi nào phù hợp</p>
+                <span class="empty-sub">Các phiếu khiếu nại hoặc góp ý từ chân trang Storefront sẽ xuất hiện tại đây.</span>
+            </div>
+        }
+        else
+        {
+            <div class="tickets-grid">
+                @foreach (var fb in FilteredFeedbacks)
+                {
+                    <div class="ticket-card @GetTicketBorderClass(fb.TrangThai)">
+                        <div class="ticket-header">
+                            <div class="ticket-meta">
+                                <span class="ticket-id">#@fb.MaPhanHoi</span>
+                                <span class="badge-type @GetTypeBadgeClass(fb.LoaiPhanHoi)">@fb.LoaiPhanHoi</span>
+                                <span class="ticket-time">@fb.NgayGui.ToString("HH:mm - dd/MM/yyyy")</span>
+                            </div>
+                            <div class="ticket-status">
+                                <span class="badge-status @GetStatusBadgeClass(fb.TrangThai)">@fb.TrangThai</span>
+                            </div>
+                        </div>
+
+                        <div class="ticket-customer-info">
+                            <div class="cust-row">
+                                <strong class="cust-name">@fb.HoTen</strong>
+                                <a href="tel:@fb.DienThoai" class="cust-phone">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                    @fb.DienThoai
+                                </a>
+                                @if (!string.IsNullOrEmpty(fb.Email))
+                                {
+                                    <span class="cust-email">@fb.Email</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="ticket-body">
+                            <h4 class="ticket-subject">@fb.TieuDe</h4>
+                            <p class="ticket-content">@fb.NoiDung</p>
+
+                            @if (fb.LoaiPhanHoi == "Yêu cầu hoàn trả hàng" && fb.MaHoaDon.HasValue)
+                            {
+                                <div class="ticket-return-details-box">
+                                    <div class="return-box-title">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                                        THÔNG TIN HOÀN TRẢ HÀNG
+                                    </div>
+                                    <div class="return-box-grid">
+                                        <span>Mã đơn hàng: <strong>#DH-@fb.MaHoaDon</strong></span>
+                                        <span>Biến thể SKU: <strong>#@fb.MaBienThe</strong></span>
+                                        <span>Số lượng hoàn: <strong>@fb.SoLuongTra</strong> sản phẩm</span>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(fb.GhiChuXuLy))
+                            {
+                                <div class="ticket-internal-notes">
+                                    <strong>Ghi chú xử lý:</strong> @fb.GhiChuXuLy
+                                </div>
+                            }
+                        </div>
+
+                        <div class="ticket-actions">
+                            @if (fb.LoaiPhanHoi == "Yêu cầu hoàn trả hàng" && fb.TrangThai == "Chưa xử lý")
+                            {
+                                <button type="button" class="btn btn-sm btn-approve-return-action" @onclick='() => ApproveReturn(fb.MaPhanHoi)' title="Duyệt yêu cầu và cộng lại số lượng vào kho">
+                                    Chấp thuận & Hoàn kho
+                                </button>
+                                <button type="button" class="btn btn-sm btn-reject-return-action" @onclick='() => RejectReturn(fb.MaPhanHoi)' title="Từ chối yêu cầu hoàn trả">
+                                    Từ chối hoàn trả
+                                </button>
+                            }
+                            else
+                            {
+                                @if (fb.TrangThai == "Chưa xử lý")
+                                {
+                                    <button type="button" class="btn btn-sm btn-primary-action" @onclick='() => UpdateStatus(fb.MaPhanHoi, "Đang xử lý")'>
+                                        Tiếp nhận xử lý
+                                    </button>
+                                }
+                                @if (fb.TrangThai != "Đã giải quyết")
+                                {
+                                    <button type="button" class="btn btn-sm btn-success-action" @onclick='() => UpdateStatus(fb.MaPhanHoi, "Đã giải quyết")'>
+                                        Đã giải quyết
+                                    </button>
+                                }
+                                @if (fb.TrangThai != "Đã đóng")
+                                {
+                                    <button type="button" class="btn btn-sm btn-secondary-action" @onclick='() => UpdateStatus(fb.MaPhanHoi, "Đã đóng")'>
+                                        Đóng ticket
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .feedback-admin-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .page-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+    .page-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 4px 0 0 0;
+    }
+    .btn-refresh {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+    }
+    .spin-refresh {
+        animation: spin 1s linear infinite;
+    }
+    @@keyframes spin { 100% { transform: rotate(360deg); } }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+    }
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .kpi-card:hover, .kpi-card.active {
+        border-color: #0f172a;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .kpi-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+    .kpi-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 4px 0;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    .text-danger { color: #ef4444 !important; }
+    .text-primary { color: #0284c7 !important; }
+    .text-success { color: #10b981 !important; }
+
+    .filter-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .filter-search-box {
+        position: relative;
+        flex: 1;
+        min-width: 260px;
+        display: flex;
+        align-items: center;
+    }
+    .filter-search-box svg {
+        position: absolute;
+        left: 12px;
+    }
+    .search-input {
+        width: 100%;
+        padding: 8px 32px 8px 36px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #0f172a;
+    }
+    .btn-clear {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        font-size: 1.1rem;
+        color: #94a3b8;
+        cursor: pointer;
+    }
+    .filter-tabs {
+        display: flex;
+        gap: 6px;
+    }
+    .filter-tab {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #f1f5f9;
+        border: none;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .filter-tab.active {
+        background: #0f172a;
+        color: #ffffff;
+    }
+
+    .tickets-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .ticket-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        transition: all 0.15s ease;
+    }
+    .ticket-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .ticket-border-pending { border-left: 4px solid #ef4444; }
+    .ticket-border-processing { border-left: 4px solid #0284c7; }
+    .ticket-border-resolved { border-left: 4px solid #10b981; }
+    .ticket-border-closed { border-left: 4px solid #94a3b8; }
+
+    .ticket-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .ticket-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .ticket-id {
+        font-weight: 800;
+        color: #0f172a;
+        font-size: 0.9rem;
+    }
+    .badge-type {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+    .badge-type-complaint { background: #fee2e2; color: #b91c1c; }
+    .badge-type-suggestion { background: #fef3c7; color: #92400e; }
+    .badge-type-bug { background: #ede9fe; color: #5b21b6; }
+    .badge-type-support { background: #e0f2fe; color: #0369a1; }
+    .badge-type-other { background: #f1f5f9; color: #475569; }
+
+    .ticket-time {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+    .badge-status {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 12px;
+    }
+    .badge-status-pending { background: #fee2e2; color: #b91c1c; }
+    .badge-status-processing { background: #e0f2fe; color: #0369a1; }
+    .badge-status-resolved { background: #dcfce7; color: #15803d; }
+    .badge-status-closed { background: #f1f5f9; color: #64748b; }
+
+    .ticket-customer-info {
+        font-size: 0.85rem;
+        color: #334155;
+    }
+    .cust-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .cust-name {
+        color: #0f172a;
+    }
+    .cust-phone {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .cust-email {
+        color: #64748b;
+    }
+
+    .ticket-subject {
+        margin: 0 0 4px 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .ticket-content {
+        margin: 0;
+        font-size: 0.88rem;
+        color: #334155;
+        line-height: 1.5;
+        background: #f8fafc;
+        padding: 10px 14px;
+        border-radius: 6px;
+    }
+    .ticket-internal-notes {
+        margin-top: 6px;
+        font-size: 0.8rem;
+        color: #475569;
+        font-style: italic;
+    }
+
+    .ticket-return-details-box {
+        margin-top: 10px;
+        padding: 10px 14px;
+        background: #FFF1F2;
+        border: 1px solid #FECDD3;
+        border-radius: 6px;
+    }
+    .return-box-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #BE123C;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 6px;
+        letter-spacing: 0.04em;
+    }
+    .return-box-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 0.84rem;
+        color: #334155;
+    }
+    .return-box-grid strong { color: #0F172A; }
+
+    .ticket-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        padding-top: 6px;
+        border-top: 1px dashed #e2e8f0;
+    }
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        border-radius: 4px;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s ease;
+    }
+    .btn-approve-return-action {
+        background: #059669;
+        color: #ffffff;
+    }
+    .btn-approve-return-action:hover { background: #047857; }
+    .btn-reject-return-action {
+        background: #F1F5F9;
+        color: #BE123C;
+        border: 1px solid #FECDD3;
+    }
+    .btn-reject-return-action:hover { background: #FFE4E6; }
+    .btn-primary-action {
+        background: #0284c7;
+        color: #ffffff;
+    }
+    .btn-primary-action:hover { background: #0369a1; }
+    .btn-success-action {
+        background: #10b981;
+        color: #ffffff;
+    }
+    .btn-success-action:hover { background: #059669; }
+    .btn-secondary-action {
+        background: #f1f5f9;
+        color: #475569;
+    }
+    .btn-secondary-action:hover { background: #e2e8f0; }
+
+    .badge-type-return {
+        background: #FFE4E6;
+        color: #BE123C;
+    }
+
+    .empty-state, .loading-state {
+        padding: 48px 16px;
+        text-align: center;
+        background: #ffffff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+    }
+    .empty-title {
+        font-weight: 700;
+        color: #0f172a;
+        margin: 12px 0 4px 0;
+    }
+    .empty-sub {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+</style>
+
+@code {
+    private List<global::Shared.DTOs.Feedback.FeedbackDto> _feedbacks = new();
+    private bool _isLoading = false;
+    private string _currentFilter = "ALL";
+    private string _searchText = string.Empty;
+
+    private IEnumerable<global::Shared.DTOs.Feedback.FeedbackDto> FilteredFeedbacks
+    {
+        get
+        {
+            var query = _feedbacks.AsEnumerable();
+
+            if (_currentFilter != "ALL")
+            {
+                query = query.Where(f => f.TrangThai.Equals(_currentFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                var term = _searchText.Trim().ToLowerInvariant();
+                query = query.Where(f => 
+                    f.HoTen.ToLowerInvariant().Contains(term) ||
+                    f.DienThoai.Contains(term) ||
+                    (f.Email != null && f.Email.ToLowerInvariant().Contains(term)) ||
+                    f.TieuDe.ToLowerInvariant().Contains(term) ||
+                    f.NoiDung.ToLowerInvariant().Contains(term));
+            }
+
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadFeedbacks();
+
+        // Đăng ký nhận sự kiện realtime từ SignalR khi có phản hồi mới từ khách hàng
+        SignalRService.OnCustomerFeedbackReceived += HandleFeedbackReceived;
+    }
+
+    private void HandleFeedbackReceived(int id, string hoTen, string loai, string tieuDe)
+    {
+        InvokeAsync(async () =>
+        {
+            Toast.ShowWarning($"[REPORT MỚI] Khách hàng '{hoTen}' vừa gửi phiếu: {tieuDe}");
+            await LoadFeedbacks();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadFeedbacks()
+    {
+        _isLoading = true;
+        try
+        {
+            _feedbacks = await AdminApi.GetFeedbacksAsync() ?? new();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải danh sách phản hồi: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task UpdateStatus(int id, string newStatus)
+    {
+        try
+        {
+            var success = await AdminApi.UpdateFeedbackStatusAsync(id, newStatus);
+            if (success)
+            {
+                Toast.ShowSuccess($"Đã cập nhật trạng thái phiếu #{id} thành '{newStatus}'!");
+                var fb = _feedbacks.FirstOrDefault(f => f.MaPhanHoi == id);
+                if (fb != null) fb.TrangThai = newStatus;
+                StateHasChanged();
+            }
+            else
+            {
+                Toast.ShowError("Cập nhật trạng thái thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi cập nhật: {ex.Message}");
+        }
+    }
+
+    private async Task ApproveReturn(int id)
+    {
+        try
+        {
+            var req = new global::Shared.DTOs.Feedback.ProcessReturnRequestDto
+            {
+                IsApproved = true,
+                Notes = "Yêu cầu hoàn trả được chấp thuận. Đã tự động hoàn trả số lượng vào kho thành công."
+            };
+
+            var res = await AdminApi.ProcessReturnRequestAsync(id, req);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã chấp thuận hoàn trả phiếu #{id} và tự động cộng lại tồn kho thành công!");
+                var fb = _feedbacks.FirstOrDefault(f => f.MaPhanHoi == id);
+                if (fb != null)
+                {
+                    fb.TrangThai = "Đã giải quyết";
+                    fb.GhiChuXuLy = req.Notes;
+                }
+                StateHasChanged();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Xử lý chấp thuận thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi duyệt hoàn trả: {ex.Message}");
+        }
+    }
+
+    private async Task RejectReturn(int id)
+    {
+        try
+        {
+            var req = new global::Shared.DTOs.Feedback.ProcessReturnRequestDto
+            {
+                IsApproved = false,
+                Notes = "Yêu cầu hoàn trả bị từ chối do không thỏa mãn chính sách đổi trả hàng."
+            };
+
+            var res = await AdminApi.ProcessReturnRequestAsync(id, req);
+            if (res.Success)
+            {
+                Toast.ShowWarning($"Đã từ chối hoàn trả cho phiếu #{id}.");
+                var fb = _feedbacks.FirstOrDefault(f => f.MaPhanHoi == id);
+                if (fb != null)
+                {
+                    fb.TrangThai = "Đã đóng";
+                    fb.GhiChuXuLy = req.Notes;
+                }
+                StateHasChanged();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Xử lý từ chối thất bại.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi từ chối hoàn trả: {ex.Message}");
+        }
+    }
+
+    private string GetTicketBorderClass(string status) => status switch
+    {
+        "Chưa xử lý" => "ticket-border-pending",
+        "Đang xử lý" => "ticket-border-processing",
+        "Đã giải quyết" => "ticket-border-resolved",
+        _ => "ticket-border-closed"
+    };
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Chưa xử lý" => "badge-status-pending",
+        "Đang xử lý" => "badge-status-processing",
+        "Đã giải quyết" => "badge-status-resolved",
+        _ => "badge-status-closed"
+    };
+
+    private string GetTypeBadgeClass(string type) => type switch
+    {
+        "Yêu cầu hoàn trả hàng" => "badge-type-return",
+        "Khiếu nại dịch vụ" => "badge-type-complaint",
+        "Góp ý sản phẩm" => "badge-type-suggestion",
+        "Báo lỗi website" => "badge-type-bug",
+        "Hỗ trợ đơn hàng" => "badge-type-support",
+        _ => "badge-type-other"
+    };
+
+    public void Dispose()
+    {
+        SignalRService.OnCustomerFeedbackReceived -= HandleFeedbackReceived;
+    }
+}

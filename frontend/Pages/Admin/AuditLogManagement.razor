@@ -1,0 +1,498 @@
+@page "/admin/audit-logs"
+@page "/admin/logs"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+
+<div class="audit-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">NHẬT KÝ HỆ THỐNG & BIẾN ĐỘNG VẬN HÀNH</h2>
+            <p class="page-subtitle">Ghi nhận lịch sử chi tiết ai đã tạo tài khoản, ai đã nhập kho và các sửa đổi toàn chuỗi</p>
+        </div>
+        <div class="header-actions">
+            <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadLogs" disabled="@_isLoading" title="Tải lại dữ liệu">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="@(_isLoading ? "spin-refresh" : "")">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                </svg>
+                <span>@(_isLoading ? "Đang tải..." : "Làm mới dữ liệu")</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Summary Pills -->
+    <div class="kpi-grid">
+        <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>
+            <div class="kpi-label">Tổng số thao tác</div>
+            <div class="kpi-value">@_logs.Count</div>
+            <div class="kpi-sub">Lịch sử toàn hệ thống</div>
+        </div>
+        <div class="kpi-card text-success @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => _currentFilter = "NHAP_HANG"'>
+            <div class="kpi-label">Nhập kho hàng</div>
+            <div class="kpi-value text-success">@_logs.Count(l => l.LoaiThaoTac == "NHAP_HANG")</div>
+            <div class="kpi-sub">Lượng hàng bổ sung</div>
+        </div>
+        <div class="kpi-card text-primary @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "TAO_TAI_KHOAN"'>
+            <div class="kpi-label">Tạo tài khoản</div>
+            <div class="kpi-value text-primary">@_logs.Count(l => l.LoaiThaoTac == "TAO_TAI_KHOAN")</div>
+            <div class="kpi-sub">Cấp quyền nhân viên</div>
+        </div>
+        <div class="kpi-card text-warning @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "CAP_NHAT_TAI_KHOAN"'>
+            <div class="kpi-label">Đổi quyền / Khóa</div>
+            <div class="kpi-value text-warning">@_logs.Count(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN")</div>
+            <div class="kpi-sub">Biến động nhân sự</div>
+        </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div class="filter-card">
+        <div class="filter-search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="search-input" placeholder="Tìm theo tên nhân viên, đối tượng, nội dung hoặc IP..." @bind="_searchText" @bind:event="oninput" />
+            @if (!string.IsNullOrEmpty(_searchText))
+            {
+                <button type="button" class="btn-clear" @onclick='() => _searchText = string.Empty'>×</button>
+            }
+        </div>
+        <div class="filter-tags">
+            <button type="button" class="tag-btn @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>Tất cả</button>
+            <button type="button" class="tag-btn @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => _currentFilter = "NHAP_HANG"'>Nhập kho</button>
+            <button type="button" class="tag-btn @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "TAO_TAI_KHOAN"'>Tạo tài khoản</button>
+            <button type="button" class="tag-btn @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "CAP_NHAT_TAI_KHOAN"'>Cập nhật tài khoản</button>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-card">
+        @if (_isLoading)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Đang tải nhật ký kiểm toán hệ thống...</p>
+            </div>
+        }
+        else if (!FilteredLogs.Any())
+        {
+            <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <p>Không có bản ghi nhật ký nào phù hợp với bộ lọc</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">Thời gian</th>
+                            <th style="width: 170px;">Người thực hiện</th>
+                            <th style="width: 140px;">Loại thao tác</th>
+                            <th style="width: 160px;">Đối tượng</th>
+                            <th>Nội dung chi tiết</th>
+                            <th style="width: 100px;">Địa chỉ IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in FilteredLogs)
+                        {
+                            <tr>
+                                <td class="font-mono text-muted text-sm">
+                                    @log.ThoiGian.ToString("dd/MM/yyyy HH:mm:ss")
+                                </td>
+                                <td>
+                                    <div class="staff-cell">
+                                        <div class="staff-name">@log.TenNhanVien</div>
+                                        <div class="staff-role">@(log.ChucVu ?? "Nhân viên")</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="action-badge @GetActionBadgeClass(log.LoaiThaoTac)">
+                                        @GetActionLabel(log.LoaiThaoTac)
+                                    </span>
+                                </td>
+                                <td class="font-weight-bold">
+                                    @log.DoiTuong
+                                </td>
+                                <td class="text-detail">
+                                    @log.NoiDungChiTiet
+                                </td>
+                                <td class="font-mono text-muted text-sm">
+                                    @(log.IpDiaChi ?? "127.0.0.1")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .audit-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .page-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+
+    .page-subtitle {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 0.25rem 0 0 0;
+    }
+
+    .btn-refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+        transition: all 0.15s ease;
+    }
+
+    .btn-refresh:hover:not(:disabled) {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+    }
+
+    .spin-refresh {
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .kpi-card.active {
+        border-color: #0f172a;
+        box-shadow: 0 0 0 2px #0f172a;
+    }
+
+    .kpi-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+    }
+
+    .kpi-value {
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0.25rem 0;
+    }
+
+    .kpi-sub {
+        font-size: 0.72rem;
+        color: #94a3b8;
+    }
+
+    .filter-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .filter-search-box {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 6px 12px;
+    }
+
+    .search-input {
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: 0.82rem;
+        width: 100%;
+        color: #0f172a;
+    }
+
+    .btn-clear {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 1rem;
+        cursor: pointer;
+        padding: 0 4px;
+    }
+
+    .filter-tags {
+        display: flex;
+        gap: 6px;
+    }
+
+    .tag-btn {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .tag-btn:hover {
+        background: #e2e8f0;
+    }
+
+    .tag-btn.active {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    .table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .admin-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.82rem;
+        color: #1e293b;
+        vertical-align: middle;
+    }
+
+    .admin-table tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .staff-cell .staff-name {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .staff-cell .staff-role {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .action-badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .badge-nhaphang {
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    .badge-taotaikhoan {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .badge-capnhat {
+        background: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+
+    .badge-other {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+
+    .text-detail {
+        line-height: 1.4;
+        color: #334155;
+    }
+
+    .text-sm { font-size: 0.75rem; }
+    .font-mono { font-family: var(--font-mono, monospace); }
+    .text-muted { color: #64748b; }
+    .font-weight-bold { font-weight: 700; }
+    .text-success { color: #10b981; }
+    .text-primary { color: #2563eb; }
+    .text-warning { color: #f59e0b; }
+
+    .loading-state, .empty-state {
+        padding: 48px 16px;
+        text-align: center;
+        color: #64748b;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e2e8f0;
+        border-top-color: #0f172a;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+</style>
+
+@code {
+    private List<global::Shared.DTOs.Audit.AuditLogDto> _logs = new();
+    private bool _isLoading = false;
+    private string _currentFilter = "ALL";
+    private string _searchText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLogs();
+    }
+
+    private async Task LoadLogs()
+    {
+        _isLoading = true;
+        try
+        {
+            var data = await AdminApi.GetAuditLogsAsync(null, 150);
+            _logs = data ?? new List<global::Shared.DTOs.Audit.AuditLogDto>();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi tải nhật ký: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private IEnumerable<global::Shared.DTOs.Audit.AuditLogDto> FilteredLogs
+    {
+        get
+        {
+            var list = _logs.AsEnumerable();
+            if (_currentFilter != "ALL")
+            {
+                if (_currentFilter == "CAP_NHAT_TAI_KHOAN")
+                {
+                    list = list.Where(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN");
+                }
+                else
+                {
+                    list = list.Where(l => l.LoaiThaoTac == _currentFilter);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                var q = _searchText.Trim().ToLower();
+                list = list.Where(l =>
+                    l.TenNhanVien.ToLower().Contains(q) ||
+                    l.DoiTuong.ToLower().Contains(q) ||
+                    l.NoiDungChiTiet.ToLower().Contains(q) ||
+                    (l.IpDiaChi != null && l.IpDiaChi.ToLower().Contains(q)));
+            }
+
+            return list;
+        }
+    }
+
+    private string GetActionBadgeClass(string action) => action switch
+    {
+        "NHAP_HANG" => "badge-nhaphang",
+        "TAO_TAI_KHOAN" => "badge-taotaikhoan",
+        "CAP_NHAT_TAI_KHOAN" or "KHOA_TAI_KHOAN" => "badge-capnhat",
+        _ => "badge-other"
+    };
+
+    private string GetActionLabel(string action) => action switch
+    {
+        "NHAP_HANG" => "Nhập hàng vào kho",
+        "TAO_TAI_KHOAN" => "Tạo tài khoản mới",
+        "CAP_NHAT_TAI_KHOAN" => "Cập nhật tài khoản",
+        "KHOA_TAI_KHOAN" => "Khóa tài khoản",
+        "BAN_HANG_POS" => "Bán lẻ tại quầy",
+        _ => action
+    };
+}

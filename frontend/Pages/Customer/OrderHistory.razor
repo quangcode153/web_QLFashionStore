@@ -1,0 +1,933 @@
+@page "/profile/orders"
+@page "/orders"
+@namespace Frontend.Pages.Customer
+@inject ICustomerApiClient CustomerApi
+@inject NavigationManager Navigation
+@inject IToastService Toast
+
+<div class="orders-page-wrapper">
+    <div class="yame-container">
+        <!-- Breadcrumb -->
+        <nav class="orders-breadcrumb" aria-label="Đường dẫn">
+            <a href="/" class="bc-link">Trang chủ</a>
+            <span class="bc-sep">/</span>
+            <a href="/profile" class="bc-link">Tài khoản</a>
+            <span class="bc-sep">/</span>
+            <span class="bc-curr">Lịch sử đơn hàng</span>
+        </nav>
+
+        <h1 class="orders-page-title">LỊCH SỬ ĐƠN HÀNG CỦA BẠN</h1>
+
+        @if (_isLoading)
+        {
+            <div class="orders-loading-state">
+                <span class="loading-icon">⏳</span>
+                <p>Đang tải danh sách đơn hàng...</p>
+            </div>
+        }
+        else if (_orders == null || !_orders.Any())
+        {
+            <div class="orders-empty-state">
+                <span class="empty-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </span>
+                <h2 class="empty-title">Bạn chưa có đơn hàng nào</h2>
+                <p class="empty-desc">Hãy khám phá ngay những bộ sưu tập thời trang cao cấp mới nhất từ QF nhé!</p>
+                <a href="/catalog" class="btn-explore-shop">KHÁM PHÁ CỬA HÀNG NGAY</a>
+            </div>
+        }
+        else
+        {
+            <div class="orders-table-card">
+                <div class="orders-table-header">
+                    <span class="th-id">Mã đơn hàng</span>
+                    <span class="th-date">Ngày đặt</span>
+                    <span class="th-qty">Số mặt hàng</span>
+                    <span class="th-total">Tổng thanh toán</span>
+                    <span class="th-status">Trạng thái</span>
+                    <span class="th-action"></span>
+                </div>
+
+                <div class="orders-table-body">
+                    @foreach (var order in _orders)
+                    {
+                        <div class="order-row">
+                            <span class="cell-id">#DH-@order.MaHoaDon</span>
+                            <span class="cell-date">@order.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
+                            <span class="cell-qty">@order.SoMatHang sản phẩm</span>
+                            <span class="cell-total">@order.TongThanhToan.ToString("N0") ₫</span>
+                            <span class="cell-status">
+                                <span class="status-badge @GetStatusBadgeClass(order.TrangThai)">
+                                    @order.TrangThai
+                                </span>
+                            </span>
+                            <span class="cell-action">
+                                <button type="button" 
+                                        class="btn-view-order-details" 
+                                        @onclick="() => OpenOrderDetailsModalAsync(order)">
+                                    Chi tiết
+                                </button>
+                                @if (order.TrangThai == "Đã hoàn thành" || order.TrangThai == "Hoàn thành")
+                                {
+                                    <button type="button" 
+                                            class="btn-open-return-modal" 
+                                            @onclick="() => OpenReturnModalAsync(order)"
+                                            title="Đăng ký hoàn trả hàng cho đơn này">
+                                        Hoàn trả
+                                    </button>
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Order Details Modal -->
+        @if (_selectedOrder != null)
+        {
+            <div class="modal-backdrop" @onclick="CloseModal"></div>
+            <div class="order-details-modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <div class="modal-title-box">
+                        <h3 class="modal-title">CHI TIẾT ĐƠN HÀNG #DH-@_selectedOrder.MaHoaDon</h3>
+                        <span class="modal-subtitle">Ngày đặt: @_selectedOrder.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" @onclick="CloseModal" aria-label="Đóng">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    @if (_isLoadingDetails)
+                    {
+                        <div class="modal-loading">⏳ Đang tải chi tiết đơn hàng...</div>
+                    }
+                    else if (_orderDetails == null || !_orderDetails.Any())
+                    {
+                        <div class="modal-empty">Không có dữ liệu mặt hàng chi tiết.</div>
+                    }
+                    else
+                    {
+                        <div class="modal-items-list">
+                            @foreach (var item in _orderDetails)
+                            {
+                                <div class="modal-item-row">
+                                    <div class="item-main">
+                                        <h4 class="item-name">@item.TenSanPham</h4>
+                                        <span class="item-variant">@item.MauSac / @item.KichCo</span>
+                                        <span class="item-qty">Số lượng: <strong>@item.SoLuong</strong> x @item.DonGia.ToString("N0") ₫</span>
+                                    </div>
+                                    <span class="item-subtotal">@item.ThanhTien.ToString("N0") ₫</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="modal-summary-box">
+                            <div class="sum-row">
+                                <span>Tiền hàng:</span>
+                                <span>@_selectedOrder.TienHang.ToString("N0") ₫</span>
+                            </div>
+                            @if (_selectedOrder.TienGiamGia > 0)
+                            {
+                                <div class="sum-row discount">
+                                    <span>Voucher / Giảm giá:</span>
+                                    <span>-@_selectedOrder.TienGiamGia.ToString("N0") ₫</span>
+                                </div>
+                            }
+                            <div class="sum-row total">
+                                <span>Tổng thanh toán:</span>
+                                <span class="total-price">@_selectedOrder.TongThanhToan.ToString("N0") ₫</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-close-action" @onclick="CloseModal">
+                        ĐÓNG
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- Return Request Modal -->
+        @if (_returnOrder != null)
+        {
+            <div class="modal-backdrop" @onclick="CloseReturnModal"></div>
+            <div class="order-details-modal return-modal-card" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <div class="modal-title-box">
+                        <h3 class="modal-title">ĐĂNG KÝ HOÀN TRẢ HÀNG - ĐƠN #DH-@_returnOrder.MaHoaDon</h3>
+                        <span class="modal-subtitle">Phiếu tiếp nhận yêu cầu hoàn trả sẽ được chuyển vào mục Khiếu nại & CSKH để xử lý</span>
+                    </div>
+                    <button type="button" class="btn-close-modal" @onclick="CloseReturnModal" aria-label="Đóng">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    @if (_isLoadingReturnItems)
+                    {
+                        <div class="modal-loading">⏳ Đang tải danh sách mặt hàng có thể hoàn trả...</div>
+                    }
+                    else if (_returnItems == null || !_returnItems.Any())
+                    {
+                        <div class="modal-empty">Không tìm thấy mặt hàng trong đơn hàng này.</div>
+                    }
+                    else
+                    {
+                        <div class="return-form-group">
+                            <label class="form-label">1. Chọn sản phẩm bạn muốn hoàn trả (*):</label>
+                            <div class="return-items-picker">
+                                @foreach (var item in _returnItems)
+                                {
+                                    <label class="return-item-choice @(_selectedVariantId == item.MaBienThe ? "selected" : "")">
+                                        <input type="radio" 
+                                               name="selectedReturnItem" 
+                                               value="@item.MaBienThe" 
+                                               checked="@(_selectedVariantId == item.MaBienThe)"
+                                               @onchange="() => OnSelectReturnVariant(item)" />
+                                        <div class="item-choice-info">
+                                            <div class="item-choice-title">@item.TenSanPham</div>
+                                            <div class="item-choice-meta">Phân loại: <strong>@item.MauSac / @item.KichCo</strong> | Đã mua: <strong>@item.SoLuong</strong> sp</div>
+                                        </div>
+                                        <div class="item-choice-price">@item.DonGia.ToString("N0") ₫</div>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+
+                        @if (_selectedVariantId > 0)
+                        {
+                            <div class="return-grid-2col">
+                                <div class="return-form-group">
+                                    <label class="form-label">2. Số lượng hoàn trả (*):</label>
+                                    <input type="number" 
+                                           class="form-control-input" 
+                                           min="1" 
+                                           max="@_maxReturnQty" 
+                                           @bind="_returnQty" />
+                                    <small class="field-hint">Tối đa @_maxReturnQty sản phẩm theo hóa đơn mua.</small>
+                                </div>
+
+                                <div class="return-form-group">
+                                    <label class="form-label">Họ và tên người gửi (*):</label>
+                                    <input type="text" class="form-control-input" placeholder="Họ và tên của bạn..." @bind="_returnCustomerName" />
+                                </div>
+
+                                <div class="return-form-group">
+                                    <label class="form-label">Số điện thoại liên hệ (*):</label>
+                                    <input type="tel" class="form-control-input" placeholder="Số điện thoại..." @bind="_returnCustomerPhone" />
+                                </div>
+
+                                <div class="return-form-group">
+                                    <label class="form-label">Email thông báo kết quả (tùy chọn):</label>
+                                    <input type="email" class="form-control-input" placeholder="Địa chỉ email..." @bind="_returnCustomerEmail" />
+                                </div>
+                            </div>
+
+                            <div class="return-form-group full-col">
+                                <label class="form-label">3. Chọn hình thức hoàn trả hàng (*):</label>
+                                <div class="return-methods-row">
+                                    <label class="return-method-card @(_returnMethod == "Thu hồi tại nhà" ? "selected" : "")">
+                                        <input type="radio" 
+                                               name="returnMethodChoice" 
+                                               class="radio-return-home" 
+                                               checked="@(_returnMethod == "Thu hồi tại nhà")" 
+                                               @onchange='() => _returnMethod = "Thu hồi tại nhà"' />
+                                        <div class="method-card-body">
+                                            <span class="method-name">🚚 Bưu tá đến lấy tại nhà (Thu hồi tận nơi)</span>
+                                            <span class="method-desc">Bưu tá liên hệ lấy hàng hoàn tại địa chỉ bạn cung cấp.</span>
+                                        </div>
+                                    </label>
+
+                                    <label class="return-method-card @(_returnMethod == "Đến chi nhánh" ? "selected" : "")">
+                                        <input type="radio" 
+                                               name="returnMethodChoice" 
+                                               class="radio-return-branch" 
+                                               checked="@(_returnMethod == "Đến chi nhánh")" 
+                                               @onchange='() => _returnMethod = "Đến chi nhánh"' />
+                                        <div class="method-card-body">
+                                            <span class="method-name">🏬 Trực tiếp mang đến chi nhánh QF Store</span>
+                                            <span class="method-desc">Chủ động gửi sản phẩm tại chi nhánh gần bạn nhất.</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                @if (_returnMethod == "Thu hồi tại nhà")
+                                {
+                                    <div class="return-sub-block home-pickup-block">
+                                        <label class="form-sub-label">Địa chỉ thu hồi hàng (*):</label>
+                                        <input type="text" 
+                                               class="form-control-input input-pickup-address" 
+                                               placeholder="Nhập địa chỉ nhà bưu tá đến lấy hàng..." 
+                                               @bind="_returnPickupAddress" />
+                                        <small class="field-hint">Bưu tá của đối tác vận chuyển sẽ tới địa chỉ này để tiếp nhận kiện hàng đổi trả.</small>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="return-sub-block branch-dropoff-block">
+                                        <label class="form-sub-label">Chọn chi nhánh tiếp nhận hàng hoàn (*):</label>
+                                        <select class="form-control-select select-branch-dropoff" @bind="_selectedBranchId">
+                                            @if (_branches != null && _branches.Any())
+                                            {
+                                                @foreach (var b in _branches)
+                                                {
+                                                    <option value="@b.MaChiNhanh">@b.TenChiNhanh - @b.DiaChi</option>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <option value="1">Chi nhánh 1 - QF Sư Vạn Hạnh (Q.10, TP.HCM)</option>
+                                                <option value="2">Chi nhánh 2 - QF Quang Trung (Q.Gò Vấp, TP.HCM)</option>
+                                            }
+                                        </select>
+                                        @if (SelectedBranch != null)
+                                        {
+                                            <div class="branch-address-preview">
+                                                <span>📍 <strong>Địa chỉ tiếp nhận:</strong> @SelectedBranch.DiaChi</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="return-form-group full-col">
+                                <label class="form-label">4. Lý do hoàn trả hàng chi tiết (*):</label>
+                                <textarea class="form-control-textarea return-reason" 
+                                          rows="3" 
+                                          placeholder="Mô tả cụ thể lý do hoàn trả (VD: Hàng bị rách đường chỉ may, không đúng mô tả, lỗi khóa kéo...)" 
+                                          @bind="_returnReason"></textarea>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal-cancel" @onclick="CloseReturnModal" disabled="@_isSubmittingReturn">
+                        HỦY BỎ
+                    </button>
+                    <button type="button" 
+                            class="btn-modal-submit-return" 
+                            @onclick="SubmitReturnRequestAsync" 
+                            disabled="@(_isSubmittingReturn || _selectedVariantId <= 0)">
+                        @(_isSubmittingReturn ? "Đang gửi..." : "GỬI YÊU CẦU HOÀN TRẢ")
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .orders-page-wrapper {
+        padding: 24px 0 60px 0;
+        background: #F8FAFC;
+        min-height: 85vh;
+    }
+    .orders-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        margin-bottom: 24px;
+    }
+    .bc-link { color: #64748B; text-decoration: none; }
+    .bc-sep { color: #CBD5E1; }
+    .bc-curr { color: #0F172A; font-weight: 700; }
+    .orders-page-title {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 24px;
+        letter-spacing: -0.02em;
+    }
+    .orders-loading-state, .orders-empty-state {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .loading-icon, .empty-icon {
+        font-size: 3.5rem;
+        display: block;
+        margin-bottom: 16px;
+    }
+    .empty-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 8px;
+    }
+    .empty-desc {
+        font-size: 0.95rem;
+        color: #64748B;
+        margin-bottom: 28px;
+    }
+    .btn-explore-shop {
+        display: inline-block;
+        background: #E11D48;
+        color: #FFFFFF;
+        font-weight: 800;
+        padding: 13px 32px;
+        border-radius: 6px;
+        text-decoration: none;
+        letter-spacing: 0.03em;
+    }
+    .btn-explore-shop:hover {
+        background: #BE123C;
+    }
+    .orders-table-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .orders-table-header {
+        display: grid;
+        grid-template-columns: 1.5fr 2fr 1.5fr 2fr 1.8fr 1.5fr;
+        padding: 16px 20px;
+        background: #F8FAFC;
+        border-bottom: 1px solid #E2E8F0;
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .orders-table-body {
+        display: flex;
+        flex-direction: column;
+    }
+    .order-row {
+        display: grid;
+        grid-template-columns: 1.5fr 2fr 1.5fr 2fr 1.8fr 1.5fr;
+        padding: 18px 20px;
+        border-bottom: 1px solid #F1F5F9;
+        align-items: center;
+        font-size: 0.92rem;
+    }
+    .order-row:last-child {
+        border-bottom: none;
+    }
+    @@media (max-width: 900px) {
+        .orders-table-header { display: none; }
+        .order-row {
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 16px;
+            border-bottom: 1px solid #E2E8F0;
+        }
+    }
+    .cell-id {
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .cell-date { color: #64748B; font-size: 0.85rem; }
+    .cell-qty { color: #475569; }
+    .cell-total {
+        font-weight: 800;
+        color: #E11D48;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+    .status-badge.status-completed {
+        background: #D1FAE5;
+        color: #059669;
+    }
+    .status-badge.status-processing {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+    .status-badge.status-cancelled {
+        background: #FEE2E2;
+        color: #DC2626;
+    }
+    .status-badge.status-default {
+        background: #F1F5F9;
+        color: #475569;
+    }
+    .btn-view-order-details {
+        background: transparent;
+        border: 1px solid #CBD5E1;
+        color: #0F172A;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 4px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .btn-view-order-details:hover {
+        background: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
+    }
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 1100;
+        backdrop-filter: blur(2px);
+    }
+    .order-details-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 90%;
+        max-width: 600px;
+        background: #FFFFFF;
+        border-radius: 12px;
+        z-index: 1101;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    .modal-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin: 0 0 4px 0;
+    }
+    .modal-subtitle {
+        font-size: 0.82rem;
+        color: #64748B;
+    }
+    .btn-close-modal {
+        background: transparent;
+        border: none;
+        font-size: 1.25rem;
+        cursor: pointer;
+        color: #64748B;
+    }
+    .modal-body {
+        padding: 20px 24px;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .modal-item-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .item-name {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin: 0 0 4px 0;
+    }
+    .item-variant {
+        display: block;
+        font-size: 0.8rem;
+        color: #64748B;
+        margin-bottom: 4px;
+    }
+    .item-qty {
+        font-size: 0.82rem;
+        color: #334155;
+    }
+    .item-subtotal {
+        font-weight: 800;
+        color: #E11D48;
+        font-size: 0.95rem;
+    }
+    .modal-summary-box {
+        background: #F8FAFC;
+        border-radius: 6px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 0.9rem;
+    }
+    .sum-row {
+        display: flex;
+        justify-content: space-between;
+        color: #475569;
+    }
+    .sum-row.discount { color: #E11D48; font-weight: 600; }
+    .sum-row.total {
+        border-top: 1px solid #E2E8F0;
+        padding-top: 8px;
+        font-weight: 800;
+        color: #0F172A;
+        font-size: 1.05rem;
+    }
+    .total-price { color: #E11D48; }
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+    .btn-modal-close-action, .btn-modal-cancel {
+        background: #F1F5F9;
+        color: #334155;
+        border: 1px solid #CBD5E1;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.88rem;
+        cursor: pointer;
+    }
+    .btn-modal-submit-return {
+        background: #E11D48;
+        color: #FFFFFF;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.88rem;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-modal-submit-return:hover:not(:disabled) { background: #BE123C; }
+    .btn-modal-submit-return:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    /* Return Form Styles */
+    .return-form-group { margin-bottom: 16px; }
+    .return-form-group.full-col { grid-column: 1 / -1; }
+    .form-label { display: block; font-weight: 700; font-size: 0.88rem; color: #1E293B; margin-bottom: 6px; }
+    .return-items-picker { display: flex; flex-direction: column; gap: 8px; }
+    .return-item-choice {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .return-item-choice.selected {
+        border-color: #E11D48;
+        background: #FFF1F2;
+    }
+    .item-choice-info { flex: 1; }
+    .item-choice-title { font-weight: 700; font-size: 0.92rem; color: #0F172A; }
+    .item-choice-meta { font-size: 0.82rem; color: #64748B; margin-top: 2px; }
+    .item-choice-price { font-weight: 700; color: #0F172A; font-size: 0.9rem; }
+    .return-grid-2col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 14px;
+    }
+    .form-control-input, .form-control-textarea {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #CBD5E1;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+    .form-control-input:focus, .form-control-textarea:focus {
+        outline: none;
+        border-color: #0F172A;
+    }
+    .field-hint { font-size: 0.8rem; color: #64748B; margin-top: 4px; display: block; }
+
+    /* Return Method Options */
+    .return-methods-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+    .return-method-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1.5px solid #E2E8F0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        background: #FFFFFF;
+    }
+    .return-method-card:hover {
+        border-color: #CBD5E1;
+        background: #F8FAFC;
+    }
+    .return-method-card.selected {
+        border-color: #E11D48;
+        background: #FFF1F2;
+    }
+    .method-name {
+        display: block;
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: #0F172A;
+        margin-bottom: 2px;
+    }
+    .method-desc {
+        display: block;
+        font-size: 0.78rem;
+        color: #64748B;
+        line-height: 1.35;
+    }
+    .return-sub-block {
+        margin-top: 10px;
+        background: #F8FAFC;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px dashed #CBD5E1;
+    }
+    .form-sub-label {
+        display: block;
+        font-weight: 700;
+        font-size: 0.84rem;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .form-control-select {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #CBD5E1;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        background: #FFFFFF;
+    }
+    .branch-address-preview {
+        margin-top: 8px;
+        font-size: 0.82rem;
+        color: #059669;
+        font-weight: 600;
+        background: #ECFDF5;
+        padding: 6px 10px;
+        border-radius: 6px;
+    }
+</style>
+
+@code {
+    private List<CustomerOrderHistoryItemDto>? _orders;
+    private bool _isLoading = true;
+
+    private CustomerOrderHistoryItemDto? _selectedOrder;
+    private List<OrderDetailItemDto>? _orderDetails;
+    private bool _isLoadingDetails = false;
+
+    // Return Request State
+    private CustomerOrderHistoryItemDto? _returnOrder;
+    private List<OrderDetailItemDto>? _returnItems;
+    private bool _isLoadingReturnItems = false;
+    private int _selectedVariantId = 0;
+    private int _returnQty = 1;
+    private int _maxReturnQty = 1;
+    private string _returnReason = string.Empty;
+    private string _returnCustomerName = string.Empty;
+    private string _returnCustomerPhone = string.Empty;
+    private string _returnCustomerEmail = string.Empty;
+    private bool _isSubmittingReturn = false;
+
+    // Return Method & Branch Selection
+    private string _returnMethod = "Thu hồi tại nhà";
+    private string _returnPickupAddress = string.Empty;
+    private int _selectedBranchId = 1;
+    private List<global::Shared.DTOs.Warehouse.BranchDto> _branches = new();
+    private global::Shared.DTOs.Warehouse.BranchDto? SelectedBranch => _branches.FirstOrDefault(b => b.MaChiNhanh == _selectedBranchId) ?? _branches.FirstOrDefault();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrdersAsync();
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _orders = await CustomerApi.GetOrderHistoryAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Đã hoàn thành" or "Hoàn thành" => "status-completed",
+            "Chờ xử lý" or "Đang giao hàng" => "status-processing",
+            "Đã hủy" => "status-cancelled",
+            _ => "status-default"
+        };
+    }
+
+    private async Task OpenOrderDetailsModalAsync(CustomerOrderHistoryItemDto order)
+    {
+        _selectedOrder = order;
+        _isLoadingDetails = true;
+        try
+        {
+            _orderDetails = await CustomerApi.GetOrderDetailsAsync(order.MaHoaDon);
+        }
+        finally
+        {
+            _isLoadingDetails = false;
+        }
+    }
+
+    private void CloseModal()
+    {
+        _selectedOrder = null;
+        _orderDetails = null;
+    }
+
+    private async Task OpenReturnModalAsync(CustomerOrderHistoryItemDto order)
+    {
+        _returnOrder = order;
+        _isLoadingReturnItems = true;
+        _selectedVariantId = 0;
+        _returnQty = 1;
+        _maxReturnQty = 1;
+        _returnReason = string.Empty;
+        _returnMethod = "Thu hồi tại nhà";
+        _returnPickupAddress = string.Empty;
+        _selectedBranchId = 1;
+
+        // Nạp trước danh sách chi nhánh
+        try
+        {
+            var branchList = await CustomerApi.GetBranchesAsync();
+            _branches = branchList ?? new List<global::Shared.DTOs.Warehouse.BranchDto>();
+            if (_branches.Any())
+            {
+                _selectedBranchId = _branches.First().MaChiNhanh;
+            }
+        }
+        catch { }
+
+        // Nạp trước thông tin từ profile khách hàng nếu có
+        var profile = await CustomerApi.GetProfileAsync();
+        if (profile != null)
+        {
+            _returnCustomerName = profile.TenKhachHang ?? string.Empty;
+            _returnCustomerPhone = profile.DienThoai ?? string.Empty;
+            _returnCustomerEmail = profile.Email ?? string.Empty;
+        }
+
+        try
+        {
+            _returnItems = await CustomerApi.GetOrderDetailsAsync(order.MaHoaDon);
+            if (_returnItems != null && _returnItems.Any())
+            {
+                OnSelectReturnVariant(_returnItems.First());
+            }
+        }
+        finally
+        {
+            _isLoadingReturnItems = false;
+        }
+    }
+
+    private void OnSelectReturnVariant(OrderDetailItemDto item)
+    {
+        _selectedVariantId = item.MaBienThe;
+        _maxReturnQty = item.SoLuong > 0 ? item.SoLuong : 1;
+        _returnQty = 1;
+    }
+
+    private void CloseReturnModal()
+    {
+        _returnOrder = null;
+        _returnItems = null;
+    }
+
+    private async Task SubmitReturnRequestAsync()
+    {
+        if (_returnOrder == null || _selectedVariantId <= 0) return;
+
+        if (string.IsNullOrWhiteSpace(_returnCustomerName))
+        {
+            Toast.ShowWarning("Vui lòng nhập họ và tên người gửi.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_returnCustomerPhone))
+        {
+            Toast.ShowWarning("Vui lòng nhập số điện thoại liên hệ.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_returnReason))
+        {
+            Toast.ShowWarning("Vui lòng nhập lý do hoàn trả hàng chi tiết.");
+            return;
+        }
+
+        if (_returnMethod == "Thu hồi tại nhà" && string.IsNullOrWhiteSpace(_returnPickupAddress))
+        {
+            Toast.ShowWarning("Vui lòng nhập địa chỉ thu hồi tại nhà để bưu tá đến lấy.");
+            return;
+        }
+
+        if (_returnMethod == "Đến chi nhánh" && _selectedBranchId <= 0)
+        {
+            Toast.ShowWarning("Vui lòng chọn chi nhánh tiếp nhận hàng hoàn.");
+            return;
+        }
+
+        _isSubmittingReturn = true;
+        try
+        {
+            var req = new global::Shared.DTOs.Feedback.CreateReturnRequestDto
+            {
+                MaHoaDon = _returnOrder.MaHoaDon,
+                MaBienThe = _selectedVariantId,
+                SoLuongTra = _returnQty,
+                LyDoTra = _returnReason.Trim(),
+                HoTen = _returnCustomerName.Trim(),
+                DienThoai = _returnCustomerPhone.Trim(),
+                Email = string.IsNullOrWhiteSpace(_returnCustomerEmail) ? null : _returnCustomerEmail.Trim(),
+                HinhThucHoan = _returnMethod,
+                DiaChiThuHoi = _returnMethod == "Thu hồi tại nhà" ? _returnPickupAddress.Trim() : null,
+                MaChiNhanhHen = _returnMethod == "Đến chi nhánh" ? _selectedBranchId : null
+            };
+
+            var res = await CustomerApi.SubmitReturnRequestAsync(req);
+            if (res.Success)
+            {
+                Toast.ShowSuccess("Gửi yêu cầu hoàn trả hàng thành công! Đã chuyển tiếp vào hệ thống Khiếu nại & CSKH để giải quyết.");
+                CloseReturnModal();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể gửi yêu cầu hoàn trả.");
+            }
+        }
+        finally
+        {
+            _isSubmittingReturn = false;
+        }
+    }
+}

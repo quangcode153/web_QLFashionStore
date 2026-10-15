@@ -1,0 +1,136 @@
+@inherits LayoutComponentBase
+@using Frontend.Shared
+@using Frontend.Components
+@inject Frontend.Services.ICartService CartService
+@inject Frontend.Services.IAuthStateService AuthStateService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="yame-app-wrapper">
+    <!-- Navbar Header Mega Menu (SALE, Áo, Quần, Jean, Phụ kiện, VIP, Cart) -->
+    <Navbar CartCount="@CartService.TotalCount" 
+            CurrentUserRole="@_currentUserRole" 
+            CurrentUserName="@_currentUserName" 
+            OnLogout="@HandleLogout" />
+
+    <!-- Main Content Area -->
+    <main class="yame-main-content">
+        @Body
+    </main>
+
+    <!-- Footer & Trụ Cột Triết Lý -->
+    <Footer />
+
+    <!-- Slide-over Cart Drawer -->
+    <CartDrawer />
+
+    <!-- Global Toast Notifications -->
+    <ToastNotification />
+</div>
+
+<style>
+    .yame-app-wrapper {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        background-color: var(--bg-main);
+    }
+    .yame-main-content {
+        flex: 1;
+    }
+</style>
+
+@code {
+    private string? _currentUserRole;
+    private string? _currentUserName;
+
+    protected override void OnInitialized()
+    {
+        CartService.OnChange += OnCartChanged;
+        AuthStateService.OnAuthStateChanged += OnAuthStateChangedHandler;
+        Navigation.LocationChanged += OnLocationChangedHandler;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthStateService.InitializeAsync();
+            await SyncAuthStateFromServiceOrStorageAsync();
+        }
+    }
+
+    private void OnAuthStateChangedHandler()
+    {
+        _currentUserRole = AuthStateService.UserRole;
+        _currentUserName = AuthStateService.StaffName;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChangedHandler(object? sender, LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await SyncAuthStateFromServiceOrStorageAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task SyncAuthStateFromServiceOrStorageAsync()
+    {
+        try
+        {
+            if (AuthStateService.IsAuthenticated)
+            {
+                _currentUserRole = AuthStateService.UserRole;
+                _currentUserName = AuthStateService.StaffName;
+            }
+            else
+            {
+                var username = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "currentUser");
+                await CartService.InitializeAsync(username);
+                _currentUserRole = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                _currentUserName = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "staffName");
+                if (string.IsNullOrEmpty(_currentUserName))
+                {
+                    _currentUserName = username;
+                }
+            }
+            StateHasChanged();
+        }
+        catch
+        {
+            // Fallback for SSR / prerendering
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await AuthStateService.ClearAuthAsync();
+            await CartService.SwitchUserOnLogoutAsync();
+        }
+        catch { }
+
+        _currentUserRole = null;
+        _currentUserName = null;
+        StateHasChanged();
+        Navigation.NavigateTo("/login");
+    }
+
+    private void OnCartChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= OnCartChanged;
+        AuthStateService.OnAuthStateChanged -= OnAuthStateChangedHandler;
+        Navigation.LocationChanged -= OnLocationChangedHandler;
+    }
+}
+
+

@@ -1,0 +1,588 @@
+@page "/profile"
+@namespace Frontend.Pages.Customer
+@inject ICustomerApiClient CustomerApi
+@inject IToastService Toast
+@inject NavigationManager Navigation
+
+<div class="profile-page-wrapper">
+    <div class="yame-container">
+        <!-- Breadcrumb -->
+        <nav class="profile-breadcrumb" aria-label="Đường dẫn">
+            <a href="/" class="bc-link">Trang chủ</a>
+            <span class="bc-sep">/</span>
+            <span class="bc-curr">Hồ sơ khách hàng VIP</span>
+        </nav>
+
+        @if (_isLoading)
+        {
+            <div class="profile-loading-state">
+                <div class="spinner"></div>
+                <p>Đang tải thông tin tài khoản...</p>
+            </div>
+        }
+        else if (_profile == null)
+        {
+            <div class="profile-error-state">
+                <span class="error-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </span>
+                <h2>Không tìm thấy thông tin</h2>
+                <p>Vui lòng đăng nhập lại để xem hồ sơ thành viên VIP của bạn.</p>
+                <a href="/login" class="btn-login-redirect">ĐĂNG NHẬP NGAY</a>
+            </div>
+        }
+        else
+        {
+            <div class="profile-grid">
+                <!-- Left Column: Digital VIP Card & Privileges -->
+                <div class="vip-card-column">
+                    <!-- Digital VIP Card Simulated Plastic / Metallic Card -->
+                    <div class="digital-vip-card @GetCardThemeClass(_profile.TenCapDo)">
+                        <div class="card-glass-glow"></div>
+                        <div class="card-top-row">
+                            <span class="card-brand">FASHION STORE</span>
+                            <span class="card-chip">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="card-rank-badge">
+                            @GetFormattedRankBadge(_profile.TenCapDo)
+                        </div>
+                        <div class="card-details-row">
+                            <div class="card-holder-box">
+                                <span class="card-label">CHỦ THẺ</span>
+                                <span class="card-name">@_profile.TenKhachHang</span>
+                            </div>
+                            <div class="card-phone-box">
+                                <span class="card-label">SỐ ĐIỆN THOẠI</span>
+                                <span class="card-phone">@_profile.DienThoai</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Privilege Stats Widgets -->
+                    <div class="vip-stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-5 0c0 4 6 2 6 6a3.5 3.5 0 0 1-5 0"></path>
+                                </svg>
+                            </span>
+                            <div class="stat-info">
+                                <span class="stat-title">Điểm thưởng ví</span>
+                                <span class="stat-value">@_profile.DiemThuong</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                                </svg>
+                            </span>
+                            <div class="stat-info">
+                                <span class="stat-title">Chiết khấu VIP</span>
+                                <span class="stat-value">@_profile.PhanTramGiamGia%</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                            </span>
+                            <div class="stat-info">
+                                <span class="stat-title">Hệ số tích điểm</span>
+                                <span class="stat-value">@(_profile.HeSoTichDiem.ToString("0.0"))x</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rank Upgrade Progress Bar (FR-09) -->
+                    <div class="rank-progress-card">
+                        <div class="progress-header">
+                            <h3 class="progress-title">TIẾN TRÌNH THĂNG HẠNG</h3>
+                            <span class="spending-total">Tổng chi tiêu: <strong>@_profile.TongChiTieu.ToString("N0") ₫</strong></span>
+                        </div>
+
+                        @{
+                            var nextRankThreshold = GetNextRankThreshold(_profile.TenCapDo);
+                            var nextRankName = GetNextRankName(_profile.TenCapDo);
+                            var remainingAmount = nextRankThreshold.HasValue ? (nextRankThreshold.Value - _profile.TongChiTieu) : 0m;
+                            var progressPercent = nextRankThreshold.HasValue 
+                                ? Math.Min(100, (int)((_profile.TongChiTieu / nextRankThreshold.Value) * 100)) 
+                                : 100;
+                        }
+
+                        @if (nextRankThreshold.HasValue && remainingAmount > 0)
+                        {
+                            <p class="progress-desc">
+                                Chi tiêu thêm <strong>@remainingAmount.ToString("N0") ₫</strong> để thăng hạng <strong>@nextRankName</strong>!
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="progress-desc success">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-2px; margin-right:4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Chúc mừng! Bạn đã đạt thứ hạng đặc quyền cao nhất của chuỗi cửa hàng!
+                            </p>
+                        }
+
+                        <div class="progress-track">
+                            <div class="progress-fill" style="width: @(progressPercent)%"></div>
+                        </div>
+
+                        <div class="evaluate-action-box">
+                            <button type="button" 
+                                    class="btn-evaluate-rank" 
+                                    @onclick="HandleEvaluateRankAsync" 
+                                    disabled="@_isEvaluating">
+                                @(_isEvaluating ? "Đang xét duyệt..." : "XÉT DUYỆT THĂNG HẠNG THẺ")
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Navigation to Order History -->
+                    <div class="history-shortcut-card">
+                        <a href="/profile/orders" class="btn-goto-orders">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="display:inline-block; vertical-align:-3px; margin-right:6px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>Xem lịch sử đơn hàng của bạn →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Right Column: Account Information Form -->
+                <div class="account-info-column">
+                    <div class="info-form-card">
+                        <h2 class="form-card-title">THÔNG TIN TÀI KHOẢN CÁ NHÂN</h2>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Họ và tên:</label>
+                                <input type="text" class="form-control" value="@_profile.TenKhachHang" readonly />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Số điện thoại:</label>
+                                <input type="text" class="form-control" value="@_profile.DienThoai" readonly />
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Địa chỉ Email:</label>
+                            <input type="email" class="form-control" value="@_profile.Email" readonly />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Cấp bậc thành viên hiện tại:</label>
+                            <input type="text" class="form-control highlight-rank" value="@_profile.TenCapDo (@_profile.PhanTramGiamGia% giảm giá trực tiếp)" readonly />
+                        </div>
+
+                        <div class="member-privileges-box">
+                            <h4 class="privileges-title">ĐẶC QUYỀN HẠNG THẺ @_profile.TenCapDo.ToUpper():</h4>
+                            <ul class="privileges-list">
+                                <li>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Giảm ngay <strong>@_profile.PhanTramGiamGia%</strong> trên mỗi đơn hàng tại quầy và online.
+                                </li>
+                                <li>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Tích điểm ví với hệ số nhân <strong>@(_profile.HeSoTichDiem.ToString("0.0"))x</strong> giá trị thanh toán.
+                                </li>
+                                <li>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Miễn phí vận chuyển toàn quốc cho tất cả đơn hàng từ 50.000 ₫.
+                                </li>
+                                <li>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px; margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Quà tặng sinh nhật độc quyền và ưu tiên trải nghiệm bộ sưu tập mới.
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .profile-page-wrapper {
+        padding: 24px 0 60px 0;
+        background: #F8FAFC;
+        min-height: 85vh;
+    }
+    .profile-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        margin-bottom: 24px;
+    }
+    .bc-link { color: #64748B; text-decoration: none; }
+    .bc-sep { color: #CBD5E1; }
+    .bc-curr { color: #0F172A; font-weight: 700; }
+    .profile-loading-state, .profile-error-state {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 60px 20px;
+        text-align: center;
+    }
+    .loading-spinner, .error-icon {
+        font-size: 3.5rem;
+        display: block;
+        margin-bottom: 16px;
+    }
+    .btn-login-redirect {
+        display: inline-block;
+        margin-top: 20px;
+        background: #E11D48;
+        color: #FFFFFF;
+        font-weight: 800;
+        padding: 12px 28px;
+        border-radius: 6px;
+        text-decoration: none;
+    }
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 460px 1fr;
+        gap: 28px;
+        align-items: start;
+    }
+    @@media (max-width: 992px) {
+        .profile-grid { grid-template-columns: 1fr; }
+    }
+    .digital-vip-card {
+        border-radius: 16px;
+        padding: 28px;
+        position: relative;
+        overflow: hidden;
+        color: #FFFFFF;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+    .digital-vip-card.card-gold {
+        background: linear-gradient(135deg, #B45309 0%, #D97706 40%, #F59E0B 70%, #FBBF24 100%);
+    }
+    .digital-vip-card.card-silver {
+        background: linear-gradient(135deg, #334155 0%, #475569 50%, #64748B 80%, #94A3B8 100%);
+    }
+    .digital-vip-card.card-standard {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 60%, #334155 100%);
+    }
+    .card-glass-glow {
+        position: absolute;
+        top: -50px;
+        right: -50px;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        pointer-events: none;
+    }
+    .card-top-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-brand {
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        font-size: 1.1rem;
+    }
+    .card-chip { font-size: 1.8rem; }
+    .card-rank-badge {
+        font-size: 1.35rem;
+        font-weight: 900;
+        letter-spacing: 0.05em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    }
+    .card-details-row {
+        display: flex;
+        justify-content: space-between;
+    }
+    .card-label {
+        display: block;
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        opacity: 0.8;
+    }
+    .card-name, .card-phone {
+        font-weight: 700;
+        font-size: 1rem;
+    }
+    .vip-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .stat-icon { font-size: 1.6rem; }
+    .stat-title {
+        display: block;
+        font-size: 0.75rem;
+        color: #64748B;
+        font-weight: 600;
+    }
+    .stat-value {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .rank-progress-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .progress-title {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0F172A;
+        letter-spacing: 0.03em;
+    }
+    .spending-total {
+        font-size: 0.85rem;
+        color: #64748B;
+    }
+    .progress-desc {
+        font-size: 0.88rem;
+        color: #334155;
+        margin-bottom: 12px;
+    }
+    .progress-desc.success { color: #059669; font-weight: 700; }
+    .progress-track {
+        height: 10px;
+        background: #E2E8F0;
+        border-radius: 999px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+    .progress-fill {
+        height: 100%;
+        background: #F59E0B;
+        transition: width 0.3s ease;
+    }
+    .btn-evaluate-rank {
+        width: 100%;
+        background: #0F172A;
+        color: #FFFFFF;
+        border: none;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 0.88rem;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-evaluate-rank:hover:not(:disabled) {
+        background: #D97706;
+    }
+    .btn-goto-orders {
+        display: block;
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        text-align: center;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        color: #0F172A;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .btn-goto-orders:hover {
+        background: #F1F5F9;
+        border-color: #0F172A;
+    }
+    .info-form-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 28px;
+    }
+    .form-card-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 24px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #E2E8F0;
+        letter-spacing: 0.02em;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+    @@media (max-width: 600px) {
+        .form-row { grid-template-columns: 1fr; }
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-label {
+        display: block;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .form-control {
+        width: 100%;
+        padding: 11px 14px;
+        border: 1px solid #E2E8F0;
+        border-radius: 6px;
+        font-size: 0.92rem;
+        background: #F8FAFC;
+        color: #0F172A;
+    }
+    .highlight-rank {
+        font-weight: 800;
+        color: #D97706;
+        background: #FEF3C7;
+        border-color: #FCD34D;
+    }
+    .member-privileges-box {
+        margin-top: 28px;
+        padding: 20px;
+        background: #F8FAFC;
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+    }
+    .privileges-title {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin-bottom: 14px;
+    }
+    .privileges-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: #334155;
+    }
+</style>
+
+@code {
+    private CustomerProfileDto? _profile;
+    private bool _isLoading = true;
+    private bool _isEvaluating = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _profile = await CustomerApi.GetProfileAsync();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetCardThemeClass(string rank)
+    {
+        return rank switch
+        {
+            "Vàng" => "card-gold",
+            "Bạc" => "card-silver",
+            _ => "card-standard"
+        };
+    }
+
+    private string GetFormattedRankBadge(string rank)
+    {
+        return rank switch
+        {
+            "Vàng" => "THÀNH VIÊN VÀNG",
+            "Bạc" => "THÀNH VIÊN BẠC",
+            _ => "THÀNH VIÊN THƯỜNG"
+        };
+    }
+
+    private decimal? GetNextRankThreshold(string rank)
+    {
+        return rank switch
+        {
+            "Thường" => 5000000m,  // 5 Triệu lên Bạc
+            "Bạc" => 10000000m,    // 10 Triệu lên Vàng
+            _ => null              // Đã là Vàng
+        };
+    }
+
+    private string GetNextRankName(string rank)
+    {
+        return rank switch
+        {
+            "Thường" => "THÀNH VIÊN BẠC",
+            "Bạc" => "THÀNH VIÊN VÀNG",
+            _ => "CẤP ĐỘ CAO NHẤT"
+        };
+    }
+
+    private async Task HandleEvaluateRankAsync()
+    {
+        _isEvaluating = true;
+        try
+        {
+            var res = await CustomerApi.EvaluateRankAsync();
+            if (res != null)
+            {
+                Toast.ShowSuccess($"Thăng hạng thành công: {res.CapDoMoi}");
+                if (_profile != null)
+                {
+                    _profile.TenCapDo = res.CapDoMoi;
+                }
+            }
+            else
+            {
+                Toast.ShowInfo("Đã đồng bộ kiểm tra hạng thẻ thành viên.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi xét duyệt: {ex.Message}");
+        }
+        finally
+        {
+            _isEvaluating = false;
+        }
+    }
+}

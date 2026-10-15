@@ -1,0 +1,809 @@
+@page "/admin/banners"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject ICatalogApiClient CatalogApi
+@inject IToastService Toast
+
+<div class="banners-admin-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">QUẢN LÝ HERO BANNER & CHIẾN DỊCH</h2>
+            <p class="page-subtitle">Tùy biến nội dung, tiêu đề, giá nổi bật, nhãn badge và hình ảnh banner ngoài trang chủ (không khóa cứng dữ liệu)</p>
+        </div>
+        <div class="header-actions">
+            <!-- Nút thêm chỉ duy nhất 1 dấu + tinh tế -->
+            <button class="btn-add-banner" @onclick="OpenCreateModal" title="Thêm banner mới" aria-label="Thêm banner mới">
+                <span class="plus-char">+</span>
+                <span>Thêm Banner Mới</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Danh sách Banner -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">Thứ tự</th>
+                        <th style="width: 120px;">Hình ảnh</th>
+                        <th>Tiêu đề & Badge</th>
+                        <th>Phụ đề & Giá</th>
+                        <th>Liên kết nút bấm</th>
+                        <th class="text-center" style="width: 130px;">Trạng thái</th>
+                        <th class="text-center" style="width: 160px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_isLoading)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span> Đang tải danh sách banner...
+                            </td>
+                        </tr>
+                    }
+                    else if (!_banners.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">
+                                Chưa có banner nào trong hệ thống. Hãy bấm nút "+ Thêm Banner Mới" để tạo banner đầu tiên!
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var b in _banners)
+                        {
+                            <tr>
+                                <td class="text-center font-weight-bold">
+                                    <span class="order-badge">@b.ThuTu</span>
+                                </td>
+                                <td>
+                                    <div class="banner-thumb">
+                                        <img src="@(string.IsNullOrEmpty(b.HinhAnh) ? "images/hero-model.jpg" : b.HinhAnh)" 
+                                             alt="@b.TieuDe" 
+                                             onerror="this.onerror=null;this.src='images/hero-model.jpg';" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="banner-title-cell">
+                                        @if (!string.IsNullOrWhiteSpace(b.NhanBadge))
+                                        {
+                                            <span class="badge-tag">@b.NhanBadge</span>
+                                        }
+                                        <div class="main-title">@b.TieuDe.Replace("\n", " / ")</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(b.PhuDe))
+                                    {
+                                        <div class="sub-title text-muted">@b.PhuDe</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(b.GiaNoiBat))
+                                    {
+                                        <div class="price-highlight">@b.GiaNoiBat</div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="links-cell">
+                                        @if (!string.IsNullOrWhiteSpace(b.NutChinhText))
+                                        {
+                                            <div><strong>Chính:</strong> @b.NutChinhText <span class="text-muted">(@b.NutChinhLink)</span></div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(b.NutPhuText))
+                                        {
+                                            <div><strong>Phụ:</strong> @b.NutPhuText <span class="text-muted">(@b.NutPhuLink)</span></div>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <button class="status-toggle-btn @(b.KichHoat ? "status-active" : "status-inactive")"
+                                            @onclick="() => ToggleStatus(b)"
+                                            title="Bấm để bật/tắt hiển thị">
+                                        @if (b.KichHoat)
+                                        {
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Đang hiện</span>
+                                        }
+                                        else
+                                        {
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block; vertical-align:-1px; margin-right:3px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg><span>Đang ẩn</span>
+                                        }
+                                    </button>
+                                </td>
+                                <td class="text-center">
+                                    <div class="action-buttons">
+                                        <button class="btn-action btn-edit" @onclick="() => OpenEditModal(b)" title="Sửa nội dung">
+                                            Sửa
+                                        </button>
+                                        <button class="btn-action btn-delete" @onclick="() => ConfirmDelete(b)" title="Xóa banner">
+                                            Xóa
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- =========================================================================
+     MODAL THÊM / CHỈNH SỬA BANNER
+     ========================================================================= -->
+@if (_showModal)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseModal">
+        <div class="modal-dialog-custom" @onclick:stopPropagation="true">
+            <div class="modal-header-custom">
+                <h3 class="modal-title-custom">
+                    @(_isEditing ? "CHỈNH SỬA HERO BANNER" : "THÊM HERO BANNER MỚI")
+                </h3>
+                <button type="button" class="btn-close-custom" @onclick="CloseModal">✕</button>
+            </div>
+
+            <div class="modal-body-custom">
+                <div class="form-row">
+                    <div class="form-group col-12">
+                        <label class="form-label required">Tiêu đề chính (Có thể xuống dòng):</label>
+                        <textarea class="form-control" rows="2" @bind="_model.TieuDe" placeholder="Ví dụ: MẶC ĐẸP ĐI LÀM&#10;TAN TẦM ĐI QUẨY"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Phụ đề / Khẩu hiệu:</label>
+                        <input type="text" class="form-control" @bind="_model.PhuDe" placeholder="Ví dụ: MUA 2 GIẢM 25%" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giá nổi bật:</label>
+                        <input type="text" class="form-control" @bind="_model.GiaNoiBat" placeholder="Ví dụ: 208K hoặc 250.000₫" />
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Nhãn Stamp Badge (Góc trái trên ảnh):</label>
+                        <input type="text" class="form-control" @bind="_model.NhanBadge" placeholder="Ví dụ: WORK TO WEEKEND" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Thứ tự ưu tiên (Số nhỏ hiện trước):</label>
+                        <input type="number" class="form-control" @bind="_model.ThuTu" min="1" max="999" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required">Đường dẫn hình ảnh:</label>
+                    <input type="text" class="form-control" @bind="_model.HinhAnh" placeholder="images/hero-model.jpg hoặc link URL ảnh online https://..." />
+                    <small class="form-text text-muted">Có thể dùng ảnh có sẵn trong thư mục images/ hoặc URL ảnh từ Unsplash/Pexels.</small>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_model.HinhAnh))
+                {
+                    <div class="image-preview-box">
+                        <div class="preview-label">Xem trước ảnh:</div>
+                        <img src="@_model.HinhAnh" alt="Preview" class="preview-img" onerror="this.onerror=null;this.src='images/hero-model.jpg';" />
+                    </div>
+                }
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Tên nút chính (CTA 1):</label>
+                        <input type="text" class="form-control" @bind="_model.NutChinhText" placeholder="Ví dụ: XEM BỘ SƯU TẬP" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Đường dẫn nút chính:</label>
+                        <input type="text" class="form-control" @bind="_model.NutChinhLink" placeholder="Ví dụ: #product-catalog hoặc /catalog?sale=true" />
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Tên nút phụ (CTA 2):</label>
+                        <input type="text" class="form-control" @bind="_model.NutPhuText" placeholder="Ví dụ: Đặc quyền VIP 2026" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Đường dẫn nút phụ:</label>
+                        <input type="text" class="form-control" @bind="_model.NutPhuLink" placeholder="Ví dụ: /vip" />
+                    </div>
+                </div>
+
+                <div class="form-check-group">
+                    <label class="custom-checkbox-label">
+                        <input type="checkbox" @bind="_model.KichHoat" />
+                        <span>Kích hoạt hiển thị ngay trên Storefront</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-footer-custom">
+                <button type="button" class="btn btn-secondary" @onclick="CloseModal">Hủy bỏ</button>
+                <button type="button" class="btn btn-primary" @onclick="SaveBanner" disabled="@_isSaving">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Đang lưu...</span>
+                    }
+                    else
+                    {
+                        <span>@(_isEditing ? "Lưu Thay Đổi" : "Tạo Banner Mới")</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .banners-admin-container {
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+
+    .page-subtitle {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin: 4px 0 0 0;
+    }
+
+    .btn-add-banner {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 18px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 0.88rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        border: 1px solid #0f172a;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-add-banner:hover {
+        background: #1e293b;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2);
+    }
+
+    .btn-add-banner:active {
+        transform: translateY(0);
+        scale: 0.98;
+    }
+
+    .btn-icon-plus {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        background: #0f172a;
+        color: #ffffff;
+        border: 1px solid #0f172a;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-icon-plus:hover {
+        background: #1e293b;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.2);
+    }
+
+    .btn-icon-plus:active {
+        transform: translateY(0);
+        scale: 0.97;
+    }
+
+    .plus-char {
+        font-size: 1.4rem;
+        font-weight: 300;
+        line-height: 1;
+        margin-top: -2px;
+    }
+
+    .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+
+    .admin-table th {
+        background: #f8fafc;
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        color: #334155;
+        text-align: left;
+    }
+
+    .admin-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    .order-badge {
+        display: inline-block;
+        width: 28px;
+        height: 28px;
+        line-height: 28px;
+        background: #f1f5f9;
+        color: #334155;
+        border-radius: 50%;
+        font-size: 0.8rem;
+    }
+
+    .banner-thumb {
+        width: 100px;
+        height: 64px;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #f1f5f9;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+
+    .banner-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .banner-title-cell .badge-tag {
+        display: inline-block;
+        background: #0f172a;
+        color: #eab308;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-bottom: 4px;
+        letter-spacing: 0.05em;
+    }
+
+    .banner-title-cell .main-title {
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.3;
+    }
+
+    .sub-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .price-highlight {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #d97706;
+    }
+
+    .links-cell {
+        font-size: 0.78rem;
+        color: #475569;
+        line-height: 1.4;
+    }
+
+    .status-toggle-btn {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s ease;
+    }
+
+    .status-active {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .status-inactive {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 6px;
+        justify-content: center;
+    }
+
+    .btn-action {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+    }
+
+    .btn-edit {
+        background: #f1f5f9;
+        color: #0f172a;
+        border-color: #cbd5e1;
+    }
+    .btn-edit:hover {
+        background: #e2e8f0;
+    }
+
+    .btn-delete {
+        background: #fef2f2;
+        color: #dc2626;
+        border-color: #fecaca;
+    }
+    .btn-delete:hover {
+        background: #fee2e2;
+    }
+
+    .btn {
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.88rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+    }
+
+    .btn-primary {
+        background: #0f172a;
+        color: #ffffff;
+    }
+    .btn-primary:hover {
+        background: #1e293b;
+    }
+
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #334155;
+    }
+    .btn-secondary:hover {
+        background: #e2e8f0;
+    }
+
+    /* Modal Styling */
+    .modal-backdrop-custom {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 20px;
+    }
+
+    .modal-dialog-custom {
+        background: #ffffff;
+        border-radius: 16px;
+        width: 100%;
+        max-width: 650px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header-custom {
+        padding: 20px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title-custom {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .btn-close-custom {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #64748b;
+    }
+
+    .modal-body-custom {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .modal-footer-custom {
+        padding: 16px 24px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        background: #fafafa;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .form-label {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .form-label.required::after {
+        content: " *";
+        color: #ef4444;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        outline: none;
+        transition: border-color 0.15s ease;
+    }
+
+    .form-control:focus {
+        border-color: #0f172a;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1);
+    }
+
+    .image-preview-box {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+    }
+
+    .preview-label {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-bottom: 6px;
+    }
+
+    .preview-img {
+        max-width: 100%;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+    .custom-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    private List<BannerDto> _banners = new();
+    private bool _isLoading = false;
+    private bool _showModal = false;
+    private bool _isEditing = false;
+    private bool _isSaving = false;
+    private int _editingId = 0;
+
+    private CreateUpdateBannerDto _model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBanners();
+    }
+
+    private async Task LoadBanners()
+    {
+        _isLoading = true;
+        try
+        {
+            var data = await CatalogApi.GetAllBannersAsync();
+            _banners = data.OrderBy(b => b.ThuTu).ToList();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi tải banner: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        _isEditing = false;
+        _editingId = 0;
+        _model = new CreateUpdateBannerDto
+        {
+            TieuDe = "BST THỜI TRANG MỚI 2026",
+            PhuDe = "ƯU ĐÃI ĐỘC QUYỀN",
+            GiaNoiBat = "199K",
+            NhanBadge = "NEW COLLECTION",
+            HinhAnh = "images/hero-model.jpg",
+            NutChinhText = "XEM NGAY",
+            NutChinhLink = "#product-catalog",
+            NutPhuText = "Xem Chi Tiết",
+            NutPhuLink = "/vip",
+            ThuTu = _banners.Count + 1,
+            KichHoat = true
+        };
+        _showModal = true;
+    }
+
+    private void OpenEditModal(BannerDto banner)
+    {
+        _isEditing = true;
+        _editingId = banner.MaBanner;
+        _model = new CreateUpdateBannerDto
+        {
+            TieuDe = banner.TieuDe,
+            PhuDe = banner.PhuDe,
+            GiaNoiBat = banner.GiaNoiBat,
+            NhanBadge = banner.NhanBadge,
+            HinhAnh = banner.HinhAnh,
+            NutChinhText = banner.NutChinhText,
+            NutChinhLink = banner.NutChinhLink,
+            NutPhuText = banner.NutPhuText,
+            NutPhuLink = banner.NutPhuLink,
+            ThuTu = banner.ThuTu,
+            KichHoat = banner.KichHoat
+        };
+        _showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task SaveBanner()
+    {
+        if (string.IsNullOrWhiteSpace(_model.TieuDe))
+        {
+            Toast.ShowError("Vui lòng nhập tiêu đề banner!");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_model.HinhAnh))
+        {
+            Toast.ShowError("Vui lòng nhập đường dẫn hình ảnh!");
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            bool success;
+            if (_isEditing)
+            {
+                success = await CatalogApi.UpdateBannerAsync(_editingId, _model);
+            }
+            else
+            {
+                success = await CatalogApi.CreateBannerAsync(_model);
+            }
+
+            if (success)
+            {
+                Toast.ShowSuccess(_isEditing ? "Cập nhật banner thành công!" : "Tạo banner mới thành công!");
+                _showModal = false;
+                await LoadBanners();
+            }
+            else
+            {
+                Toast.ShowError("Không thể lưu banner. Vui lòng kiểm tra lại kết nối API!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi lưu banner: {ex.Message}");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task ToggleStatus(BannerDto banner)
+    {
+        var updateDto = new CreateUpdateBannerDto
+        {
+            TieuDe = banner.TieuDe,
+            PhuDe = banner.PhuDe,
+            GiaNoiBat = banner.GiaNoiBat,
+            NhanBadge = banner.NhanBadge,
+            HinhAnh = banner.HinhAnh,
+            NutChinhText = banner.NutChinhText,
+            NutChinhLink = banner.NutChinhLink,
+            NutPhuText = banner.NutPhuText,
+            NutPhuLink = banner.NutPhuLink,
+            ThuTu = banner.ThuTu,
+            KichHoat = !banner.KichHoat
+        };
+
+        var success = await CatalogApi.UpdateBannerAsync(banner.MaBanner, updateDto);
+        if (success)
+        {
+            banner.KichHoat = !banner.KichHoat;
+            Toast.ShowSuccess($"Đã {(banner.KichHoat ? "bật" : "tắt")} hiển thị banner #{banner.MaBanner}");
+        }
+        else
+        {
+            Toast.ShowError("Lỗi cập nhật trạng thái banner");
+        }
+    }
+
+    private async Task ConfirmDelete(BannerDto banner)
+    {
+        var success = await CatalogApi.DeleteBannerAsync(banner.MaBanner);
+        if (success)
+        {
+            Toast.ShowSuccess($"Đã xóa thành công banner #{banner.MaBanner}");
+            await LoadBanners();
+        }
+        else
+        {
+            Toast.ShowError("Lỗi khi xóa banner");
+        }
+    }
+}

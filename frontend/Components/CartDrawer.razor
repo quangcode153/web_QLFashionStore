@@ -1,0 +1,467 @@
+@namespace Frontend.Components
+@inject ICartService CartService
+@inject IJSRuntime JSRuntime
+@inject IToastService Toast
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (CartService.IsDrawerOpen)
+{
+    <div class="cart-drawer-backdrop" @onclick="CloseDrawer"></div>
+    <aside class="cart-drawer-panel" aria-label="Ngăn kéo giỏ hàng">
+        <!-- Header -->
+        <div class="cart-drawer-header">
+            <div class="header-title-box">
+                <span class="header-title">GIỎ HÀNG</span>
+                <span class="header-count">(@CartService.TotalCount)</span>
+            </div>
+            <button type="button" class="btn-close-drawer" @onclick="CloseDrawer" aria-label="Đóng giỏ hàng">✕</button>
+        </div>
+
+        <!-- Freeship Progress Banner (FR-07/CMP-01: Ngưỡng 50.000 ₫) -->
+        <div class="cart-freeship-banner">
+            @{
+                const decimal FreeshipThreshold = 50000m;
+                var currentTotal = CartService.SubTotal;
+                var diff = FreeshipThreshold - currentTotal;
+                var progressPercent = currentTotal >= FreeshipThreshold ? 100 : (int)((currentTotal / FreeshipThreshold) * 100);
+            }
+            @if (currentTotal >= FreeshipThreshold)
+            {
+                <div class="freeship-text success-text">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    <strong>Chúc mừng!</strong> Bạn đã được FREESHIP toàn quốc!
+                </div>
+            }
+            else
+            {
+                <div class="freeship-text">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    Mua thêm <strong>@diff.ToString("N0") ₫</strong> để được FREESHIP!
+                </div>
+            }
+            <div class="freeship-progress-bar">
+                <div class="freeship-progress-fill" style="width: @(progressPercent)%"></div>
+            </div>
+        </div>
+
+        <!-- Body / Items List -->
+        <div class="cart-drawer-body">
+            @if (!CartService.Items.Any())
+            {
+                <div class="cart-empty-state">
+                    <div class="empty-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <path d="M16 10a4 4 0 0 1-8 0"></path>
+                        </svg>
+                    </div>
+                    <p class="empty-title">Giỏ hàng của bạn đang trống</p>
+                    <p class="empty-desc">Hãy dạo quanh bộ sưu tập thời trang mới nhất của QF Fashion nhé!</p>
+                    <a href="/catalog" class="btn-explore-now" @onclick="CloseDrawer">Khám phá ngay</a>
+                </div>
+            }
+            else
+            {
+                <div class="cart-items-list">
+                    @foreach (var item in CartService.Items)
+                    {
+                        <div class="cart-drawer-item">
+                            <div class="item-img-box">
+                                <img src="@(string.IsNullOrEmpty(item.HinhAnh) ? "/images/no-image.svg" : item.HinhAnh)" 
+                                     alt="@item.TenSanPham" 
+                                     class="item-img" 
+                                     loading="lazy" 
+                                     decoding="async" 
+                                     onerror="this.onerror=null;this.src='/images/no-image.svg';" />
+                            </div>
+                            <div class="item-info">
+                                <h4 class="item-name">@item.TenSanPham</h4>
+                                <div class="item-variant">@item.MauSac / @item.KichCo</div>
+                                <div class="item-price">@item.DonGia.ToString("N0") ₫</div>
+                                
+                                <div class="item-actions">
+                                    <div class="item-qty-control">
+                                        <button type="button" class="qty-btn" @onclick="() => DecrementQty(item)">−</button>
+                                        <span class="qty-val">@item.SoLuong</span>
+                                        <button type="button" class="qty-btn" @onclick="() => IncrementQty(item)" disabled="@(item.SoLuong >= item.SoLuongTon)">+</button>
+                                    </div>
+                                    <button type="button" class="cart-item-remove-btn" @onclick="() => RemoveItem(item.MaBienThe)">
+                                        Xóa
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Footer / Checkout Actions -->
+        @if (CartService.Items.Any())
+        {
+            <div class="cart-drawer-footer">
+                <div class="drawer-summary-row">
+                    <span class="summary-label">Tạm tính:</span>
+                    <span class="summary-value">@CartService.SubTotal.ToString("N0") ₫</span>
+                </div>
+                <div class="drawer-actions-box">
+                    <button type="button" class="btn-drawer-checkout" @onclick="ProceedToCheckout">
+                        Tiến hành Đặt hàng
+                    </button>
+                    <a href="/cart" class="btn-drawer-viewcart" @onclick="CloseDrawer">
+                        Xem chi tiết giỏ hàng
+                    </a>
+                </div>
+            </div>
+        }
+    </aside>
+}
+
+<style>
+    .cart-drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        backdrop-filter: blur(2px);
+    }
+    .cart-drawer-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 420px;
+        background: #FFFFFF;
+        z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -4px 0 25px rgba(0, 0, 0, 0.15);
+        animation: slideInRight 0.25s ease-out;
+    }
+    @@keyframes slideInRight {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+    .cart-drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px;
+        border-bottom: 1px solid #E2E8F0;
+    }
+    .header-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        color: #0F172A;
+    }
+    .header-count {
+        font-size: 0.95rem;
+        color: #64748B;
+        font-weight: 600;
+        margin-left: 6px;
+    }
+    .btn-close-drawer {
+        background: transparent;
+        border: none;
+        font-size: 1.25rem;
+        cursor: pointer;
+        color: #64748B;
+        padding: 4px;
+        transition: color 0.15s;
+    }
+    .btn-close-drawer:hover {
+        color: #0F172A;
+    }
+    .cart-freeship-banner {
+        background: #F8FAFC;
+        padding: 12px 20px;
+        border-bottom: 1px solid #E2E8F0;
+    }
+    .freeship-text {
+        font-size: 0.85rem;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .freeship-text.success-text {
+        color: #10B981;
+    }
+    .freeship-progress-bar {
+        height: 6px;
+        background: #E2E8F0;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+    .freeship-progress-fill {
+        height: 100%;
+        background: #E11D48;
+        transition: width 0.3s ease;
+    }
+    .cart-drawer-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+    }
+    .cart-empty-state {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    .empty-icon {
+        font-size: 3.5rem;
+        margin-bottom: 12px;
+    }
+    .empty-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin-bottom: 8px;
+    }
+    .empty-desc {
+        font-size: 0.9rem;
+        color: #64748B;
+        margin-bottom: 24px;
+    }
+    .btn-explore-now {
+        display: inline-block;
+        background: #0F172A;
+        color: #FFFFFF;
+        padding: 10px 24px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+    .btn-explore-now:hover {
+        background: #E11D48;
+    }
+    .cart-items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .cart-drawer-item {
+        display: flex;
+        gap: 14px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .item-img-box {
+        width: 72px;
+        height: 96px;
+        flex-shrink: 0;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #F1F5F9;
+    }
+    .item-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .item-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .item-name {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #0F172A;
+        margin: 0 0 4px 0;
+        line-height: 1.3;
+    }
+    .item-variant {
+        font-size: 0.8rem;
+        color: #64748B;
+        margin-bottom: 6px;
+    }
+    .item-price {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #E11D48;
+        margin-bottom: 8px;
+    }
+    .item-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: auto;
+    }
+    .item-qty-control {
+        display: flex;
+        align-items: center;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .qty-btn {
+        background: #F8FAFC;
+        border: none;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #334155;
+    }
+    .qty-btn:hover:not(:disabled) {
+        background: #E2E8F0;
+    }
+    .qty-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    .qty-val {
+        min-width: 30px;
+        text-align: center;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #0F172A;
+    }
+    .cart-item-remove-btn {
+        background: transparent;
+        border: none;
+        color: #94A3B8;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 4px 8px;
+        transition: color 0.15s;
+    }
+    .cart-item-remove-btn:hover {
+        color: #EF4444;
+    }
+    .cart-drawer-footer {
+        padding: 20px;
+        background: #FFFFFF;
+        border-top: 1px solid #E2E8F0;
+    }
+    .drawer-summary-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+    .summary-label {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #0F172A;
+    }
+    .summary-value {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #E11D48;
+    }
+    .drawer-actions-box {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .btn-drawer-checkout {
+        width: 100%;
+        background: #E11D48;
+        color: #FFFFFF;
+        border: none;
+        padding: 13px;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-drawer-checkout:hover {
+        background: #BE123C;
+    }
+    .btn-drawer-viewcart {
+        display: block;
+        text-align: center;
+        border: 1px solid #CBD5E1;
+        color: #334155;
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .btn-drawer-viewcart:hover {
+        background: #F8FAFC;
+        border-color: #94A3B8;
+    }
+</style>
+
+@code {
+    protected override void OnInitialized()
+    {
+        CartService.OnChange += OnCartStateChanged;
+    }
+
+    private void OnCartStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseDrawer()
+    {
+        CartService.SetDrawerOpen(false);
+    }
+
+    private async Task IncrementQty(CartItemDto item)
+    {
+        await CartService.UpdateQuantityAsync(item.MaBienThe, item.SoLuong + 1);
+    }
+
+    private async Task DecrementQty(CartItemDto item)
+    {
+        await CartService.UpdateQuantityAsync(item.MaBienThe, item.SoLuong - 1);
+    }
+
+    private async Task RemoveItem(int maBienThe)
+    {
+        await CartService.RemoveItemAsync(maBienThe);
+    }
+
+    private async Task ProceedToCheckout()
+    {
+        CloseDrawer();
+        string? token = null;
+        try
+        {
+            token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+        }
+        catch { }
+
+        if (!string.IsNullOrEmpty(token))
+        {
+            Navigation.NavigateTo("/checkout");
+        }
+        else
+        {
+            Toast.ShowInfo("Vui lòng đăng nhập hoặc tạo tài khoản để hoàn tất đơn hàng.");
+            Navigation.NavigateTo("/login?returnUrl=/checkout");
+        }
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= OnCartStateChanged;
+    }
+}

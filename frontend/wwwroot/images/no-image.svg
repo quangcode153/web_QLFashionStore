@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="100%" height="100%">
+  <rect width="600" height="800" fill="#f3f4f6"/>
+  <g transform="translate(200, 300)" fill="none" stroke="#9ca3af" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="200" height="150" rx="12" fill="#e5e7eb" stroke="#d1d5db" stroke-width="2"/>
+    <circle cx="60" cy="50" r="18" fill="#cbd5e1" stroke="none"/>
+    <path d="M20 130 L80 70 L130 115 L150 95 L185 130 Z" fill="#cbd5e1" stroke="none"/>
+    <path d="M10 200 L190 200" stroke="#d1d5db" stroke-width="2"/>
+  </g>
+  <text x="300" y="520" text-anchor="middle" fill="#6b7280" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="20" font-weight="600">
+    HÌNH ẢNH ĐANG CẬP NHẬT
+  </text>
+  <text x="300" y="550" text-anchor="middle" fill="#9ca3af" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-size="14">
+    Fashion Store Management
+  </text>
+</svg>

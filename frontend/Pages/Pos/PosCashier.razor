@@ -1,0 +1,1225 @@
+@page "/pos"
+@namespace Frontend.Pages.Pos
+@inject IPosApiClient PosApiClient
+@inject IToastService Toast
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject Frontend.Services.IAuthStateService AuthStateService
+@inject Frontend.Services.ISignalRNotificationService SignalRService
+
+<div class="pos-layout">
+    <!-- CỘT TRÁI: DANH MỤC BÁN NHANH & TÌM KIẾM SKU/BARCODE -->
+    <div class="pos-left-panel">
+        <div class="pos-header">
+            <div class="pos-brand-badge">
+                <span class="badge-dot"></span>
+                <span class="pos-title">THU NGÂN BÁN LẺ (POS)</span>
+            </div>
+            <div class="pos-cashier-meta">
+                <span>Ca trực: <strong>Sáng</strong></span>
+                <span class="separator">|</span>
+                <span>Nhân viên: <strong>@(_cashierName ?? "Lê Văn Cường")</strong></span>
+                <span class="separator">|</span>
+                <span>Cơ sở: <strong>@(_cashierBranchName ?? "QF Sư Vạn Hạnh (Q.10, TP.HCM)")</strong></span>
+                <span class="separator">|</span>
+                <RealtimeNotificationBell />
+                <span class="separator">|</span>
+                @if (_canAccessWarehouse)
+                {
+                    <a href="/admin/warehouse" class="pos-meta-link pos-link-warehouse" title="Mở module Quản lý kho & Nhập hàng" style="color: #0284c7; font-weight: 700;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-1px; margin-right:3px;">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        </svg>
+                        Quản lý kho
+                    </a>
+                    <span class="separator">|</span>
+                }
+                @if (_canAccessAdmin)
+                {
+                    <a href="/admin/dashboard" class="pos-meta-link" title="Trang quản trị hệ thống">Admin</a>
+                    <span class="separator">|</span>
+                }
+                <a href="/" class="pos-meta-link" title="Về trang chủ">Trang chủ</a>
+                <span class="separator">|</span>
+                <button type="button" class="pos-meta-btn-logout" @onclick="HandleLogout">Đăng xuất</button>
+            </div>
+        </div>
+
+        <!-- Ô quét / nhập mã vạch Barcode & SKU -->
+        <div class="pos-search-bar">
+            <div class="search-input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <line x1="7" y1="8" x2="7" y2="16"></line>
+                    <line x1="11" y1="8" x2="11" y2="16"></line>
+                    <line x1="15" y1="8" x2="15" y2="16"></line>
+                    <line x1="17" y1="8" x2="17" y2="16"></line>
+                </svg>
+                <input type="text" 
+                       class="pos-input" 
+                       placeholder="Quét hoặc nhập mã vạch, mã SKU..." 
+                       value="@_searchBarcode" 
+                       @onchange="OnBarcodeChanged" 
+                       @onkeydown="OnBarcodeKeyDown" />
+            </div>
+            <button class="btn btn-primary btn-search-sku" @onclick="HandleSearchSku">
+                Tìm SKU
+            </button>
+            <button type="button" class="btn btn-outline btn-pos-return" @onclick="OpenReturnModal" title="Đổi trả hàng / Nhập kho lỗi tại quầy (F3)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-2px; margin-right:4px;">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                </svg>
+                Nhập hàng trả (F3)
+            </button>
+        </div>
+
+        <!-- Tiêu đề danh mục bán nhanh -->
+        <div class="fast-sale-heading">
+            <h4>Sản Phẩm Bán Nhanh (Top Picks)</h4>
+            <span class="item-count">@_fastSaleProducts.Count món</span>
+        </div>
+
+        <!-- Lưới sản phẩm bán nhanh -->
+        <div class="fast-sale-grid">
+            @if (_isLoadingFastSale)
+            {
+                <div class="pos-loading-state">Đang tải sản phẩm...</div>
+            }
+            else if (_fastSaleProducts.Count == 0)
+            {
+                <div class="pos-empty-grid">Chưa có sản phẩm gợi ý</div>
+            }
+            else
+            {
+                @foreach (var prod in _fastSaleProducts)
+                {
+                    <div class="fast-sale-tile" @onclick="() => HandleFastSaleSelect(prod)">
+                        <div class="tile-image-container">
+                            @if (!string.IsNullOrEmpty(prod.AnhDaiDien))
+                            {
+                                <img src="@prod.AnhDaiDien" alt="@prod.TenSanPham" class="tile-img" />
+                            }
+                            else
+                            {
+                                <div class="tile-img-placeholder">SP</div>
+                            }
+                            <!-- Nút thêm chỉ 1 dấu + tinh tế trên thẻ -->
+                            <span class="tile-add-plus" title="Thêm vào hóa đơn">+</span>
+                        </div>
+                        <div class="tile-details">
+                            <div class="tile-name" title="@prod.TenSanPham">@prod.TenSanPham</div>
+                            <div class="tile-price tabular-nums">@prod.GiaThapNhat.ToString("N0") đ</div>
+                            <div class="tile-stock tabular-nums">Tồn: @prod.TongTonKho</div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- CỘT PHẢI: HÓA ĐƠN BÁN LẺ & THANH TOÁN -->
+    <div class="pos-right-panel">
+        <!-- Khối Tra Cứu Khách Hàng / Khách VIP -->
+        <div class="customer-lookup-box">
+            <div class="lookup-input-group">
+                <input type="text" 
+                       class="pos-input" 
+                       placeholder="Nhập số điện thoại khách..." 
+                       value="@_customerPhone" 
+                       @onchange="OnCustomerPhoneChanged" 
+                       @onkeydown="OnCustomerPhoneKeyDown" />
+                <button class="btn btn-outline btn-lookup-customer" @onclick="HandleLookupCustomer">
+                    Tìm KH
+                </button>
+            </div>
+
+            @if (_currentCustomer != null)
+            {
+                <div class="vip-badge-card">
+                    <div class="vip-info">
+                        <span class="vip-name">@_currentCustomer.TenKhachHang</span>
+                        <span class="vip-rank">Hạng: @_currentCustomer.TenCapDo (Giảm @_currentCustomer.PhanTramGiamGia%)</span>
+                    </div>
+                    <div class="vip-points">
+                        <span>Điểm: @_currentCustomer.DiemThuong</span>
+                        <button class="btn-remove-customer" @onclick="RemoveCustomer" title="Bỏ chọn">×</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="walkin-customer-note">Khách lẻ vãng lai (không tích điểm)</div>
+            }
+        </div>
+
+        <!-- Danh Sách Hàng Trong Đơn POS -->
+        <div class="pos-cart-items-container">
+            @if (_cartItems.Count == 0)
+            {
+                <div class="pos-cart-empty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    <p>Hóa đơn hiện đang trống</p>
+                    <small>Quét mã hoặc chọn ô bên trái để thêm món</small>
+                </div>
+            }
+            else
+            {
+                <table class="pos-cart-table">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th class="text-center">SL</th>
+                            <th class="text-right">Đơn giá</th>
+                            <th class="text-right">Thành tiền</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _cartItems)
+                        {
+                            <tr class="cart-item-row">
+                                <td class="item-name-col">
+                                    <div class="item-name">@item.TenSanPham</div>
+                                    <div class="item-meta">@item.MaSku | @item.MauSac - @item.KichCo</div>
+                                </td>
+                                <td class="item-qty-col">
+                                    <div class="qty-control-inline">
+                                        <button class="btn-qty-minus" @onclick="() => UpdateQuantity(item, -1)">-</button>
+                                        <span class="qty-val">@item.SoLuong</span>
+                                        <button class="btn-qty-plus" @onclick="() => UpdateQuantity(item, 1)">+</button>
+                                    </div>
+                                </td>
+                                <td class="text-right item-price-col">@item.DonGia.ToString("N0")</td>
+                                <td class="text-right item-total-col">@item.ThanhTien.ToString("N0")</td>
+                                <td class="text-center">
+                                    <button class="btn-del-item" @onclick="() => RemoveCartItem(item)">×</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- Tổng Hợp Tài Chính & Tính Tiền -->
+        <div class="pos-checkout-section">
+            <div class="calc-row">
+                <span>Tổng tiền hàng:</span>
+                <span class="calc-val">@SubTotal.ToString("N0") đ</span>
+            </div>
+
+            @if (DiscountAmount > 0)
+            {
+                <div class="calc-row discount-row">
+                    <span>Giảm giá (@(DiscountDescription)):</span>
+                    <span class="calc-val">-@DiscountAmount.ToString("N0") đ</span>
+                </div>
+            }
+
+            <div class="calc-row grand-total-row">
+                <span>CẦN THANH TOÁN:</span>
+                <span class="grand-total-val">@GrandTotal.ToString("N0") đ</span>
+            </div>
+
+            <!-- Khối Tiền Khách Đưa & Tiền Thừa Linh Hoạt -->
+            <div class="cash-calc-box">
+                <div class="cash-input-row">
+                    <div class="cash-label-group">
+                        <label for="cashGiven">Khách đưa (VNĐ):</label>
+                        <button type="button" class="btn-exact-cash" @onclick="() => SetQuickCash(GrandTotal)" title="Gán khách đưa đúng số tiền cần thanh toán">
+                            ✓ Đủ tiền
+                        </button>
+                    </div>
+                    <div class="cash-input-wrapper">
+                        <input type="number" 
+                               id="cashGiven"
+                               class="pos-input input-cash-given tabular-nums" 
+                               placeholder="Nhập số tiền..." 
+                               value="@_cashGivenInput" 
+                               @oninput="OnCashGivenInput"
+                               @onchange="OnCashGivenChanged" />
+                        @if (!string.IsNullOrWhiteSpace(_cashGivenInput))
+                        {
+                            <button type="button" class="btn-clear-cash" @onclick='() => _cashGivenInput = string.Empty' title="Xóa nhập lại">×</button>
+                        }
+                    </div>
+                </div>
+
+                <div class="change-due-row">
+                    <span class="change-title">Tiền thừa trả khách:</span>
+                    <span class="pos-change-amount tabular-nums @(ChangeDue > 0 ? "has-change" : "")">@ChangeDue.ToString("N0") đ</span>
+                </div>
+                @if (CashGiven > 0 && CashGiven < GrandTotal)
+                {
+                    <div class="cash-short-warning tabular-nums">
+                        (Còn thiếu: @((GrandTotal - CashGiven).ToString("N0")) đ)
+                    </div>
+                }
+            </div>
+
+            <!-- Nút Hành Động Thanh Toán -->
+            <button class="btn btn-primary btn-block btn-pos-pay" 
+                    disabled="@(_cartItems.Count == 0 || _isProcessingPayment)" 
+                    @onclick="HandleCheckoutAndPrint">
+                @if (_isProcessingPayment)
+                {
+                    <span>ĐANG XỬ LÝ...</span>
+                }
+                else
+                {
+                    <span>THANH TOÁN & IN HÓA ĐƠN K80</span>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal In Nhiệt K80 -->
+<PosPrintModal IsVisible="@_showPrintModal" 
+               Receipt="@_activeReceipt" 
+               CashGiven="@CashGiven" 
+               OnClose="ClosePrintModal" />
+
+<!-- Modal Nhập Hàng Trả Tại Quầy (POS Return F3) -->
+<PosReturnModal IsVisible="@_showReturnModal"
+                OnClose="CloseReturnModal"
+                OnReturnSuccess="HandleReturnSuccess" />
+
+<style>
+    .pos-layout {
+        display: flex;
+        height: calc(100vh - 40px);
+        background: #f3f4f6;
+        font-family: var(--font-family);
+        overflow: hidden;
+    }
+
+    .pos-left-panel {
+        flex: 1.2;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        background: #f9fafb;
+        border-right: 1px solid #e5e7eb;
+        overflow-y: auto;
+    }
+
+    .pos-right-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        background: #ffffff;
+        box-shadow: -4px 0 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .pos-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .pos-brand-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .badge-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #10b981;
+    }
+
+    .pos-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        color: #111827;
+    }
+
+    .pos-cashier-meta {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+
+    .pos-cashier-meta .separator {
+        margin: 0 6px;
+    }
+
+    .pos-meta-link {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .pos-meta-link:hover {
+        text-decoration: underline;
+    }
+
+    .pos-meta-btn-logout {
+        background: transparent;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 0;
+    }
+    .pos-meta-btn-logout:hover {
+        text-decoration: underline;
+    }
+
+    .pos-search-bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .btn-pos-return {
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-pos-return:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #dc2626;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+        flex: 1;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+    }
+
+    .pos-input {
+        width: 100%;
+        padding: 10px 12px 10px 40px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        background: #fff;
+    }
+
+    .pos-input:focus {
+        outline: none;
+        border-color: #111827;
+        box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.1);
+    }
+
+    .fast-sale-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .fast-sale-heading h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #374151;
+    }
+
+    .fast-sale-heading .item-count {
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
+    .fast-sale-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+        overflow-y: auto;
+    }
+
+    .fast-sale-tile {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .fast-sale-tile:hover {
+        border-color: #111827;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .tile-image-container {
+        position: relative;
+        height: 80px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 6px;
+        overflow: hidden;
+    }
+
+    .tile-add-plus {
+        position: absolute;
+        bottom: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 0.85rem;
+        font-weight: 400;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        transition: all 0.15s ease;
+    }
+
+    .fast-sale-tile:hover .tile-add-plus {
+        background: #eab308;
+        color: #000000;
+        transform: scale(1.1);
+    }
+
+    .tile-img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: cover;
+    }
+
+    .tile-img-placeholder {
+        font-weight: 700;
+        color: #9ca3af;
+    }
+
+    .tile-name {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tile-price {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 2px 0;
+    }
+
+    .tile-stock {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .tabular-nums {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .customer-lookup-box {
+        margin-bottom: 12px;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 12px;
+    }
+
+    .lookup-input-group {
+        display: flex;
+        gap: 8px;
+    }
+
+    .lookup-input-group .pos-input {
+        padding-left: 12px;
+    }
+
+    .vip-badge-card {
+        margin-top: 8px;
+        background: #fdf2e9;
+        border: 1px solid #fbd38d;
+        border-radius: 6px;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .vip-info .vip-name {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #7c2d12;
+        margin-right: 6px;
+    }
+
+    .vip-info .vip-rank {
+        font-size: 0.8rem;
+        color: #c2410c;
+        font-weight: 600;
+    }
+
+    .vip-points {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: #7c2d12;
+    }
+
+    .btn-remove-customer {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #9a3412;
+    }
+
+    .walkin-customer-note {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+
+    .pos-cart-items-container {
+        flex: 1;
+        overflow-y: auto;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+
+    .pos-cart-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #9ca3af;
+        padding: 20px;
+    }
+
+    .pos-cart-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+
+    .pos-cart-table th {
+        background: #f9fafb;
+        padding: 8px;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 600;
+        color: #4b5563;
+    }
+
+    .cart-item-row td {
+        padding: 8px;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+    }
+
+    .item-name-col .item-name {
+        font-weight: 600;
+        color: #111827;
+    }
+
+    .item-name-col .item-meta {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+
+    .qty-control-inline {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+    }
+
+    .qty-control-inline button {
+        background: #f9fafb;
+        border: none;
+        padding: 2px 8px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .qty-control-inline .qty-val {
+        padding: 0 8px;
+        font-weight: 600;
+    }
+
+    .btn-del-item {
+        background: none;
+        border: none;
+        color: #ef4444;
+        font-size: 1.1rem;
+        cursor: pointer;
+    }
+
+    .pos-checkout-section {
+        border-top: 1px solid #e5e7eb;
+        padding-top: 12px;
+    }
+
+    .calc-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+        color: #4b5563;
+    }
+
+    .calc-row.discount-row {
+        color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .calc-row.grand-total-row {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #111827;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 2px dashed #e5e7eb;
+    }
+
+    .grand-total-val {
+        color: #111827;
+    }
+
+    .cash-calc-box {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .cash-input-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .cash-label-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .cash-label-group label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #334155;
+        margin: 0;
+    }
+
+    /* NÚT ĐỦ TIỀN NỔI BẬT TIỆN LỢI */
+    .btn-exact-cash {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+        padding: 4px 10px;
+        border-radius: 5px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-exact-cash:hover {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.1);
+    }
+
+    .btn-exact-cash:active {
+        transform: translateY(0);
+    }
+
+    .cash-input-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        flex: 1;
+        max-width: 220px;
+    }
+
+    .cash-input-wrapper .input-cash-given {
+        width: 100%;
+        padding: 7px 28px 7px 12px;
+        text-align: right;
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #ffffff;
+        box-sizing: border-box;
+    }
+
+    .cash-input-wrapper .input-cash-given:focus {
+        border-color: #0f172a;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn-clear-cash {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 1.1rem;
+        cursor: pointer;
+        line-height: 1;
+        padding: 2px;
+    }
+
+    .btn-clear-cash:hover {
+        color: #ef4444;
+    }
+
+    .change-due-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #047857;
+        padding-top: 8px;
+        border-top: 1px dashed #cbd5e1;
+    }
+
+    .change-title {
+        color: #475569;
+        font-size: 0.85rem;
+    }
+
+    .pos-change-amount {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #64748b;
+    }
+
+    .pos-change-amount.has-change {
+        color: #10b981;
+    }
+
+    .cash-short-warning {
+        font-size: 0.75rem;
+        color: #ef4444;
+        text-align: right;
+        font-weight: 600;
+        margin-top: 3px;
+    }
+
+    .btn-pos-pay {
+        font-size: 1rem;
+        font-weight: 800;
+        padding: 12px;
+        letter-spacing: 0.5px;
+    }
+
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+</style>
+
+@code {
+    private string _searchBarcode = string.Empty;
+    private string _customerPhone = string.Empty;
+    private string _cashGivenInput = string.Empty;
+    private decimal CashGiven => decimal.TryParse(_cashGivenInput, out var val) ? val : 0;
+
+    private List<ProductListItemDto> _fastSaleProducts = new();
+    private List<PosCartLineItem> _cartItems = new();
+    private CustomerProfileDto? _currentCustomer;
+
+    private bool _isLoadingFastSale = true;
+    private bool _isProcessingPayment = false;
+    private bool _showPrintModal = false;
+    private bool _showReturnModal = false;
+    private ReceiptPrintDto? _activeReceipt;
+
+    private decimal SubTotal => _cartItems.Sum(x => x.ThanhTien);
+    private decimal DiscountAmount => _currentCustomer != null && _currentCustomer.PhanTramGiamGia > 0
+        ? Math.Round(SubTotal * _currentCustomer.PhanTramGiamGia / 100m, 0)
+        : 0;
+
+    private string DiscountDescription => _currentCustomer != null 
+        ? $"VIP {_currentCustomer.TenCapDo} {_currentCustomer.PhanTramGiamGia}%"
+        : string.Empty;
+
+    private decimal GrandTotal => Math.Max(0, SubTotal - DiscountAmount);
+    private decimal ChangeDue => CashGiven > GrandTotal ? CashGiven - GrandTotal : 0;
+    private string? _cashierName;
+    private int _staffId = 1;
+    private int _cashierBranchId = 1;
+    private string? _cashierBranchName;
+    private string? _userRole;
+    private bool _canAccessWarehouse = false;
+    private bool _canAccessAdmin = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            var name = await JS.InvokeAsync<string?>("localStorage.getItem", "staffName");
+            if (!string.IsNullOrEmpty(name)) _cashierName = name;
+
+            var idStr = await JS.InvokeAsync<string?>("localStorage.getItem", "staffId");
+            if (int.TryParse(idStr, out var id) && id > 0) _staffId = id;
+
+            var bIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+            if (int.TryParse(bIdStr, out var bId) && bId > 0) _cashierBranchId = bId;
+
+            var bName = await JS.InvokeAsync<string?>("localStorage.getItem", "branchName");
+            if (!string.IsNullOrEmpty(bName)) _cashierBranchName = bName;
+
+            if (!string.IsNullOrEmpty(role))
+            {
+                _userRole = role;
+                _canAccessAdmin = role.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                  role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                                  role.Contains("chuỗi", StringComparison.OrdinalIgnoreCase);
+
+                _canAccessWarehouse = _canAccessAdmin ||
+                                      role.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                                      role.Contains("kho", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch { }
+
+        await SignalRService.StartAsync();
+        await LoadFastSaleProducts();
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await AuthStateService.ClearAuthAsync();
+        }
+        catch { }
+        Navigation.NavigateTo("/login");
+    }
+
+    private async Task LoadFastSaleProducts()
+    {
+        _isLoadingFastSale = true;
+        try
+        {
+            var res = await PosApiClient.GetFastSaleProductsAsync();
+            _fastSaleProducts = res ?? new List<ProductListItemDto>();
+        }
+        catch
+        {
+            _fastSaleProducts = new List<ProductListItemDto>();
+        }
+        finally
+        {
+            _isLoadingFastSale = false;
+        }
+    }
+
+    private void OnBarcodeChanged(ChangeEventArgs e)
+    {
+        _searchBarcode = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnBarcodeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "F3")
+        {
+            OpenReturnModal();
+        }
+        else if (e.Key == "Enter")
+        {
+            await HandleSearchSku();
+        }
+    }
+
+    private void OpenReturnModal()
+    {
+        _showReturnModal = true;
+    }
+
+    private void CloseReturnModal()
+    {
+        _showReturnModal = false;
+    }
+
+    private async Task HandleReturnSuccess(int orderId)
+    {
+        await LoadFastSaleProducts();
+    }
+
+    private async Task HandleSearchSku()
+    {
+        if (string.IsNullOrWhiteSpace(_searchBarcode)) return;
+
+        try
+        {
+            var variant = await PosApiClient.SearchSkuAsync(_searchBarcode.Trim());
+            if (variant != null)
+            {
+                AddVariantToCart(variant);
+                _searchBarcode = string.Empty;
+            }
+            else
+            {
+                Toast.ShowWarning($"Không tìm thấy sản phẩm với mã SKU: {_searchBarcode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tra cứu SKU: {ex.Message}");
+        }
+    }
+
+    private void HandleFastSaleSelect(ProductListItemDto prod)
+    {
+        var existing = _cartItems.FirstOrDefault(x => x.MaSanPham == prod.MaSanPham);
+        if (existing != null)
+        {
+            existing.SoLuong++;
+            return;
+        }
+
+        _cartItems.Add(new PosCartLineItem
+        {
+            MaBienThe = prod.MaSanPham,
+            MaSanPham = prod.MaSanPham,
+            TenSanPham = prod.TenSanPham,
+            MaSku = $"SP-{prod.MaSanPham}",
+            MauSac = "Tiêu chuẩn",
+            KichCo = "Freesize",
+            DonGia = prod.GiaThapNhat,
+            SoLuong = 1
+        });
+    }
+
+    private void AddVariantToCart(ProductVariantDto variant)
+    {
+        var existing = _cartItems.FirstOrDefault(x => x.MaBienThe == variant.MaBienThe);
+        if (existing != null)
+        {
+            existing.SoLuong++;
+        }
+        else
+        {
+            _cartItems.Add(new PosCartLineItem
+            {
+                MaBienThe = variant.MaBienThe,
+                MaSanPham = variant.MaSanPham,
+                TenSanPham = variant.TenSanPham,
+                MaSku = variant.MaSku,
+                MauSac = variant.MauSac,
+                KichCo = variant.KichCo,
+                DonGia = variant.GiaBan,
+                SoLuong = 1
+            });
+        }
+    }
+
+    private void UpdateQuantity(PosCartLineItem item, int delta)
+    {
+        item.SoLuong += delta;
+        if (item.SoLuong <= 0)
+        {
+            _cartItems.Remove(item);
+        }
+    }
+
+    private void RemoveCartItem(PosCartLineItem item)
+    {
+        _cartItems.Remove(item);
+    }
+
+    private void OnCustomerPhoneChanged(ChangeEventArgs e)
+    {
+        _customerPhone = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OnCustomerPhoneKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await HandleLookupCustomer();
+        }
+    }
+
+    private async Task HandleLookupCustomer()
+    {
+        if (string.IsNullOrWhiteSpace(_customerPhone)) return;
+
+        try
+        {
+            var customer = await PosApiClient.LookupCustomerByPhoneAsync(_customerPhone.Trim());
+            if (customer != null)
+            {
+                _currentCustomer = customer;
+                Toast.ShowSuccess($"Đã gắn thông tin khách VIP: {customer.TenKhachHang} ({customer.TenCapDo})");
+            }
+            else
+            {
+                Toast.ShowWarning("Không tìm thấy khách hàng với số điện thoại này.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tra cứu khách hàng: {ex.Message}");
+        }
+    }
+
+    private void RemoveCustomer()
+    {
+        _currentCustomer = null;
+        _customerPhone = string.Empty;
+    }
+
+    private void OnCashGivenChanged(ChangeEventArgs e)
+    {
+        _cashGivenInput = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnCashGivenInput(ChangeEventArgs e)
+    {
+        _cashGivenInput = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private void SetQuickCash(decimal amount)
+    {
+        _cashGivenInput = amount > 0 ? amount.ToString("0") : "0";
+    }
+
+    private async Task HandleCheckoutAndPrint()
+    {
+        if (_cartItems.Count == 0) return;
+
+        if (CashGiven > 0 && CashGiven < GrandTotal)
+        {
+            Toast.ShowWarning($"Số tiền khách đưa ({CashGiven:N0} đ) chưa đủ để thanh toán ({GrandTotal:N0} đ).");
+            return;
+        }
+
+        _isProcessingPayment = true;
+        try
+        {
+            var orderReq = new CreateOrderRequestDto
+            {
+                MaKhachHang = _currentCustomer?.MaKhachHang,
+                MaNhanVien = _staffId > 0 ? _staffId : 1, // Mã nhân viên của người đang trực tiếp thao tác tại quầy POS
+                MaChiNhanh = _cashierBranchId > 0 ? _cashierBranchId : 1, // Chi nhánh của thu ngân
+                MaGiamGia = null,
+                TrangThai = "Đã hoàn thành", // Khách thanh toán đủ tại quầy -> tự động hoàn tất đơn
+                Items = _cartItems.Select(x => new CreateOrderItemDto
+                {
+                    MaBienThe = x.MaBienThe,
+                    SoLuong = x.SoLuong
+                }).ToList()
+            };
+
+            var orderRes = await PosApiClient.CreatePosOrderAsync(orderReq);
+            if (orderRes != null && orderRes.MaHoaDon > 0)
+            {
+                var receipt = await PosApiClient.GetReceiptPrintAsync(orderRes.MaHoaDon);
+                _activeReceipt = receipt ?? new ReceiptPrintDto
+                {
+                    MaHoaDon = orderRes.MaHoaDon,
+                    NgayLapHoaDon = DateTime.Now,
+                    TenKhachHang = _currentCustomer?.TenKhachHang ?? "Khách lẻ",
+                    SdtKhachHang = _currentCustomer?.DienThoai,
+                    ThuNgan = _cashierName ?? "Thu ngân 01",
+                    TienHang = SubTotal,
+                    TienGiamGia = DiscountAmount,
+                    TongThanhToan = GrandTotal,
+                    TrangThai = "Đã thanh toán",
+                    Items = _cartItems.Select(x => new ReceiptItemDto
+                    {
+                        TenSanPham = x.TenSanPham,
+                        MauSac = x.MauSac,
+                        KichCo = x.KichCo,
+                        SoLuong = x.SoLuong,
+                        DonGia = x.DonGia,
+                        ThanhTien = x.ThanhTien
+                    }).ToList()
+                };
+
+                _showPrintModal = true;
+                Toast.ShowSuccess($"Tạo đơn hàng #{orderRes.MaHoaDon} thành công!");
+            }
+            else
+            {
+                Toast.ShowError("Tạo đơn hàng tại quầy thất bại. Vui lòng kiểm tra tồn kho.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi thanh toán: {ex.Message}");
+        }
+        finally
+        {
+            _isProcessingPayment = false;
+        }
+    }
+
+    private void ClosePrintModal()
+    {
+        _showPrintModal = false;
+        _activeReceipt = null;
+        _cartItems.Clear();
+        _customerPhone = string.Empty;
+        _currentCustomer = null;
+        _cashGivenInput = string.Empty;
+    }
+
+    public class PosCartLineItem
+    {
+        public int MaBienThe { get; set; }
+        public int MaSanPham { get; set; }
+        public string TenSanPham { get; set; } = string.Empty;
+        public string MaSku { get; set; } = string.Empty;
+        public string MauSac { get; set; } = string.Empty;
+        public string KichCo { get; set; } = string.Empty;
+        public decimal DonGia { get; set; }
+        public int SoLuong { get; set; }
+        public decimal ThanhTien => DonGia * SoLuong;
+    }
+}

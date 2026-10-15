@@ -1,0 +1,1933 @@
+@page "/warehouse"
+@page "/admin/warehouse"
+@page "/warehouse/portal"
+@page "/kho"
+@namespace Frontend.Pages.Warehouse
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject Frontend.Services.IAuthStateService AuthStateService
+@inject Frontend.Services.ISignalRNotificationService SignalRService
+
+<div class="warehouse-portal-layout">
+    <!-- TOPBAR ĐIỀU HÀNH KHO CHUYÊN NGHIỆP -->
+    <header class="wh-topbar">
+        <div class="topbar-left">
+            <div class="wh-brand">
+                <div class="wh-brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                <div class="wh-brand-text">
+                    <span class="brand-title">QF WAREHOUSE</span>
+                    <span class="brand-sub">Trung Tâm Điều Hành Tồn Kho & Nhập Hàng</span>
+                </div>
+            </div>
+
+            <div class="role-scope-badge">
+                <span class="role-chip">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    <span>@_badgeRoleTitle</span>
+                </span>
+                <span class="scope-text">@_scopeDescText</span>
+            </div>
+        </div>
+
+        <div class="topbar-right">
+            <RealtimeNotificationBell />
+            <div class="topbar-divider"></div>
+
+            @if (_canAccessPos)
+            {
+                <a href="/pos" class="btn-portal-shortcut" title="Mở máy tính tiền POS bán lẻ">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <span>Quầy POS</span>
+                </a>
+            }
+
+            @if (_canAccessAdminChain)
+            {
+                <a href="/admin/dashboard" class="btn-portal-shortcut" title="Về trang Quản trị chuỗi">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"></rect>
+                        <rect x="14" y="3" width="7" height="5"></rect>
+                        <rect x="14" y="12" width="7" height="9"></rect>
+                        <rect x="3" y="16" width="7" height="5"></rect>
+                    </svg>
+                    <span>Admin Hub</span>
+                </a>
+            }
+
+            <div class="wh-user-profile">
+                <div class="avatar-squircle">@_avatarLetters</div>
+                <div class="profile-info">
+                    <span class="profile-name">@(_staffName ?? "Lê Văn Cường")</span>
+                    <span class="profile-role">@_roleDisplayTitle</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-logout" @onclick="HandleLogout" title="Đăng xuất">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Thoát</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <main class="wh-main-content">
+        <!-- 1. KPI RIBBON: CÁC CHỈ SỐ KHO TỨC THỜI -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon icon-box">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    </svg>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">BIẾN THỂ SKU THEO DÕI</span>
+                    <div class="kpi-value tabular-nums">@_totalSkuTracked</div>
+                    <span class="kpi-hint">Đầy đủ màu sắc & size</span>
+                </div>
+            </div>
+
+            <div class="kpi-card @(_lowStockAlerts.Count > 0 ? "border-amber" : "")">
+                <div class="kpi-icon icon-warn">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">CẢNH BÁO SẮP HẾT (&le; 10 CÁI)</span>
+                    <div class="kpi-value tabular-nums text-amber">@_lowStockAlerts.Count</div>
+                    <span class="kpi-hint">Cần lập đơn nhập hàng bổ sung</span>
+                </div>
+            </div>
+
+            <div class="kpi-card @(_outOfStockCount > 0 ? "border-red" : "")">
+                <div class="kpi-icon icon-danger">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                    </svg>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">CẠN HÀNG TRONG KHO (0 CÁI)</span>
+                    <div class="kpi-value tabular-nums text-red">@_outOfStockCount</div>
+                    <span class="kpi-hint">Hết sạch biến thể bày bán</span>
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-icon icon-supplier">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                </div>
+                <div class="kpi-body">
+                    <span class="kpi-label">NHÀ CUNG CẤP LIÊN KẾT</span>
+                    <div class="kpi-value tabular-nums text-emerald">@_suppliers.Count</div>
+                    <span class="kpi-hint">Đối tác may mặc & phụ kiện</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. TABS ĐIỀU HƯỚNG TÁC VỤ THỦ KHO -->
+        <div class="wh-tabs-bar">
+            <button type="button" class="wh-tab-btn @(_currentTab == TabType.Import ? "active" : "")" @onclick="() => SetTab(TabType.Import)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+                <span>1. LẬP PHIẾU NHẬP HÀNG</span>
+            </button>
+
+            <button type="button" class="wh-tab-btn @(_currentTab == TabType.Inventory ? "active" : "")" @onclick="() => SetTab(TabType.Inventory)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>2. CẢNH BÁO TỒN KHO & KIỂM KÊ</span>
+                @if (_lowStockAlerts.Count > 0)
+                {
+                    <span class="tab-badge-count">@_lowStockAlerts.Count</span>
+                }
+            </button>
+
+            <button type="button" class="wh-tab-btn @(_currentTab == TabType.History ? "active" : "")" @onclick="() => SetTab(TabType.History)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>3. LỊCH SỬ NHẬP KHO & AUDIT</span>
+            </button>
+
+            <button type="button" class="wh-tab-btn @(_currentTab == TabType.Announcements ? "active" : "")" @onclick="() => SetTab(TabType.Announcements)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span>4. THÔNG BÁO ĐIỀU HÀNH KHO</span>
+                @if (_announcements.Count > 0)
+                {
+                    <span class="tab-badge-blue">@_announcements.Count</span>
+                }
+            </button>
+        </div>
+
+        <!-- 3. NỘI DUNG TỪNG TAB -->
+        @if (_currentTab == TabType.Import)
+        {
+            <!-- TAB 1: LẬP PHIẾU NHẬP HÀNG -->
+            <div class="import-tab-layout">
+                <!-- FORM NHẬP KHO CHÍNH -->
+                <div class="card wh-card">
+                    <div class="card-header">
+                        <div class="header-left">
+                            <span class="step-num">01</span>
+                            <div>
+                                <h3 class="card-title">LẬP PHIẾU NHẬP KHO TỨC THÌ</h3>
+                                <p class="card-desc">Cập nhật số lượng tồn vào kho và ghi vết kiểm toán hệ thống</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-clear-form" @onclick="ResetImportForm" title="Xóa dữ liệu để nhập mới">
+                            Làm mới form
+                        </button>
+                    </div>
+
+                    <div class="card-body">
+                        <!-- Dòng 1: Nhà cung cấp & Chi nhánh nhận -->
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <div class="label-with-action">
+                                    <label class="form-label">Nhà cung cấp hàng hóa <span class="required">*</span></label>
+                                    <button type="button" class="btn-text-action" @onclick="ToggleSupplierMode">
+                                        @if (_isCustomSupplierMode)
+                                        {
+                                            <span>&larr; Chọn từ danh sách</span>
+                                        }
+                                        else
+                                        {
+                                            <span>+ Thêm NCC mới</span>
+                                        }
+                                    </button>
+                                </div>
+
+                                @if (_isCustomSupplierMode)
+                                {
+                                    <div class="quick-add-supplier-box">
+                                        <input type="text" class="form-control" placeholder="Tên nhà cung cấp mới (*)..." @bind="_newSupplierName" />
+                                        <input type="text" class="form-control" placeholder="SĐT liên hệ..." @bind="_newSupplierPhone" />
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="SaveNewSupplierQuickly" disabled="@_isSavingSupplier">
+                                            @(_isSavingSupplier ? "Đang lưu..." : "Lưu & Chọn")
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    @if (_isLoadingData && !_suppliers.Any())
+                                    {
+                                        <select class="form-control" disabled>
+                                            <option>⏳ Đang nạp danh sách nhà cung cấp...</option>
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <select class="form-control" @bind="_selectedSupplierId">
+                                            @if (!_suppliers.Any())
+                                            {
+                                                <option value="0">-- Chưa có dữ liệu nhà cung cấp --</option>
+                                            }
+                                            @foreach (var s in _suppliers)
+                                            {
+                                                <option value="@s.MaNhaCungCap">@s.TenNhaCungCap (@(string.IsNullOrEmpty(s.DienThoaiLienHe) ? "Chưa có SĐT" : s.DienThoaiLienHe))</option>
+                                            }
+                                        </select>
+                                    }
+                                }
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Cơ sở / Kho tiếp nhận hàng <span class="required">*</span></label>
+                                <select class="form-control" @bind="_selectedBranchId">
+                                    <option value="1">Kho Tổng (Chi nhánh Quận 1)</option>
+                                    <option value="2">Cơ sở QF Quận 10 (Sư Vạn Hạnh)</option>
+                                    <option value="3">Cơ sở QF Tân Bình (Lê Văn Sỹ)</option>
+                                    <option value="4">Cơ sở QF Gò Vấp (Quang Trung)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Dòng 2: Tra cứu & Chọn biến thể SKU -->
+                        <div class="form-group variant-lookup-group">
+                            <label class="form-label">Mặt hàng / Biến thể cần nhập <span class="required">*</span></label>
+                            <div class="lookup-input-wrapper">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" class="lookup-icon">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="text" 
+                                       class="form-control lookup-input" 
+                                       placeholder="Gõ mã SKU hoặc tên sản phẩm để tìm nhanh (Vd: AT-TRANG-M, Áo Thun, Polo...)" 
+                                       @bind="_skuSearchQuery" 
+                                       @bind:event="oninput" />
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_skuSearchQuery) && _filteredSuggestions.Any())
+                            {
+                                <div class="lookup-dropdown">
+                                    @foreach (var v in _filteredSuggestions)
+                                    {
+                                        <div class="lookup-item" @onclick="() => SelectSuggestion(v)">
+                                            <div class="item-left">
+                                                <code class="sku-tag">@v.MaSku</code>
+                                                <span class="item-name">@v.TenSanPham</span>
+                                                <span class="item-variant">(@v.MauSac - Size @v.KichCo)</span>
+                                            </div>
+                                            <div class="item-right">
+                                                <span class="stock-pill">Tồn: @v.SoLuongTon</span>
+                                                <span class="price-pill">@v.GiaNhap.ToString("N0") đ</span>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if (_selectedVariant != null)
+                            {
+                                <div class="selected-variant-card">
+                                    <div class="card-pill">ĐÃ CHỌN</div>
+                                    <div class="variant-details">
+                                        <strong>@_selectedVariant.TenSanPham</strong>
+                                        <span>SKU: <code>@_selectedVariant.MaSku</code></span>
+                                        <span>Phân loại: <strong>@_selectedVariant.MauSac - @_selectedVariant.KichCo</strong></span>
+                                        <span>Tồn hiện tại: <strong class="text-amber">@_selectedVariant.SoLuongTon cái</strong></span>
+                                        <span>Mã biến thể ID: <strong>#@_selectedVariant.MaBienThe</strong></span>
+                                    </div>
+                                    <button type="button" class="btn-clear-selected" @onclick="ClearSelectedVariant" title="Đổi sang mặt hàng khác">
+                                        ✕ Đổi mặt hàng
+                                    </button>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Dòng 3: Số lượng & Đơn giá nhập -->
+                        <div class="form-row-3">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Mã biến thể ID (*) 
+                                    <span class="text-muted" style="font-size: 0.72rem; font-weight: normal;">(Tự khóa theo mặt hàng)</span>
+                                </label>
+                                <input type="text" 
+                                       class="form-control font-mono font-weight-bold" 
+                                       readonly 
+                                       disabled
+                                       value="@(_selectedVariant != null ? $"#{_selectedVariant.MaBienThe} ({_selectedVariant.MaSku})" : (_importVariantId > 0 ? $"#{_importVariantId}" : "Vui lòng chọn ở trên"))" 
+                                       style="background: #f8fafc; color: #0f172a; cursor: not-allowed; border-color: #cbd5e1; font-weight: 700;" />
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Số lượng nhập (*)</label>
+                                <div class="qty-input-row">
+                                    <input type="number" class="form-control input-qty" placeholder="VD: 50" @bind="_importQuantity" />
+                                    <div class="quick-qty-chips">
+                                        <button type="button" class="btn-qty-chip" @onclick="() => AddQuickQty(20)">+20</button>
+                                        <button type="button" class="btn-qty-chip" @onclick="() => AddQuickQty(50)">+50</button>
+                                        <button type="button" class="btn-qty-chip" @onclick="() => AddQuickQty(100)">+100</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Đơn giá nhập (VNĐ) (*)</label>
+                                <input type="number" class="form-control tabular-nums" placeholder="VD: 85000" @bind="_importPrice" />
+                            </div>
+                        </div>
+
+                        <!-- Dòng 4: Ghi chú & Tổng tiền phiếu nhập -->
+                        <div class="form-row-2 align-items-center">
+                            <div class="form-group">
+                                <label class="form-label">Ghi chú phiếu nhập / Số hóa đơn NCC</label>
+                                <input type="text" class="form-control" placeholder="Vd: Lô vải cao cấp nhập từ NCC 01 / Hóa đơn #HD-892" @bind="_importNote" />
+                            </div>
+
+                            <div class="preview-total-box">
+                                <span class="total-label">DỰ TÍNH TỔNG TIỀN PHIẾU NHẬP:</span>
+                                <span class="total-value tabular-nums">@((_importQuantity * _importPrice).ToString("N0")) đ</span>
+                            </div>
+                        </div>
+
+                        <div class="form-actions-footer">
+                            <button type="button" class="btn btn-submit-import" @onclick="HandleImportStock" disabled="@_isSubmittingImport">
+                                @if (_isSubmittingImport)
+                                {
+                                    <span class="btn-spinner"></span>
+                                    <span>ĐANG LƯU VÀO CSDL KHO...</span>
+                                }
+                                else
+                                {
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                    </svg>
+                                    <span>XÁC NHẬN NHẬP KHO & CẬP NHẬT TỒN NGAY</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CỘT PHỤ: DANH SÁCH NHANH CÁC MẶT HÀNG CẦN NHẬP GẤP -->
+                <div class="card wh-card urgent-stock-panel">
+                    <div class="card-header">
+                        <div class="header-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.2">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                            <h4 class="card-title">CẦN BỔ SUNG GẤP</h4>
+                        </div>
+                        <span class="badge-count">@_lowStockAlerts.Count mặt hàng</span>
+                    </div>
+
+                    <div class="urgent-list">
+                        @if (!_lowStockAlerts.Any())
+                        {
+                            <div class="empty-urgent-state">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>Tất cả mặt hàng đều đảm bảo tồn kho an toàn!</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var item in _lowStockAlerts.Take(8))
+                            {
+                                <div class="urgent-item" @onclick="() => PreFillImport(item.MaBienThe, item.GiaNhap, item)">
+                                    <div class="item-info">
+                                        <span class="item-sku"><code>@item.MaSku</code></span>
+                                        <span class="item-prod-name">@item.TenSanPham</span>
+                                        <span class="item-specs">@item.MauSac - Size @item.KichCo</span>
+                                    </div>
+                                    <div class="item-action">
+                                        <span class="badge-stock-urgent @(item.SoLuongTon == 0 ? "zero" : "")">
+                                            @(item.SoLuongTon == 0 ? "HẾT HÀNG" : $"Còn {item.SoLuongTon}")
+                                        </span>
+                                        <button type="button" class="btn-quick-import" title="Nạp nhanh vào form nhập">+ Nhập</button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else if (_currentTab == TabType.Inventory)
+        {
+            <!-- TAB 2: CẢNH BÁO TỒN KHO & KIỂM KÊ -->
+            <div class="card wh-card">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h3 class="card-title">KIỂM KÊ TỒN KHO & CẢNH BÁO MỨC TỐI THIỂU</h3>
+                    </div>
+                    <div class="header-filter-bar">
+                        <div class="search-box">
+                            <input type="text" class="form-control" placeholder="Lọc theo SKU, tên sản phẩm, màu sắc, size..." @bind="_inventoryFilterQuery" @bind:event="oninput" />
+                        </div>
+                        <div class="status-filters">
+                            <button type="button" class="filter-chip @(_stockFilterMode == "ALL" ? "active" : "")" @onclick='() => _stockFilterMode = "ALL"'>Tất cả (@_lowStockAlerts.Count)</button>
+                            <button type="button" class="filter-chip @(_stockFilterMode == "LOW" ? "active" : "")" @onclick='() => _stockFilterMode = "LOW"'>Sắp hết (&le; 10)</button>
+                            <button type="button" class="filter-chip @(_stockFilterMode == "OUT" ? "active" : "")" @onclick='() => _stockFilterMode = "OUT"'>Cạn kho (0)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="wh-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">MÃ BT</th>
+                                <th>MÃ SKU</th>
+                                <th>TÊN SẢN PHẨM</th>
+                                <th>PHÂN LOẠI</th>
+                                <th class="text-center">SỐ LƯỢNG TỒN</th>
+                                <th class="text-right">GIÁ NHẬP ĐỀ XUẤT</th>
+                                <th class="text-center">TRẠNG THÁI</th>
+                                <th class="text-center" style="width: 110px;">THAO TÁC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!FilteredInventoryList.Any())
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        Không tìm thấy sản phẩm nào phù hợp điều kiện lọc.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in FilteredInventoryList)
+                                {
+                                    <tr class="@(item.SoLuongTon == 0 ? "row-out-of-stock" : "row-low-stock")">
+                                        <td class="font-mono text-muted">#@item.MaBienThe</td>
+                                        <td><code class="sku-code">@item.MaSku</code></td>
+                                        <td class="font-bold">@item.TenSanPham</td>
+                                        <td>@item.MauSac - Size @item.KichCo</td>
+                                        <td class="text-center tabular-nums">
+                                            <span class="stock-badge @(item.SoLuongTon == 0 ? "stock-zero" : "stock-low")">
+                                                @item.SoLuongTon
+                                            </span>
+                                        </td>
+                                        <td class="text-right tabular-nums">@item.GiaNhap.ToString("N0") đ</td>
+                                        <td class="text-center">
+                                            @if (item.SoLuongTon == 0)
+                                            {
+                                                <span class="badge-status-out">HẾT HÀNG</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-status-warn">SẮP HẾT HÀNG</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-action-import" @onclick="() => PreFillImport(item.MaBienThe, item.GiaNhap, item)">
+                                                + Nhập hàng
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        else if (_currentTab == TabType.History)
+        {
+            <!-- TAB 3: LỊCH SỬ NHẬP KHO & AUDIT -->
+            <div class="card wh-card">
+                <div class="card-header">
+                    <h3 class="card-title">NHẬT KÝ THAO TÁC NHẬP HÀNG & BIẾN ĐỘNG KHO</h3>
+                    <button type="button" class="btn-refresh" @onclick="LoadAuditLogs">Làm mới lịch sử</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="wh-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 90px;">MÃ VẾT</th>
+                                <th style="width: 140px;">ĐỐI TƯỢNG</th>
+                                <th>NỘI DUNG CHI TIẾT NHẬP HÀNG</th>
+                                <th style="width: 180px;">NGƯỜI THỰC HIỆN</th>
+                                <th style="width: 160px;" class="text-right">THỜI GIAN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!_auditLogs.Any())
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center py-5 text-muted">Chưa ghi nhận đợt nhập hàng nào trong nhật ký.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var log in _auditLogs)
+                                {
+                                    <tr>
+                                        <td class="font-mono text-muted">#@log.MaNhatKy</td>
+                                        <td><span class="pill-badge">@log.DoiTuong</span></td>
+                                        <td class="log-content">@log.NoiDungChiTiet</td>
+                                        <td><strong>@log.TenNhanVien</strong></td>
+                                        <td class="text-right font-mono text-muted">@log.ThoiGian.ToString("dd/MM/yyyy HH:mm")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        else if (_currentTab == TabType.Announcements)
+        {
+            <!-- TAB 4: THÔNG BÁO ĐIỀU HÀNH KHO -->
+            <div class="card wh-card">
+                <div class="card-header">
+                    <h3 class="card-title">THÔNG BÁO ĐIỀU HÀNH TỪ QUẢN TRỊ VIÊN & CỬA HÀNG TRƯỞNG</h3>
+                    <button type="button" class="btn-refresh" @onclick="LoadAnnouncements">Tải lại thông báo</button>
+                </div>
+
+                <div class="announcements-body">
+                    @if (!_announcements.Any())
+                    {
+                        <div class="empty-state py-5">Chưa có thông báo nào gửi đến bộ phận kho.</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in _announcements)
+                        {
+                            <div class="announcement-item priority-@item.MucDoUuTien.ToLower()">
+                                <div class="ann-top">
+                                    <div class="badges">
+                                        <span class="badge-priority">@item.MucDoUuTien</span>
+                                        <span class="badge-scope">@item.PhamViGui</span>
+                                    </div>
+                                    <span class="ann-date">@item.NgayTao.ToString("HH:mm - dd/MM/yyyy")</span>
+                                </div>
+                                <h4 class="ann-title">@item.TieuDe</h4>
+                                <p class="ann-content">@item.NoiDung</p>
+                                <div class="ann-footer">Người gửi: <strong>@item.TenNguoiGui</strong> (@(item.ChucVuNguoiGui ?? "Quản lý"))</div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    </main>
+</div>
+
+<style>
+    .warehouse-portal-layout {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        background: #f8fafc;
+        font-family: var(--font-family);
+    }
+
+    /* TOPBAR: NOIR THEME */
+    .wh-topbar {
+        background: #090d16;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 10px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #ffffff;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+    }
+
+    .wh-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .wh-brand-icon {
+        width: 38px;
+        height: 38px;
+        background: rgba(234, 179, 8, 0.12);
+        border: 1px solid rgba(234, 179, 8, 0.3);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .wh-brand-text {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .brand-title {
+        font-size: 0.95rem;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        color: #f8fafc;
+    }
+
+    .brand-sub {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    .role-scope-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 4px 10px;
+        border-radius: 6px;
+    }
+
+    .role-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #eab308;
+    }
+
+    .scope-text {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .topbar-divider {
+        width: 1px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-portal-shortcut {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #e2e8f0;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+
+    .btn-portal-shortcut:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+    }
+
+    .wh-user-profile {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .avatar-squircle {
+        width: 32px;
+        height: 32px;
+        background: #1e293b;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #eab308;
+        font-weight: 800;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+
+    .profile-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .profile-name {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #f8fafc;
+    }
+
+    .profile-role {
+        font-size: 0.68rem;
+        color: #94a3b8;
+    }
+
+    .btn-logout {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 10px;
+        background: transparent;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #f87171;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-logout:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+    }
+
+    /* MAIN CONTAINER */
+    .wh-main-content {
+        flex: 1;
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-width: 1600px;
+        margin: 0 auto;
+        width: 100%;
+    }
+
+    /* KPI RIBBON */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+
+    .kpi-card.border-amber { border-left: 4px solid #f59e0b; }
+    .kpi-card.border-red { border-left: 4px solid #ef4444; }
+
+    .kpi-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+    }
+
+    .icon-box { background: #eff6ff; }
+    .icon-warn { background: #fef3c7; }
+    .icon-danger { background: #fee2e2; }
+    .icon-supplier { background: #ecfdf5; }
+
+    .kpi-body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .kpi-label {
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: #64748b;
+        letter-spacing: 0.04em;
+    }
+
+    .kpi-value {
+        font-size: 1.45rem;
+        font-weight: 900;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .text-amber { color: #d97706; }
+    .text-red { color: #dc2626; }
+    .text-emerald { color: #059669; }
+
+    .kpi-hint {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    /* TABS BAR */
+    .wh-tabs-bar {
+        display: flex;
+        gap: 6px;
+        background: #ffffff;
+        padding: 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .wh-tab-btn {
+        flex: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .wh-tab-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .wh-tab-btn.active {
+        background: #0f172a;
+        color: #ffffff;
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.15);
+    }
+
+    .tab-badge-count {
+        background: #f59e0b;
+        color: #000000;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 10px;
+    }
+
+    .tab-badge-blue {
+        background: #2563eb;
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 10px;
+    }
+
+    /* TAB 1: IMPORT LAYOUT */
+    .import-tab-layout {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 16px;
+        align-items: start;
+    }
+
+    .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 12px 18px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .step-num {
+        width: 26px;
+        height: 26px;
+        background: #0f172a;
+        color: #ffffff;
+        font-weight: 800;
+        font-size: 0.72rem;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .card-title {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        letter-spacing: 0.02em;
+    }
+
+    .card-desc {
+        font-size: 0.72rem;
+        color: #64748b;
+        margin: 2px 0 0 0;
+    }
+
+    .btn-clear-form {
+        background: transparent;
+        border: 1px solid #cbd5e1;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: #475569;
+    }
+
+    .card-body {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .form-row-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .form-row-3 {
+        display: grid;
+        grid-template-columns: 1fr 1.5fr 1.5fr;
+        gap: 12px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .label-with-action {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .form-label {
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #334155;
+    }
+
+    .required { color: #ef4444; }
+
+    .btn-text-action {
+        background: transparent;
+        border: none;
+        color: #2563eb;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        color: #0f172a;
+        outline: none;
+        transition: all 0.15s ease;
+    }
+
+    .form-control:focus {
+        border-color: #0f172a;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1);
+    }
+
+    .quick-add-supplier-box {
+        display: flex;
+        gap: 6px;
+    }
+
+    /* VARIANT LOOKUP */
+    .variant-lookup-group {
+        position: relative;
+    }
+
+    .lookup-input-wrapper {
+        position: relative;
+    }
+
+    .lookup-icon {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+    }
+
+    .lookup-input {
+        padding-left: 34px;
+    }
+
+    .lookup-dropdown {
+        position: absolute;
+        top: 66px;
+        left: 0;
+        right: 0;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        max-height: 220px;
+        overflow-y: auto;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        z-index: 50;
+    }
+
+    .lookup-item {
+        padding: 8px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        font-size: 0.78rem;
+    }
+
+    .lookup-item:hover {
+        background: #eff6ff;
+    }
+
+    .sku-tag {
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-right: 6px;
+    }
+
+    .stock-pill {
+        background: #fef3c7;
+        color: #b45309;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+        margin-right: 6px;
+    }
+
+    .selected-variant-card {
+        margin-top: 6px;
+        padding: 8px 12px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .card-pill {
+        background: #16a34a;
+        color: #ffffff;
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .variant-details {
+        font-size: 0.76rem;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: #166534;
+        flex: 1;
+    }
+
+    .btn-clear-selected {
+        margin-left: auto;
+        padding: 3px 8px;
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-clear-selected:hover {
+        background: #fecaca;
+        color: #7f1d1d;
+    }
+
+    .qty-input-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .quick-qty-chips {
+        display: flex;
+        gap: 4px;
+    }
+
+    .btn-qty-chip {
+        flex: 1;
+        padding: 2px 6px;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .btn-qty-chip:hover {
+        background: #e2e8f0;
+    }
+
+    .preview-total-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .total-label {
+        font-size: 0.68rem;
+        font-weight: 800;
+        color: #64748b;
+    }
+
+    .total-value {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: #0f172a;
+    }
+
+    .btn-submit-import {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+
+    .btn-submit-import:hover:not(:disabled) {
+        background: #1e293b;
+    }
+
+    .btn-spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    /* URGENT LIST */
+    .urgent-stock-panel {
+        max-height: 580px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .urgent-list {
+        overflow-y: auto;
+        padding: 8px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .urgent-item {
+        padding: 10px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #ffffff;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .urgent-item:hover {
+        border-color: #f59e0b;
+        background: #fffdf5;
+    }
+
+    .item-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .item-sku code {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #0f172a;
+        background: #f1f5f9;
+        padding: 1px 4px;
+        border-radius: 3px;
+    }
+
+    .item-prod-name {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .item-specs {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .item-action {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .badge-stock-urgent {
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #fef3c7;
+        color: #b45309;
+    }
+
+    .badge-stock-urgent.zero {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .btn-quick-import {
+        padding: 4px 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    /* TABLES */
+    .wh-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+
+    .wh-table th {
+        background: #f8fafc;
+        padding: 10px 14px;
+        text-align: left;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #475569;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .wh-table td {
+        padding: 10px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+
+    .row-out-of-stock {
+        background: #fffafa;
+    }
+
+    .stock-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 800;
+    }
+
+    .stock-zero { background: #fee2e2; color: #dc2626; }
+    .stock-low { background: #fef3c7; color: #b45309; }
+
+    .badge-status-out {
+        font-size: 0.7rem;
+        font-weight: 800;
+        background: #fee2e2;
+        color: #dc2626;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .badge-status-warn {
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: #fef3c7;
+        color: #b45309;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .btn-action-import {
+        padding: 4px 10px;
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .pill-badge {
+        background: #eff6ff;
+        color: #1e40af;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .header-filter-bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .status-filters {
+        display: flex;
+        gap: 4px;
+    }
+
+    .filter-chip {
+        background: transparent;
+        border: 1px solid #cbd5e1;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .filter-chip.active {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    /* ANNOUNCEMENTS BODY */
+    .announcements-body {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .announcement-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px 14px;
+        border-left: 4px solid #cbd5e1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .announcement-item.priority-quan_trọng,
+    .announcement-item.priority-quan\ trọng { border-left-color: #f59e0b; }
+    .announcement-item.priority-khẩn_cấp,
+    .announcement-item.priority-khẩn\ cấp { border-left-color: #ef4444; background: #fffafa; }
+
+    .ann-top {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .badge-priority {
+        background: #fef3c7;
+        color: #b45309;
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+    }
+
+    .badge-scope {
+        background: #eff6ff;
+        color: #1e40af;
+        font-size: 0.68rem;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: 4px;
+    }
+
+    .ann-date { font-size: 0.72rem; color: #94a3b8; font-family: var(--font-mono, monospace); }
+    .ann-title { margin: 0; font-size: 0.88rem; font-weight: 800; color: #0f172a; }
+    .ann-content { margin: 0; font-size: 0.8rem; color: #334155; }
+    .ann-footer { font-size: 0.72rem; color: #64748b; }
+
+    .btn-refresh {
+        background: transparent;
+        border: 1px solid #cbd5e1;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    .font-mono { font-family: var(--font-mono, monospace); }
+    .font-bold { font-weight: 700; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+
+    @@keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private enum TabType { Import, Inventory, History, Announcements }
+    private TabType _currentTab = TabType.Import;
+
+    private string? _staffName;
+    private int _staffId = 3; // Default warehouse staff Lê Văn Cường
+    private string? _userRole;
+    private bool _canAccessAdminChain = false;
+    private bool _canAccessPos = false;
+    private string _badgeRoleTitle = "THỦ KHO CHUYÊN TRÁCH";
+    private string _scopeDescText = "Phạm vi: Kho Tổng & 9 Chi Nhánh QF";
+    private string _roleDisplayTitle = "Thủ kho hệ thống QF";
+    private string _avatarLetters = "TK";
+
+    private List<global::Shared.DTOs.Warehouse.LowStockAlertDto> _allVariants = new();
+    private List<global::Shared.DTOs.Warehouse.LowStockAlertDto> _lowStockAlerts = new();
+    private List<global::Shared.DTOs.Warehouse.SupplierDto> _suppliers = new();
+    private List<global::Shared.DTOs.Audit.AuditLogDto> _auditLogs = new();
+    private List<global::Shared.DTOs.Announcement.InternalAnnouncementDto> _announcements = new();
+
+    private int _totalSkuTracked = 0;
+    private int _outOfStockCount = 0;
+    private bool _isLoadingData = true;
+
+    // Form nhập hàng
+    private int _selectedSupplierId = 1;
+    private int _selectedBranchId = 9;
+    private int _staffBranchId = 9;
+    private string _staffBranchName = "Kho Tổng QF Tân Bình";
+    private string _loaiThuKho = "Thủ kho Online (Kho Tổng)";
+    private int _importVariantId = 0;
+    private int _importQuantity = 30;
+    private decimal _importPrice = 0;
+    private string? _importNote;
+    private bool _isSubmittingImport = false;
+
+    // Tìm kiếm biến thể SKU
+    private string _skuSearchQuery = string.Empty;
+    private global::Shared.DTOs.Warehouse.LowStockAlertDto? _selectedVariant;
+
+    // Thêm nhanh NCC mới
+    private bool _isCustomSupplierMode = false;
+    private string _newSupplierName = string.Empty;
+    private string? _newSupplierPhone;
+    private bool _isSavingSupplier = false;
+
+    // Bộ lọc Tab 2
+    private string _inventoryFilterQuery = string.Empty;
+    private string _stockFilterMode = "ALL";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SignalRService.StartAsync();
+        await LoadWarehouseData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _userRole = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                _staffName = await JS.InvokeAsync<string?>("localStorage.getItem", "staffName");
+                var idStr = await JS.InvokeAsync<string?>("localStorage.getItem", "staffId");
+                if (int.TryParse(idStr, out var id) && id > 0)
+                {
+                    _staffId = id;
+                }
+
+                var branchIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "staffBranchId");
+                var branchName = await JS.InvokeAsync<string?>("localStorage.getItem", "staffBranchName");
+                var loaiThuKhoVal = await JS.InvokeAsync<string?>("localStorage.getItem", "loaiThuKho");
+                if (int.TryParse(branchIdStr, out var bId) && bId > 0)
+                {
+                    _staffBranchId = bId;
+                    _selectedBranchId = bId;
+                    _staffBranchName = branchName ?? $"Chi nhánh #{bId}";
+                }
+                if (!string.IsNullOrEmpty(loaiThuKhoVal))
+                {
+                    _loaiThuKho = loaiThuKhoVal;
+                }
+
+                if (!string.IsNullOrEmpty(_userRole))
+                {
+                    var isChainAdmin = _userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                                       _userRole.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                                       _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase);
+
+                    var isBranchManager = _userRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                                          _userRole.Contains("Cửa hàng trưởng", StringComparison.OrdinalIgnoreCase);
+
+                    var isThuKho = _userRole.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                                   _userRole.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                                   _userRole.Contains("warehouse", StringComparison.OrdinalIgnoreCase);
+
+                    if (isChainAdmin)
+                    {
+                        _canAccessAdminChain = true;
+                        _canAccessPos = true;
+                        _badgeRoleTitle = "QUẢN LÝ CHUỖI TOÀN HỆ THỐNG";
+                        _scopeDescText = "Phạm vi: Toàn chuỗi (9 chi nhánh)";
+                        _roleDisplayTitle = "Quản trị viên toàn chuỗi";
+                        var name = _staffName ?? "Admin";
+                        _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "AD";
+                    }
+                    else if (isBranchManager)
+                    {
+                        _canAccessAdminChain = false;
+                        _canAccessPos = true;
+                        _badgeRoleTitle = "QUẢN LÝ CHI NHÁNH";
+                        _scopeDescText = $"Phạm vi: {_staffBranchName}";
+                        _roleDisplayTitle = "Cửa hàng trưởng chi nhánh";
+                        var name = _staffName ?? "QL";
+                        _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "QL";
+                    }
+                    else if (isThuKho)
+                    {
+                        // THỦ KHO: Phân biệt Thủ kho Online (Kho Tổng) vs Thủ kho chi nhánh
+                        _canAccessAdminChain = false;
+                        _canAccessPos = false;
+                        if (_loaiThuKho.Contains("Online", StringComparison.OrdinalIgnoreCase) || _staffBranchId == 9)
+                        {
+                            _badgeRoleTitle = "THỦ KHO ONLINE (KHO TỔNG)";
+                            _scopeDescText = "Phạm vi: Kho Tổng QF Tân Bình (Đơn Online & Bán buôn)";
+                            _roleDisplayTitle = "Thủ kho Online (Kho Tổng)";
+                        }
+                        else
+                        {
+                            _badgeRoleTitle = "THỦ KHO CHI NHÁNH";
+                            _scopeDescText = $"Phạm vi: {_staffBranchName}";
+                            _roleDisplayTitle = $"Thủ kho {_staffBranchName}";
+                        }
+                        _avatarLetters = "TK";
+                    }
+                    else
+                    {
+                        _canAccessAdminChain = false;
+                        _canAccessPos = true;
+                        _badgeRoleTitle = "NHÂN VIÊN BÁN HÀNG";
+                        _scopeDescText = "Phạm vi: Điểm bán POS";
+                        _roleDisplayTitle = "Nhân viên bán lẻ";
+                        _avatarLetters = "NV";
+                    }
+                }
+                else
+                {
+                    // Mặc định là Thủ kho: không có quyền Quản lý chuỗi
+                    _canAccessAdminChain = false;
+                    _canAccessPos = false;
+                }
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private void SetTab(TabType tab)
+    {
+        _currentTab = tab;
+        if (tab == TabType.History && !_auditLogs.Any())
+        {
+            _ = LoadAuditLogs();
+        }
+        else if (tab == TabType.Announcements && !_announcements.Any())
+        {
+            _ = LoadAnnouncements();
+        }
+    }
+
+    private async Task LoadWarehouseData()
+    {
+        _isLoadingData = true;
+        try
+        {
+            var variantsTask = AdminApi.GetAllWarehouseVariantsAsync();
+            var alertsTask = AdminApi.GetLowStockAlertsAsync(threshold: 15);
+            var suppliersTask = AdminApi.GetSuppliersAsync();
+            var announcementsTask = AdminApi.GetAnnouncementsAsync(phamVi: "Thủ kho");
+
+            await Task.WhenAll(variantsTask, alertsTask, suppliersTask, announcementsTask);
+
+            _allVariants = (await variantsTask) ?? new();
+            _lowStockAlerts = (await alertsTask) ?? new();
+            _suppliers = (await suppliersTask) ?? new();
+            _announcements = (await announcementsTask) ?? new();
+
+            if (_suppliers.Any() && (_selectedSupplierId == 0 || !_suppliers.Any(s => s.MaNhaCungCap == _selectedSupplierId)))
+            {
+                _selectedSupplierId = _suppliers.First().MaNhaCungCap;
+            }
+
+            _outOfStockCount = _lowStockAlerts.Count(x => x.SoLuongTon == 0);
+            _totalSkuTracked = _allVariants.Any() ? _allVariants.Count : Math.Max(_lowStockAlerts.Count + 42, 60);
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải dữ liệu kho: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingData = false;
+        }
+    }
+
+    private async Task LoadAuditLogs()
+    {
+        try
+        {
+            var data = await AdminApi.GetAuditLogsAsync("NHAP_HANG", 50);
+            _auditLogs = data ?? new();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải lịch sử: {ex.Message}");
+        }
+    }
+
+    private async Task LoadAnnouncements()
+    {
+        try
+        {
+            var data = await AdminApi.GetAnnouncementsAsync(phamVi: "Thủ kho");
+            _announcements = data ?? new();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải thông báo: {ex.Message}");
+        }
+    }
+
+    private IEnumerable<global::Shared.DTOs.Warehouse.LowStockAlertDto> _filteredSuggestions =>
+        string.IsNullOrWhiteSpace(_skuSearchQuery) 
+            ? Enumerable.Empty<global::Shared.DTOs.Warehouse.LowStockAlertDto>()
+            : (_allVariants.Any() ? _allVariants : _lowStockAlerts).Where(x => 
+                x.MaSku.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                x.TenSanPham.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase) ||
+                (x.MauSac != null && x.MauSac.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase)) ||
+                (x.KichCo != null && x.KichCo.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase)))
+                .Take(25);
+
+    private IEnumerable<global::Shared.DTOs.Warehouse.LowStockAlertDto> FilteredInventoryList
+    {
+        get
+        {
+            var source = _allVariants.Any() ? _allVariants : _lowStockAlerts;
+            var q = source.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(_inventoryFilterQuery))
+            {
+                q = q.Where(x => 
+                    x.MaSku.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
+                    x.TenSanPham.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
+                    x.MauSac.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
+                    x.KichCo.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase));
+            }
+            if (_stockFilterMode == "LOW")
+            {
+                q = q.Where(x => x.SoLuongTon > 0 && x.SoLuongTon <= 10);
+            }
+            else if (_stockFilterMode == "OUT")
+            {
+                q = q.Where(x => x.SoLuongTon == 0);
+            }
+            return q;
+        }
+    }
+
+    private void SelectSuggestion(global::Shared.DTOs.Warehouse.LowStockAlertDto item)
+    {
+        _selectedVariant = item;
+        _importVariantId = item.MaBienThe;
+        if (item.GiaNhap > 0) _importPrice = item.GiaNhap;
+        _skuSearchQuery = string.Empty;
+    }
+
+    private void ClearSelectedVariant()
+    {
+        _selectedVariant = null;
+        _importVariantId = 0;
+        _importPrice = 0;
+        _skuSearchQuery = string.Empty;
+    }
+
+    private void PreFillImport(int variantId, decimal price, global::Shared.DTOs.Warehouse.LowStockAlertDto? item = null)
+    {
+        _currentTab = TabType.Import;
+        _importVariantId = variantId;
+        if (price > 0) _importPrice = price;
+        _selectedVariant = item 
+            ?? _allVariants.FirstOrDefault(x => x.MaBienThe == variantId) 
+            ?? _lowStockAlerts.FirstOrDefault(x => x.MaBienThe == variantId);
+        Toast.ShowSuccess($"Đã nạp thông tin SKU #{variantId} vào form nhập!");
+    }
+
+    private void AddQuickQty(int add)
+    {
+        _importQuantity += add;
+    }
+
+    private void ResetImportForm()
+    {
+        _importVariantId = 0;
+        _importQuantity = 30;
+        _importPrice = 0;
+        _selectedVariant = null;
+        _importNote = string.Empty;
+        _skuSearchQuery = string.Empty;
+    }
+
+    private void ToggleSupplierMode()
+    {
+        _isCustomSupplierMode = !_isCustomSupplierMode;
+    }
+
+    private async Task SaveNewSupplierQuickly()
+    {
+        if (string.IsNullOrWhiteSpace(_newSupplierName))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên nhà cung cấp mới.");
+            return;
+        }
+
+        _isSavingSupplier = true;
+        try
+        {
+            var req = new global::Shared.DTOs.Warehouse.CreateSupplierRequestDto
+            {
+                TenNhaCungCap = _newSupplierName.Trim(),
+                DienThoaiLienHe = string.IsNullOrWhiteSpace(_newSupplierPhone) ? null : _newSupplierPhone.Trim()
+            };
+
+            var created = await AdminApi.CreateSupplierAsync(req);
+            if (created != null && created.MaNhaCungCap > 0)
+            {
+                _suppliers.Insert(0, created);
+                _selectedSupplierId = created.MaNhaCungCap;
+                _newSupplierName = string.Empty;
+                _newSupplierPhone = null;
+                _isCustomSupplierMode = false;
+                Toast.ShowSuccess($"Đã tạo NCC '{created.TenNhaCungCap}' thành công!");
+            }
+            else
+            {
+                Toast.ShowError("Không thể tạo nhà cung cấp.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tạo NCC: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingSupplier = false;
+        }
+    }
+
+    private async Task HandleImportStock()
+    {
+        if (_importVariantId <= 0 && _selectedVariant != null)
+        {
+            _importVariantId = _selectedVariant.MaBienThe;
+        }
+
+        if (_importVariantId <= 0)
+        {
+            Toast.ShowWarning("Vui lòng tìm và chọn mặt hàng/biến thể cần nhập ở ô tìm kiếm phía trên.");
+            return;
+        }
+
+        if (_importQuantity <= 0)
+        {
+            Toast.ShowWarning("Số lượng nhập phải lớn hơn 0.");
+            return;
+        }
+
+        if (_importPrice < 0)
+        {
+            Toast.ShowWarning("Đơn giá nhập không hợp lệ.");
+            return;
+        }
+
+        _isSubmittingImport = true;
+        try
+        {
+            var req = new global::Shared.DTOs.Warehouse.ImportStockRequestDto
+            {
+                MaChiNhanh = _staffBranchId > 0 ? _staffBranchId : (_selectedBranchId > 0 ? _selectedBranchId : 9),
+                MaBienThe = _importVariantId,
+                MaNhaCungCap = _selectedSupplierId,
+                MaNhanVien = _staffId,
+                SoLuong = _importQuantity,
+                DonGiaNhap = _importPrice,
+                GhiChu = _importNote
+            };
+
+            var success = await AdminApi.ImportStockAsync(req);
+            if (success)
+            {
+                Toast.ShowSuccess($"Nhập kho thành công {_importQuantity} sản phẩm (SKU #{_importVariantId})!");
+                await LoadWarehouseData();
+                await LoadAuditLogs();
+                ResetImportForm();
+            }
+            else
+            {
+                Toast.ShowError("Nhập kho thất bại. Vui lòng kiểm tra mã biến thể SKU.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi nhập kho: {ex.Message}");
+        }
+        finally
+        {
+            _isSubmittingImport = false;
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        try
+        {
+            await AuthStateService.ClearAuthAsync();
+        }
+        catch { }
+        Navigation.NavigateTo("/login");
+    }
+}
