@@ -29,6 +29,7 @@ public interface IAuthRepository
     Task<int> CreateStaffAccountAsync(Shared.DTOs.Auth.CreateStaffAccountDto dto, string passwordHash);
     Task<List<Shared.DTOs.Auth.AccountSummaryDto>> GetAllAccountsAsync(string? roleFilter = null);
     Task<bool> ToggleAccountStatusAsync(int accountId);
+    Task<Shared.DTOs.Auth.AccountSummaryDto?> GetAccountByIdAsync(int accountId);
 }
 
 public class AuthRepository : IAuthRepository
@@ -100,7 +101,7 @@ public class AuthRepository : IAuthRepository
         if (!branchId.HasValue && !string.IsNullOrWhiteSpace(dto.ChiNhanh))
         {
             branchId = await connection.ExecuteScalarAsync<int?>(
-                "SELECT TOP 1 ma_chi_nhanh FROM ChiNhanh WHERE ten_chi_nhanh LIKE @Name AND da_xoa = 0",
+                "SELECT TOP 1 ma_chi_nhanh FROM ChiNhanh WHERE ten_chi_nhanh LIKE @Name AND dang_hoat_dong = 1",
                 new { Name = $"%{dto.ChiNhanh.Trim()}%" });
         }
 
@@ -172,6 +173,29 @@ public class AuthRepository : IAuthRepository
             WHERE ma_tai_khoan = @Id;";
         var rows = await connection.ExecuteAsync(sql, new { Id = accountId });
         return rows > 0;
+    }
+
+    public async Task<Shared.DTOs.Auth.AccountSummaryDto?> GetAccountByIdAsync(int accountId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT 
+                tk.ma_tai_khoan AS MaTaiKhoan,
+                tk.ten_dang_nhap AS TenDangNhap,
+                nv.ma_nhan_vien AS MaNhanVien,
+                nv.ten_nhan_vien AS TenNhanVien,
+                nv.dien_thoai AS DienThoai,
+                nv.vai_tro AS VaiTro,
+                nv.ma_chi_nhanh AS MaChiNhanh,
+                cn.ten_chi_nhanh AS ChiNhanh,
+                cn.ten_chi_nhanh AS TenChiNhanh,
+                ISNULL(cn.is_online_warehouse, 0) AS IsOnlineWarehouse,
+                tk.dang_hoat_dong AS DangHoatDong
+            FROM TaiKhoan tk
+            JOIN NhanVien nv ON tk.ma_nhan_vien = nv.ma_nhan_vien
+            LEFT JOIN ChiNhanh cn ON nv.ma_chi_nhanh = cn.ma_chi_nhanh
+            WHERE tk.ma_tai_khoan = @Id;";
+        return await connection.QueryFirstOrDefaultAsync<Shared.DTOs.Auth.AccountSummaryDto>(sql, new { Id = accountId });
     }
 
     public async Task<UserAuthModel?> GetUserByUsernameAsync(string username)

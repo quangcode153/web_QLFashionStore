@@ -8,5 +8,5 @@ namespace Backend.Services;
 public interface IAuditLogService
 {
     Task<ApiResponse<int>> CreateLogAsync(CreateAuditLogRequestDto request);
-    Task<ApiResponse<IEnumerable<AuditLogDto>>> GetLogsAsync(string? loaiThaoTac = null, int limit = 100);
+    Task<ApiResponse<IEnumerable<AuditLogDto>>> GetLogsAsync(string? loaiThaoTac = null, int? maChiNhanh = null, int limit = 100);
 }

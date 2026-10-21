@@ -1,6 +1,7 @@
 @page "/staff/order-support"
 @layout AdminLayout
 @namespace Frontend.Pages.Staff
+@using global::Shared.Constants
 @using global::Shared.DTOs.Common
 @using global::Shared.DTOs.Feedback
 @using global::Shared.DTOs.Order
@@ -9,24 +10,71 @@
 @inject IToastService ToastService
 @inject ISignalRNotificationService SignalRNotification
 @inject IAuthStateService AuthState
+@inject NavigationManager Navigation
 @inject IJSRuntime JS
 
 <div class="order-support-portal">
     <!-- Top Header & Brand Bar -->
     <div class="portal-header">
-        <div class="header-left">
+        <div class="portal-header-left">
             <div class="badge-row">
-                <span class="role-badge">ORDER COORDINATOR</span>
+                <span class="role-badge">@(_isChainAdmin ? "QUẢN TRỊ VIÊN HỆ THỐNG" : (_isBranchManager ? "QUẢN LÝ CHI NHÁNH" : (_userRole == RoleConstants.OrderCoordinator ? "ĐIỀU PHỐI VIÊN" : "ĐỔI TRẢ & HOÀN KHO")))</span>
                 <span class="live-status-pill">
                     <span class="pulse-dot"></span>
                     TRỰC TUYẾN
                 </span>
+                @if (!_isChainAdmin && !string.IsNullOrEmpty(_userBranchName))
+                {
+                    <span class="branch-scope-pill">
+                        @_userBranchName
+                    </span>
+                }
+                @if (_isChainAdmin)
+                {
+                    <span class="branch-scope-pill scope-chain">
+                        TOÀN CHUỖI
+                    </span>
+                }
             </div>
-            <h1 class="portal-title">TRUNG TÂM ĐIỀU PHỐI ĐƠN HÀNG & ĐỔI TRẢ ONLINE</h1>
-            <p class="portal-subtitle">Cổng điều hành giao vận chuyên biệt, kết nối bưu tá và xử lý quy trình thu hồi hàng lỗi trực tuyến</p>
+            <h1 class="portal-title">QUẢN LÝ ĐỔI TRẢ & HOÀN KHO LỖI</h1>
+            <p class="portal-subtitle">
+                @if (_isChainAdmin)
+                {
+                    <span>Xem toàn chuỗi hoặc lọc theo từng chi nhánh để kiểm tra tiếp nhận và lưu kho hàng lỗi.</span>
+                }
+                else if (_isOrderCoordinator)
+                {
+                    <span>Tiếp nhận yêu cầu thu hồi hàng tận nơi và hoàn kho lỗi tại @_userBranchName.</span>
+                }
+                else
+                {
+                    <span>Tiếp nhận, kiểm tra và xác nhận hoàn kho lỗi cho các đơn có địa chỉ nhận tại @_userBranchName.</span>
+                }
+            </p>
         </div>
 
-        <div class="header-actions">
+        <div class="portal-header-actions">
+            @if (_isChainAdmin)
+            {
+                <div class="admin-branch-picker">
+                    <label class="admin-branch-picker-label">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                        <span>Chi nhánh:</span>
+                    </label>
+                    <select class="admin-branch-select" 
+                            value="@_adminSelectedBranchId" 
+                            @onchange="OnAdminBranchFilterChanged">
+                        <option value="0">🌐 Toàn bộ chuỗi (Tất cả chi nhánh)</option>
+                        @foreach (var br in _branches)
+                        {
+                            <option value="@br.MaChiNhanh">@br.TenChiNhanh @(br.IsOnlineWarehouse || br.MaChiNhanh == 9 ? "🌐 (Kho Tổng Online)" : "")</option>
+                        }
+                    </select>
+                </div>
+            }
             <button class="btn btn-refresh" @onclick="LoadDataAsync" disabled="@_isLoading" title="Tải lại dữ liệu">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="23 4 23 10 17 10"></polyline>
@@ -38,42 +86,8 @@
         </div>
     </div>
 
-    <!-- 4 KPI Summary Cards -->
+    <!-- 4 KPI Summary Cards Chuyên Biệt Cho Đổi Trả & Hoàn Kho -->
     <div class="kpi-grid">
-        <div class="kpi-card card-cho-xu-ly">
-            <div class="kpi-card-inner">
-                <div class="kpi-info">
-                    <span class="kpi-title">Chờ bàn giao vận chuyển</span>
-                    <div class="kpi-value kpi-cho-xu-ly">@_pendingDispatchCount</div>
-                    <span class="kpi-sub">Cần đóng gói & bàn giao</span>
-                </div>
-                <div class="kpi-icon-box box-amber">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <div class="kpi-card card-dang-giao">
-            <div class="kpi-card-inner">
-                <div class="kpi-info">
-                    <span class="kpi-title">Đang giao hàng (Shipping)</span>
-                    <div class="kpi-value kpi-dang-giao">@_shippingCount</div>
-                    <span class="kpi-sub">Đang trên đường giao</span>
-                </div>
-                <div class="kpi-icon-box box-blue">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="1" y="3" width="15" height="13"></rect>
-                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
         <div class="kpi-card card-doi-tra-can-duyet">
             <div class="kpi-card-inner">
                 <div class="kpi-info">
@@ -93,9 +107,42 @@
         <div class="kpi-card card-hang-hoan-dang-ve">
             <div class="kpi-card-inner">
                 <div class="kpi-info">
-                    <span class="kpi-title">Hàng hoàn đang về kho</span>
+                    <span class="kpi-title">Đang thu hồi / Đến chi nhánh</span>
                     <div class="kpi-value kpi-hang-hoan-dang-ve">@_inTransitReturnCount</div>
                     <span class="kpi-sub">Đang hoàn về chi nhánh/kho</span>
+                </div>
+                <div class="kpi-icon-box box-blue">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="kpi-card card-da-nhap-kho">
+            <div class="kpi-card-inner">
+                <div class="kpi-info">
+                    <span class="kpi-title">Đã hoàn kho lỗi</span>
+                    <div class="kpi-value text-success" style="color: #10b981; font-weight: 800;">@_completedReturnCount</div>
+                    <span class="kpi-sub">Nhập kho lỗi thành công</span>
+                </div>
+                <div class="kpi-icon-box box-green" style="background: rgba(16, 185, 129, 0.12); color: #10b981;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="kpi-card card-tong-phieu">
+            <div class="kpi-card-inner">
+                <div class="kpi-info">
+                    <span class="kpi-title">Tổng phiếu đổi trả</span>
+                    <div class="kpi-value text-primary" style="color: #6366f1; font-weight: 800;">@_totalReturnCount</div>
+                    <span class="kpi-sub">Tất cả yêu cầu tiếp nhận</span>
                 </div>
                 <div class="kpi-icon-box box-indigo">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -109,175 +156,31 @@
         </div>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="portal-nav-tabs">
-        <button class="tab-btn tab-dispatch-orders @(_activeTab == "ORDERS" ? "active" : "")" 
-                @onclick="@(() => SwitchTab("ORDERS"))">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1"></path>
-                <path d="M18 8h4a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4"></path>
-                <circle cx="8" cy="18" r="2"></circle>
-                <circle cx="18" cy="18" r="2"></circle>
+    <!-- Tab Navigation: Xử lý đổi trả vs Kho khiếu nại & Hàng lỗi -->
+    <div class="portal-main-tabs">
+        <button type="button" class="portal-tab-btn @(_activeTab == "RETURNS" ? "active" : "")" @onclick='() => _activeTab = "RETURNS"'>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
             </svg>
-            <span>ĐIỀU PHỐI GIAO VẬN ĐƠN HÀNG</span>
-            <span class="tab-count-badge">@_onlineOrders.Count</span>
+            <span>XỬ LÝ YÊU CẦU ĐỔI TRẢ</span>
+            <span class="tab-badge">@ScopedFeedbacks.Count()</span>
         </button>
 
-        <button class="tab-btn tab-return-tickets @(_activeTab == "RETURNS" ? "active" : "")" 
-                @onclick="@(() => SwitchTab("RETURNS"))">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
+        <button type="button" class="portal-tab-btn tab-btn-defective @(_activeTab == "DEFECTIVE_STOCK" ? "active" : "")" @onclick='() => _activeTab = "DEFECTIVE_STOCK"'>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                <line x1="12" y1="22.08" x2="12" y2="12"></line>
             </svg>
-            <span>QUẢN LÝ ĐỔI TRẢ & HOÀN KHO LỖI</span>
-            <span class="tab-count-badge">@_returnFeedbacks.Count</span>
+            <span>KHO KHIẾU NẠI & HÀNG LỖI @(!_isChainAdmin ? (!string.IsNullOrEmpty(_userBranchName) ? $"({_userBranchName})" : "") : (_adminSelectedBranchId > 0 ? $"({_branches.FirstOrDefault(b => b.MaChiNhanh == _adminSelectedBranchId)?.TenChiNhanh})" : "(Toàn chuỗi)"))</span>
+            <span class="tab-badge tab-badge-danger">@DefectiveFeedbacks.Count mặt hàng</span>
         </button>
     </div>
 
-    <!-- Tab 1: Dispatch Orders Management -->
-    @if (_activeTab == "ORDERS")
-    {
-        <div class="tab-content-panel orders-panel">
-            <div class="filter-toolbar">
-                <div class="search-input-box">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" 
-                           placeholder="Tìm theo mã đơn #DH, tên khách, số điện thoại..." 
-                           @bind="_orderSearch" 
-                           @bind:event="oninput" />
-                </div>
-
-                <div class="status-chips">
-                    <button class="status-chip @(string.IsNullOrEmpty(_orderStatusFilter) ? "active" : "")" @onclick="@(() => _orderStatusFilter = "")">
-                        Tất cả (@_onlineOrders.Count)
-                    </button>
-                    <button class="status-chip chip-amber @(_orderStatusFilter == "Chờ xử lý" ? "active" : "")" @onclick="@(() => _orderStatusFilter = "Chờ xử lý")">
-                        Chờ bàn giao (@_pendingDispatchCount)
-                    </button>
-                    <button class="status-chip chip-blue @(_orderStatusFilter == "Đang giao hàng" ? "active" : "")" @onclick="@(() => _orderStatusFilter = "Đang giao hàng")">
-                        Đang giao (@_shippingCount)
-                    </button>
-                    <button class="status-chip chip-green @(_orderStatusFilter == "Đã hoàn thành" ? "active" : "")" @onclick="@(() => _orderStatusFilter = "Đã hoàn thành")">
-                        Đã giao thành công
-                    </button>
-                </div>
-            </div>
-
-            <div class="table-container">
-                <table class="portal-table">
-                    <thead>
-                        <tr>
-                            <th>MÃ ĐƠN</th>
-                            <th>KHÁCH HÀNG & LIÊN HỆ</th>
-                            <th>NGÀY ĐẶT</th>
-                            <th>TỔNG TIỀN</th>
-                            <th>ĐỊA CHỈ GIAO HÀNG</th>
-                            <th>TRẠNG THÁI</th>
-                            <th class="text-right">THAO TÁC ĐIỀU PHỐI</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if (FilteredOrders.Count == 0)
-                        {
-                            <tr>
-                                <td colspan="7" class="empty-state">
-                                    <div class="empty-box">
-                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                        </svg>
-                                        <p>Không tìm thấy đơn hàng trực tuyến nào phù hợp bộ lọc.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                        else
-                        {
-                            @foreach (var o in FilteredOrders)
-                            {
-                                <tr>
-                                    <td>
-                                        <span class="order-id-badge">#DH-@o.MaHoaDon</span>
-                                        <span class="badge-online">ONLINE</span>
-                                    </td>
-                                    <td>
-                                        <div class="customer-cell">
-                                            <strong class="customer-name">@o.TenKhachHang</strong>
-                                            <span class="customer-phone">@o.SdtKhachHang</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="date-cell">
-                                            <span>@o.NgayLapHoaDon.ToString("dd/MM/yyyy")</span>
-                                            <small>@o.NgayLapHoaDon.ToString("HH:mm")</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <strong class="order-amount">@o.TongThanhToan.ToString("N0") đ</strong>
-                                    </td>
-                                    <td>
-                                        <div class="address-snippet" title="@o.DiaChiGiaoHang">
-                                            @(string.IsNullOrWhiteSpace(o.DiaChiGiaoHang) ? "Giao hàng tận nơi" : o.DiaChiGiaoHang)
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="status-pill status-@GetStatusClass(o.TrangThai)">@o.TrangThai</span>
-                                    </td>
-                                    <td class="text-right">
-                                        <div class="action-buttons-group">
-                                            @if (o.TrangThai == "Chờ xử lý")
-                                            {
-                                                <button class="btn btn-action-shipping" 
-                                                        data-order-id="@o.MaHoaDon" 
-                                                        @onclick="() => HandoverToShipper(o.MaHoaDon)"
-                                                        title="Bàn giao đơn hàng cho Shipper vận chuyển">
-                                                    🚚 Bàn giao Shipper
-                                                </button>
-                                                <button class="btn btn-action-cancel" 
-                                                        data-order-id="@o.MaHoaDon" 
-                                                        @onclick="() => CancelOrder(o.MaHoaDon)"
-                                                        title="Hủy đơn hàng nếu khách yêu cầu hoặc sai thông tin">
-                                                    Hủy đơn
-                                                </button>
-                                            }
-                                            else if (o.TrangThai == "Đang giao hàng")
-                                            {
-                                                <button class="btn btn-action-complete" 
-                                                        data-order-id="@o.MaHoaDon" 
-                                                        @onclick="() => CompleteDelivery(o.MaHoaDon)"
-                                                        title="Xác nhận giao hàng thành công & Hoàn tất đơn">
-                                                    ✅ Giao thành công
-                                                </button>
-                                                <button class="btn btn-action-cancel" 
-                                                        data-order-id="@o.MaHoaDon" 
-                                                        @onclick="() => CancelOrder(o.MaHoaDon)"
-                                                        title="Giao hàng thất bại / Hủy đơn">
-                                                    Giao thất bại
-                                                </button>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-muted-completed">Đã kết thúc</span>
-                                            }
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
-
-    <!-- Tab 2: Return Tickets & Defective Stock Management -->
     @if (_activeTab == "RETURNS")
     {
+        <!-- Returns & Defective Stock Panel -->
         <div class="tab-content-panel returns-panel">
             <div class="filter-toolbar">
                 <div class="search-input-box">
@@ -288,21 +191,22 @@
                     <input type="text" 
                            placeholder="Tìm theo mã phiếu #PH, mã đơn #DH, tên khách, địa chỉ..." 
                            @bind="_returnSearch" 
-                           @bind:event="oninput" />
+                           @bind:event="oninput"
+                           @bind:after="ResetReturnPage" />
                 </div>
 
                 <div class="status-chips">
-                    <button class="status-chip @(string.IsNullOrEmpty(_returnStatusFilter) ? "active" : "")" @onclick="@(() => _returnStatusFilter = "")">
-                        Tất cả phiếu (@_returnFeedbacks.Count)
+                    <button class="status-chip @(string.IsNullOrEmpty(_returnStatusFilter) ? "active" : "")" @onclick="@(() => { _returnStatusFilter = ""; ResetReturnPage(); })">
+                        Tất cả phiếu (@ScopedFeedbacks.Count())
                     </button>
-                    <button class="status-chip chip-orange @(_returnStatusFilter == "Cần duyệt" ? "active" : "")" @onclick="@(() => _returnStatusFilter = "Cần duyệt")">
+                    <button class="status-chip chip-orange @(_returnStatusFilter == "Cần duyệt" ? "active" : "")" @onclick="@(() => { _returnStatusFilter = "Cần duyệt"; ResetReturnPage(); })">
                         Cần duyệt (@_pendingReturnCount)
                     </button>
-                    <button class="status-chip chip-blue @(_returnStatusFilter == "Đã duyệt" ? "active" : "")" @onclick="@(() => _returnStatusFilter = "Đã duyệt")">
+                    <button class="status-chip chip-blue @(_returnStatusFilter == "Đã duyệt" ? "active" : "")" @onclick="@(() => { _returnStatusFilter = "Đã duyệt"; ResetReturnPage(); })">
                         Đang thu hồi (@_inTransitReturnCount)
                     </button>
-                    <button class="status-chip chip-green @(_returnStatusFilter == "Đã hoàn tất" ? "active" : "")" @onclick="@(() => _returnStatusFilter = "Đã hoàn tất")">
-                        Đã nhập kho lỗi
+                    <button class="status-chip chip-green @(_returnStatusFilter == "Đã hoàn tất" ? "active" : "")" @onclick="@(() => { _returnStatusFilter = "Đã hoàn tất"; ResetReturnPage(); })">
+                        Đã nhập kho lỗi (@_completedReturnCount)
                     </button>
                 </div>
             </div>
@@ -321,7 +225,7 @@
                 }
                 else
                 {
-                    @foreach (var fb in FilteredReturns)
+                    @foreach (var fb in PagedReturns)
                     {
                         <div class="return-ticket-card status-border-@GetStatusClass(fb.TrangThai)">
                             <div class="ticket-header">
@@ -357,7 +261,12 @@
                                     @if (fb.HinhThucHoan == "Thu hồi tại nhà")
                                     {
                                         <div class="address-item-card address-pickup">
-                                            <div class="address-icon">📍</div>
+                                            <div class="address-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                                    <circle cx="12" cy="10" r="3"></circle>
+                                                </svg>
+                                            </div>
                                             <div class="address-content dia-chi-thu-hoi">
                                                 <div class="address-tag">ĐỊA CHỈ THU HỒI TẠI NHÀ (BƯU TÁ ĐẾN LẤY):</div>
                                                 <div class="address-text">@fb.DiaChiThuHoi</div>
@@ -365,7 +274,13 @@
                                         </div>
 
                                         <div class="address-item-card address-destination">
-                                            <div class="address-icon">🏢</div>
+                                            <div class="address-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                                </svg>
+                                            </div>
                                             <div class="address-content dia-chi-nhan-hang">
                                                 <div class="address-tag">KHO TIẾP NHẬN BƯU PHẨM HOÀN VỀ:</div>
                                                 <div class="address-text">
@@ -379,7 +294,12 @@
                                     else
                                     {
                                         <div class="address-item-card address-branch">
-                                            <div class="address-icon">🏬</div>
+                                            <div class="address-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                                </svg>
+                                            </div>
                                             <div class="address-content dia-chi-nhan-hang">
                                                 <div class="address-tag">CHI NHÁNH TIẾP NHẬN HÀNG TRẢ (KHÁCH MANG ĐẾN):</div>
                                                 <div class="address-text">
@@ -395,7 +315,7 @@
 
                             <div class="ticket-footer">
                                 <div class="ticket-action-btns">
-                                    @if (fb.TrangThai == "Cần duyệt")
+                                    @if (fb.TrangThai == "Cần duyệt" || fb.TrangThai == "Chưa xử lý" || fb.TrangThai == "Chờ xử lý" || string.IsNullOrWhiteSpace(fb.TrangThai))
                                     {
                                         <button class="btn btn-approve-return" 
                                                 data-feedback-id="@fb.MaPhanHoi" 
@@ -415,8 +335,13 @@
                                                 @onclick="() => ReceiveDefectiveStock(fb.MaPhanHoi)">
                                             📥 Đã nhận bưu phẩm hoàn (Nhập kho lỗi)
                                         </button>
+                                        <button class="btn btn-reject-return" 
+                                                data-feedback-id="@fb.MaPhanHoi" 
+                                                @onclick="() => RejectReturn(fb.MaPhanHoi)">
+                                            ❌ Hủy duyệt / Từ chối
+                                        </button>
                                     }
-                                    else if (fb.TrangThai == "Đã hoàn tất")
+                                    else if (fb.TrangThai == "Đã hoàn tất" || fb.TrangThai == "Đã nhận hàng hoàn" || fb.TrangThai == "Đã xử lý")
                                     {
                                         <div class="completed-receipt-badge">
                                             ✓ Đã nhập kho lỗi thành công
@@ -427,11 +352,196 @@
                                         <div class="rejected-badge">
                                             ✕ Yêu cầu đã bị từ chối
                                         </div>
+                                        <button class="btn btn-approve-return" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;"
+                                                data-feedback-id="@fb.MaPhanHoi" 
+                                                @onclick="() => ApproveReturn(fb.MaPhanHoi)">
+                                            🔄 Duyệt lại
+                                        </button>
                                     }
                                 </div>
                             </div>
                         </div>
                     }
+                }
+            </div>
+
+            <!-- Thanh phân trang Pagination cho Đổi Trả -->
+            @if (FilteredReturns.Count > 0)
+            {
+                <div class="pagination-footer">
+                    <div class="pagination-info">
+                        Hiển thị <strong>@((_returnPage - 1) * _returnPageSize + 1)</strong> - <strong>@(Math.Min(_returnPage * _returnPageSize, FilteredReturns.Count))</strong> trong tổng số <strong>@FilteredReturns.Count</strong> phiếu đổi trả
+                    </div>
+
+                    <div class="pagination-controls">
+                        <div class="page-size-selector">
+                            <label>Hiển thị:</label>
+                            <select @onchange="OnReturnPageSizeChanged" value="@_returnPageSize">
+                                <option value="10">10 / trang</option>
+                                <option value="20">20 / trang</option>
+                                <option value="50">50 / trang</option>
+                            </select>
+                        </div>
+
+                        <button class="page-nav-btn page-nav-prev" 
+                                disabled="@(_returnPage <= 1)" 
+                                @onclick="() => GoToReturnPage(_returnPage - 1)" 
+                                title="Trang trước">
+                            ‹ Trước
+                        </button>
+
+                        <div class="page-numbers">
+                            @for (int p = 1; p <= TotalReturnPages; p++)
+                            {
+                                var pageNum = p;
+                                @if (pageNum == 1 || pageNum == TotalReturnPages || Math.Abs(pageNum - _returnPage) <= 1)
+                                {
+                                    <button class="page-num-btn @(pageNum == _returnPage ? "active" : "")" 
+                                            @onclick="() => GoToReturnPage(pageNum)">
+                                        @pageNum
+                                    </button>
+                                }
+                                else if (pageNum == 2 && _returnPage > 3)
+                                {
+                                    <span class="page-ellipsis">...</span>
+                                }
+                                else if (pageNum == TotalReturnPages - 1 && _returnPage < TotalReturnPages - 2)
+                                {
+                                    <span class="page-ellipsis">...</span>
+                                }
+                            }
+                        </div>
+
+                        <button class="page-nav-btn page-nav-next" 
+                                disabled="@(_returnPage >= TotalReturnPages)" 
+                                @onclick="() => GoToReturnPage(_returnPage + 1)" 
+                                title="Trang sau">
+                            Sau ›
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Kho Khiếu Nại & Hàng Lỗi Cách Ly Panel -->
+        <div class="tab-content-panel defective-stock-panel">
+            <div class="defective-header-banner">
+                <div class="banner-info">
+                    <div class="banner-title-row">
+                        <span class="quarantine-pill">KHO HÀNG LỖI CÁCH LY</span>
+                        <h3 class="defective-title">Danh Mục Hàng Khiếu Nại & Đổi Trả Đã Hoàn Kho</h3>
+                    </div>
+                    <p class="defective-subtitle">
+                        Toàn bộ sản phẩm lỗi thu hồi từ khách hàng được lưu trữ riêng biệt tại kho lỗi (<code>so_luong_loi</code>), tuyệt đối không cộng vào tồn kho bán lẻ để tránh bán nhầm cho khách hàng khác.
+                    </p>
+                </div>
+                <div class="defective-stats-row">
+                    <div class="defective-stat-box">
+                        <span class="stat-num">@DefectiveFeedbacks.Count</span>
+                        <span class="stat-lbl">Mặt hàng khiếu nại</span>
+                    </div>
+                    <div class="defective-stat-box text-danger">
+                        <span class="stat-num text-danger">@DefectiveFeedbacks.Sum(f => f.SoLuongTra ?? 1)</span>
+                        <span class="stat-lbl">Tổng sản phẩm lỗi</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Toolbar cho Kho Hàng Lỗi -->
+            <div class="filter-toolbar">
+                <div class="search-input-box">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" 
+                           placeholder="Tìm theo mã đơn #DH, mã phiếu #PH, mã biến thể SKU, lý do lỗi, khách hàng..." 
+                           @bind="_defectiveSearch" 
+                           @bind:event="oninput" />
+                </div>
+            </div>
+
+            <!-- Bảng Danh Sách Hàng Lỗi Trong Kho Khiếu Nại -->
+            <div class="defective-table-card">
+                @if (FilteredDefectiveItems.Count == 0)
+                {
+                    <div class="empty-state-full">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                        <p>Hiện không có mặt hàng nào trong kho khiếu nại & hàng lỗi.</p>
+                        <span class="empty-sub">Khi nhân viên xác nhận "Nhận bưu phẩm & Nhập kho lỗi" ở Tab Xử lý đổi trả, hàng lỗi sẽ hiển thị tại đây.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="admin-table admin-table-defective">
+                            <thead>
+                                <tr>
+                                    <th style="width: 140px;">Mã phiếu / Đơn</th>
+                                    <th style="width: 180px;">Khách khiếu nại</th>
+                                    <th style="width: 130px;">Biến thể SKU</th>
+                                    <th style="width: 110px; text-align: center;">Số lượng lỗi</th>
+                                    <th>Lý do khiếu nại / Tình trạng lỗi</th>
+                                    <th style="width: 180px;">Kho / Chi nhánh lưu</th>
+                                    <th style="width: 140px;">Ngày nhập kho lỗi</th>
+                                    <th style="width: 130px; text-align: center;">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in FilteredDefectiveItems)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="id-stack">
+                                                <span class="ticket-id-tag">#PH-@item.MaPhanHoi</span>
+                                                <span class="order-id-tag">#DH-@(item.MaHoaDon?.ToString() ?? "N/A")</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="cust-info-stack">
+                                                <span class="cust-name-bold">@item.HoTen</span>
+                                                <span class="cust-phone-mono">@item.DienThoai</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <code class="sku-code-pill">#BT-@(item.MaBienThe?.ToString() ?? "SKU-N/A")</code>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="defective-qty-badge">
+                                                @(item.SoLuongTra ?? 1) cái
+                                            </span>
+                                        </td>
+                                        <td class="defective-reason-cell">
+                                            <div class="reason-text">@item.NoiDung</div>
+                                            @if (!string.IsNullOrEmpty(item.GhiChuXuLy))
+                                            {
+                                                <div class="audit-note">Ghi chú: @item.GhiChuXuLy</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="branch-storage-tag">
+                                                @(item.TenChiNhanhHen ?? item.DiaChiNhanHangHoanVe ?? "Kho tổng QF")
+                                            </span>
+                                        </td>
+                                        <td class="time-cell-mono">
+                                            @item.NgayCapNhat.ToString("dd/MM/yyyy HH:mm")
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge-quarantine">
+                                                Đã cách ly kho lỗi
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 }
             </div>
         </div>
@@ -440,28 +550,105 @@
 
 @code {
     private bool _isLoading = false;
-    private string _activeTab = "ORDERS"; // "ORDERS" hoặc "RETURNS"
+    private string _activeTab = "RETURNS";
+    private string _defectiveSearch = string.Empty;
 
-    private List<OrderSummaryDto> _allOrders = new();
-    private List<OrderSummaryDto> _onlineOrders = new();
     private List<FeedbackDto> _allFeedbacks = new();
     private List<FeedbackDto> _returnFeedbacks = new();
-
-    private string _orderSearch = string.Empty;
-    private string _orderStatusFilter = string.Empty;
+    private List<global::Shared.DTOs.Warehouse.BranchDto> _branches = new();
 
     private string _returnSearch = string.Empty;
     private string _returnStatusFilter = string.Empty;
 
-    // KPI Counters
-    private int _pendingDispatchCount = 0;
-    private int _shippingCount = 0;
+    private string? _userRole;
+    private int? _userBranchId;
+    private string? _userBranchName;
+    private bool _isChainAdmin = false;
+    private bool _isBranchManager = false;
+    private bool _isOrderCoordinator = false;
+    private int _adminSelectedBranchId = 0;
+
+    // KPI Counters cho Đổi Trả & Hoàn Kho
     private int _pendingReturnCount = 0;
     private int _inTransitReturnCount = 0;
+    private int _completedReturnCount = 0;
+    private int _totalReturnCount = 0;
+
+    // Pagination cho Đổi Trả
+    private int _returnPage = 1;
+    private int _returnPageSize = 10;
+    private int TotalReturnPages => Math.Max(1, (int)Math.Ceiling((double)FilteredReturns.Count / _returnPageSize));
+    private List<FeedbackDto> PagedReturns => FilteredReturns
+        .Skip((_returnPage - 1) * _returnPageSize)
+        .Take(_returnPageSize)
+        .ToList();
+
+    private void GoToReturnPage(int page)
+    {
+        if (page >= 1 && page <= TotalReturnPages)
+        {
+            _returnPage = page;
+        }
+    }
+
+    private void OnReturnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size) && size > 0)
+        {
+            _returnPageSize = size;
+            _returnPage = 1;
+        }
+    }
+
+    private void ResetReturnPage() => _returnPage = 1;
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            _userRole = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            var branchIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+            if (int.TryParse(branchIdStr, out var bId)) _userBranchId = bId;
+            _userBranchName = await JS.InvokeAsync<string?>("localStorage.getItem", "branchName");
+
+            _isChainAdmin = _userRole == RoleConstants.AdminChuoi 
+                || _userRole == RoleConstants.QuanLyHeThong 
+                || string.Equals(_userRole, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(_userRole, "Administrator", StringComparison.OrdinalIgnoreCase);
+
+            _isBranchManager = _userRole == RoleConstants.QuanLyChiNhanh;
+            _isOrderCoordinator = _userRole == RoleConstants.OrderCoordinator 
+                || _userRole?.Contains("Điều phối", StringComparison.OrdinalIgnoreCase) == true;
+
+            if (_isChainAdmin)
+            {
+                var branchList = await AdminApi.GetBranchesAsync();
+                _branches = branchList ?? new();
+            }
+
+            if (!string.IsNullOrEmpty(_userRole))
+            {
+                var isAuthorized = _isChainAdmin || _isBranchManager 
+                    || _userRole == RoleConstants.OrderCoordinator 
+                    || _userRole.Contains("Điều phối", StringComparison.OrdinalIgnoreCase);
+
+                if (!isAuthorized)
+                {
+                    ToastService.ShowWarning("Bạn không có quyền truy cập cổng điều phối đổi trả đơn hàng!");
+                    Navigation.NavigateTo(_userRole.Contains("kho", StringComparison.OrdinalIgnoreCase) ? "/warehouse" : "/pos");
+                    return;
+                }
+            }
+        }
+        catch { }
+
         await LoadDataAsync();
+    }
+
+    private static bool IsReturnFeedback(FeedbackDto f)
+    {
+        // Cổng đổi trả chỉ tiếp nhận đúng phiếu "Yêu cầu hoàn trả hàng"
+        return string.Equals(f.LoaiPhanHoi?.Trim(), "Yêu cầu hoàn trả hàng", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task LoadDataAsync()
@@ -469,21 +656,16 @@
         _isLoading = true;
         try
         {
-            var orders = await AdminApi.GetAllOrdersAsync(null);
-            _allOrders = orders ?? new List<OrderSummaryDto>();
-            // Lọc ra các đơn hàng ONLINE hoặc đơn cần xử lý giao hàng
-            _onlineOrders = _allOrders.Where(o => o.LoaiDonHang == "ONLINE" || string.IsNullOrEmpty(o.LoaiDonHang)).ToList();
-
             var feedbacks = await AdminApi.GetFeedbacksAsync();
             _allFeedbacks = feedbacks ?? new List<FeedbackDto>();
             // Lọc ra các phiếu loại hoàn trả hàng
-            _returnFeedbacks = _allFeedbacks.Where(f => f.LoaiPhanHoi == "Yêu cầu hoàn trả hàng" || f.HinhThucHoan != null).ToList();
+            _returnFeedbacks = _allFeedbacks.Where(IsReturnFeedback).ToList();
 
             CalculateKpi();
         }
         catch (Exception ex)
         {
-            ToastService.ShowError($"Lỗi khi tải dữ liệu cổng điều phối: {ex.Message}");
+            ToastService.ShowError($"Lỗi khi tải dữ liệu đổi trả: {ex.Message}");
         }
         finally
         {
@@ -491,67 +673,68 @@
         }
     }
 
+    private bool BelongsToBranch(FeedbackDto f, int branchId)
+    {
+        if (_isOrderCoordinator)
+        {
+            // Điều phối viên phụ trách điều phối thu hồi tại nhà hoặc đơn thuộc chi nhánh mình
+            if (string.Equals(f.HinhThucHoan?.Trim(), "Thu hồi tại nhà", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return f.MaChiNhanhHen == branchId || f.MaChiNhanhDonHang == branchId;
+        }
+
+        if (branchId == 9)
+        {
+            // Chi nhánh Online / Kho tổng Online tiếp nhận đơn thu hồi tại nhà hoặc hẹn tại kho tổng 9
+            return f.MaChiNhanhHen == 9 
+                || string.Equals(f.HinhThucHoan?.Trim(), "Thu hồi tại nhà", StringComparison.OrdinalIgnoreCase)
+                || (f.MaChiNhanhHen == null && (f.MaChiNhanhDonHang == null || f.MaChiNhanhDonHang == 9));
+        }
+        // Các chi nhánh vật lý: Khách chọn trả tại chi nhánh đó
+        return f.MaChiNhanhHen == branchId 
+            || (f.MaChiNhanhHen == null && f.MaChiNhanhDonHang == branchId && !string.Equals(f.HinhThucHoan?.Trim(), "Thu hồi tại nhà", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IEnumerable<FeedbackDto> ScopedFeedbacks
+    {
+        get
+        {
+            if (_isChainAdmin)
+            {
+                if (_adminSelectedBranchId > 0)
+                {
+                    return _returnFeedbacks.Where(f => BelongsToBranch(f, _adminSelectedBranchId));
+                }
+                return _returnFeedbacks;
+            }
+
+            if (_userBranchId.HasValue && _userBranchId.Value > 0)
+            {
+                return _returnFeedbacks.Where(f => BelongsToBranch(f, _userBranchId.Value));
+            }
+
+            return _returnFeedbacks;
+        }
+    }
+
     private void CalculateKpi()
     {
-        _pendingDispatchCount = _onlineOrders.Count(o => o.TrangThai == "Chờ xử lý");
-        _shippingCount = _onlineOrders.Count(o => o.TrangThai == "Đang giao hàng");
-        _pendingReturnCount = _returnFeedbacks.Count(f => f.TrangThai == "Cần duyệt");
-        _inTransitReturnCount = _returnFeedbacks.Count(f => f.TrangThai == "Đã duyệt");
+        var scoped = ScopedFeedbacks.ToList();
+        _pendingReturnCount = scoped.Count(f => f.TrangThai == "Cần duyệt" || f.TrangThai == "Chưa xử lý" || f.TrangThai == "Chờ xử lý" || string.IsNullOrWhiteSpace(f.TrangThai));
+        _inTransitReturnCount = scoped.Count(f => f.TrangThai == "Đã duyệt");
+        _completedReturnCount = scoped.Count(f => f.TrangThai == "Đã hoàn tất" || f.TrangThai == "Đã xử lý" || f.TrangThai == "Đã nhận hàng hoàn");
+        _totalReturnCount = scoped.Count;
     }
 
-    private void SwitchTab(string tab)
+    private void OnAdminBranchFilterChanged(ChangeEventArgs e)
     {
-        _activeTab = tab;
-    }
-
-    // Handover to Shipper (Chờ xử lý -> Đang giao hàng)
-    private async Task HandoverToShipper(int orderId)
-    {
-        var success = await AdminApi.UpdateOrderStatusAsync(orderId, "Đang giao hàng");
-        if (success)
+        if (int.TryParse(e.Value?.ToString(), out var bId))
         {
-            ToastService.ShowSuccess($"Bàn giao đơn hàng #{orderId} cho Shipper thành công!");
-            var item = _onlineOrders.FirstOrDefault(o => o.MaHoaDon == orderId);
-            if (item != null) item.TrangThai = "Đang giao hàng";
+            _adminSelectedBranchId = bId;
+            ResetReturnPage();
             CalculateKpi();
-        }
-        else
-        {
-            ToastService.ShowError($"Không thể bàn giao đơn #{orderId}. Vui lòng kiểm tra lại trạng thái!");
-        }
-    }
-
-    // Complete delivery (Đang giao hàng -> Đã hoàn thành)
-    private async Task CompleteDelivery(int orderId)
-    {
-        var success = await AdminApi.UpdateOrderStatusAsync(orderId, "Đã hoàn thành");
-        if (success)
-        {
-            ToastService.ShowSuccess($"Đơn hàng #{orderId} đã giao thành công và hoàn tất!");
-            var item = _onlineOrders.FirstOrDefault(o => o.MaHoaDon == orderId);
-            if (item != null) item.TrangThai = "Đã hoàn thành";
-            CalculateKpi();
-        }
-        else
-        {
-            ToastService.ShowError($"Không thể xác nhận hoàn tất đơn #{orderId}!");
-        }
-    }
-
-    // Cancel order
-    private async Task CancelOrder(int orderId)
-    {
-        var success = await AdminApi.UpdateOrderStatusAsync(orderId, "Đã hủy");
-        if (success)
-        {
-            ToastService.ShowSuccess($"Đã hủy đơn hàng #{orderId} thành công!");
-            var item = _onlineOrders.FirstOrDefault(o => o.MaHoaDon == orderId);
-            if (item != null) item.TrangThai = "Đã hủy";
-            CalculateKpi();
-        }
-        else
-        {
-            ToastService.ShowError($"Không thể hủy đơn hàng #{orderId}!");
         }
     }
 
@@ -618,7 +801,7 @@
         {
             ToastService.ShowSuccess($"Đã nhận bưu phẩm hoàn và ghi nhận nhập kho lỗi cho phiếu #{feedbackId}!");
             var fb = _returnFeedbacks.FirstOrDefault(f => f.MaPhanHoi == feedbackId);
-            if (fb != null) fb.TrangThai = "Đã hoàn tất";
+            if (fb != null) fb.TrangThai = "Đã nhận hàng hoàn";
             CalculateKpi();
         }
         else
@@ -627,16 +810,13 @@
         }
     }
 
-    private List<OrderSummaryDto> FilteredOrders => _onlineOrders
-        .Where(o => string.IsNullOrEmpty(_orderStatusFilter) || o.TrangThai == _orderStatusFilter)
-        .Where(o => string.IsNullOrWhiteSpace(_orderSearch) ||
-                    o.MaHoaDon.ToString().Contains(_orderSearch.Trim()) ||
-                    (o.TenKhachHang ?? "").Contains(_orderSearch.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                    (o.SdtKhachHang ?? "").Contains(_orderSearch.Trim()))
-        .ToList();
-
-    private List<FeedbackDto> FilteredReturns => _returnFeedbacks
-        .Where(f => string.IsNullOrEmpty(_returnStatusFilter) || f.TrangThai == _returnStatusFilter)
+    private List<FeedbackDto> FilteredReturns => ScopedFeedbacks
+        .Where(f => string.IsNullOrEmpty(_returnStatusFilter) || 
+                    (_returnStatusFilter == "Cần duyệt" 
+                        ? (f.TrangThai == "Cần duyệt" || f.TrangThai == "Chưa xử lý" || f.TrangThai == "Chờ xử lý" || string.IsNullOrWhiteSpace(f.TrangThai))
+                        : _returnStatusFilter == "Đã hoàn tất"
+                            ? (f.TrangThai == "Đã hoàn tất" || f.TrangThai == "Đã nhận hàng hoàn" || f.TrangThai == "Đã xử lý")
+                            : f.TrangThai == _returnStatusFilter))
         .Where(f => string.IsNullOrWhiteSpace(_returnSearch) ||
                     f.MaPhanHoi.ToString().Contains(_returnSearch.Trim()) ||
                     (f.MaHoaDon.HasValue && f.MaHoaDon.Value.ToString().Contains(_returnSearch.Trim())) ||
@@ -646,15 +826,32 @@
                     (f.DiaChiChiNhanhHen ?? "").Contains(_returnSearch.Trim(), StringComparison.OrdinalIgnoreCase))
         .ToList();
 
+    private List<FeedbackDto> DefectiveFeedbacks => ScopedFeedbacks
+        .Where(f => f.TrangThai == "Đã hoàn tất" || f.TrangThai == "Đã xử lý" || f.TrangThai == "Đã nhận hàng hoàn")
+        .ToList();
+
+    private List<FeedbackDto> FilteredDefectiveItems => DefectiveFeedbacks
+        .Where(f => string.IsNullOrWhiteSpace(_defectiveSearch) ||
+                    f.MaPhanHoi.ToString().Contains(_defectiveSearch.Trim()) ||
+                    (f.MaHoaDon.HasValue && f.MaHoaDon.Value.ToString().Contains(_defectiveSearch.Trim())) ||
+                    (f.MaBienThe.HasValue && f.MaBienThe.Value.ToString().Contains(_defectiveSearch.Trim())) ||
+                    (f.HoTen ?? "").Contains(_defectiveSearch.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                    (f.NoiDung ?? "").Contains(_defectiveSearch.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                    (f.TenChiNhanhHen ?? "").Contains(_defectiveSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
     private string GetStatusClass(string status) => status switch
     {
-        "Chờ xử lý" => "cho-xu-ly",
+        "Chờ xử lý" => "can-duyet",
+        "Chưa xử lý" => "can-duyet",
         "Đang giao hàng" => "dang-giao",
         "Đã hoàn thành" => "hoan-thanh",
         "Đã hủy" => "da-huy",
         "Cần duyệt" => "can-duyet",
         "Đã duyệt" => "da-duyet",
         "Đã hoàn tất" => "hoan-tat",
+        "Đã nhận hàng hoàn" => "hoan-tat",
+        "Đã xử lý" => "hoan-tat",
         "Từ chối" => "tu-choi",
         _ => "default"
     };

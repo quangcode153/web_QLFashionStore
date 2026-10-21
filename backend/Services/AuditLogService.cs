@@ -34,11 +34,11 @@ public class AuditLogService : IAuditLogService
         }
     }
 
-    public async Task<ApiResponse<IEnumerable<AuditLogDto>>> GetLogsAsync(string? loaiThaoTac = null, int limit = 100)
+    public async Task<ApiResponse<IEnumerable<AuditLogDto>>> GetLogsAsync(string? loaiThaoTac = null, int? maChiNhanh = null, int limit = 100)
     {
         try
         {
-            var logs = await _auditLogRepository.GetAuditLogsAsync(loaiThaoTac, limit);
+            var logs = await _auditLogRepository.GetAuditLogsAsync(loaiThaoTac, maChiNhanh, limit);
             return ApiResponse<IEnumerable<AuditLogDto>>.Ok(logs);
         }
         catch (Exception ex)

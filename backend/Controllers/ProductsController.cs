@@ -1,6 +1,7 @@
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Constants;
 using Shared.DTOs.Catalog;
 using Shared.DTOs.Common;
 
@@ -33,6 +34,14 @@ public class ProductsController : ControllerBase
         return Ok(ApiResponse<IEnumerable<ProductVariantDto>>.Ok(result));
     }
 
+    [HttpGet("{id}/branch-stock")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetBranchStock(int id)
+    {
+        var result = await _catalogService.GetProductBranchStockAsync(id);
+        return Ok(ApiResponse<IEnumerable<ProductBranchStockDto>>.Ok(result));
+    }
+
     [HttpGet("{id}/images")]
     [AllowAnonymous]
     public async Task<IActionResult> GetImages(int id)
@@ -60,7 +69,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "AdminChuoi,QuanLyChiNhanh")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
     {
         if (request == null)
@@ -84,7 +93,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost("{id}/variants")]
-    [Authorize(Roles = "AdminChuoi,QuanLyChiNhanh")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
     public async Task<IActionResult> CreateVariant(int id, [FromBody] CreateProductVariantRequest request)
     {
         if (request == null)
@@ -109,7 +118,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost("variants")]
-    [Authorize(Roles = "AdminChuoi,QuanLyChiNhanh")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
     public async Task<IActionResult> CreateVariantDirect([FromBody] CreateProductVariantRequest request)
     {
         if (request == null || request.MaSanPham <= 0)
@@ -130,5 +139,104 @@ public class ProductsController : ControllerBase
         {
             return StatusCode(500, ApiResponse<int>.Fail($"Lỗi hệ thống: {ex.Message}"));
         }
+    }
+
+    [HttpPatch("{id}/toggle-status")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},AdminChuoi,QuanLyHeThong")]
+    public async Task<IActionResult> ToggleProductStatus(int id)
+    {
+        try
+        {
+            var success = await _catalogService.ToggleProductStatusAsync(id);
+            if (!success)
+            {
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy sản phẩm cần cập nhật."));
+            }
+
+            return Ok(ApiResponse<bool>.Ok(true, "Cập nhật trạng thái hiển thị sản phẩm thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
+
+    [HttpPatch("variants/{variantId}/toggle-status")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},AdminChuoi,QuanLyHeThong")]
+    public async Task<IActionResult> ToggleVariantStatus(int variantId)
+    {
+        try
+        {
+            var success = await _catalogService.ToggleVariantStatusAsync(variantId);
+            if (!success)
+            {
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy biến thể cần cập nhật."));
+            }
+
+            return Ok(ApiResponse<bool>.Ok(true, "Cập nhật trạng thái hiển thị biến thể thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("{id}/variants/admin")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
+    public async Task<IActionResult> GetVariantsForAdmin(int id)
+    {
+        var result = await _catalogService.GetProductVariantsForAdminAsync(id);
+        return Ok(ApiResponse<IEnumerable<ProductVariantDto>>.Ok(result));
+    }
+
+    [HttpPut("{id}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
+    public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductRequest request)
+    {
+        try
+        {
+            if (request == null)
+            {
+                return BadRequest(ApiResponse<bool>.Fail("Dữ liệu cập nhật không hợp lệ."));
+            }
+
+            request.MaSanPham = id;
+            var success = await _catalogService.UpdateProductAsync(request);
+            if (!success)
+            {
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy sản phẩm để cập nhật."));
+            }
+
+            return Ok(ApiResponse<bool>.Ok(true, "Cập nhật thông tin sản phẩm thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
+
+    [HttpPost("check-availability")]
+    [AllowAnonymous]
+    public async Task<IActionResult> CheckAvailability([FromBody] CheckVariantAvailabilityRequest request)
+    {
+        if (request == null || request.VariantIds == null || !request.VariantIds.Any())
+        {
+            return Ok(ApiResponse<IEnumerable<VariantAvailabilityDto>>.Ok(Enumerable.Empty<VariantAvailabilityDto>()));
+        }
+
+        var result = await _catalogService.CheckVariantsAvailabilityAsync(request.VariantIds);
+        return Ok(ApiResponse<IEnumerable<VariantAvailabilityDto>>.Ok(result));
     }
 }

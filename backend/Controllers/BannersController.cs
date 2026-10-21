@@ -1,6 +1,7 @@
 using Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Constants;
 using Shared.DTOs.Catalog;
 
 namespace Backend.Controllers;
@@ -31,7 +32,7 @@ public class BannersController : ControllerBase
     /// Lấy tất cả banner trong hệ thống phục vụ trang quản trị Admin.
     /// </summary>
     [HttpGet("all")]
-    [Authorize(Roles = "Admin")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAllBanners()
     {
         var banners = await _bannerService.GetAllBannersAsync();
@@ -42,7 +43,7 @@ public class BannersController : ControllerBase
     /// Lấy thông tin chi tiết một banner theo mã ID.
     /// </summary>
     [HttpGet("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [AllowAnonymous]
     public async Task<IActionResult> GetBannerById(int id)
     {
         var banner = await _bannerService.GetByIdAsync(id);
@@ -54,7 +55,7 @@ public class BannersController : ControllerBase
     /// Tạo mới banner quảng cáo (Chỉ dành cho Quản trị viên).
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},Admin")]
     public async Task<IActionResult> CreateBanner([FromBody] CreateUpdateBannerDto dto)
     {
         try
@@ -72,7 +73,7 @@ public class BannersController : ControllerBase
     /// Cập nhật thông tin banner quảng cáo (Chỉ dành cho Quản trị viên).
     /// </summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},Admin")]
     public async Task<IActionResult> UpdateBanner(int id, [FromBody] CreateUpdateBannerDto dto)
     {
         try
@@ -91,7 +92,7 @@ public class BannersController : ControllerBase
     /// Xóa banner quảng cáo (Chỉ dành cho Quản trị viên).
     /// </summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},Admin")]
     public async Task<IActionResult> DeleteBanner(int id)
     {
         var success = await _bannerService.DeleteAsync(id);

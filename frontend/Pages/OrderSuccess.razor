@@ -1,6 +1,11 @@
 @page "/order-success/{OrderId:int?}"
 @namespace Frontend.Pages
+@using global::Shared.DTOs.Payment
+@using Frontend.Services
 @inject NavigationManager Navigation
+@inject IOrderApiClient OrderApiClient
+@inject IToastService ToastService
+@inject IJSRuntime JS
 
 <div class="order-success-page">
     <div class="yame-container">
@@ -14,12 +19,138 @@
             </div>
 
             <h1 class="success-title">ĐẶT HÀNG THÀNH CÔNG!</h1>
-            <p class="success-subtitle">Cảm ơn bạn đã tin tưởng và mua sắm tại <strong>Fashion Store</strong>.</p>
+            <p class="success-subtitle">Cảm ơn bạn đã tin tưởng và mua sắm tại <strong>QF Noir Fashion Store</strong>.</p>
 
             <div class="order-reference-box">
                 <span class="ref-label">MÃ ĐƠN HÀNG CỦA BẠN:</span>
                 <span class="ref-code">#DH-@(OrderId.HasValue ? OrderId.Value.ToString() : "10025")</span>
             </div>
+
+            @if (IsQrPayment)
+            {
+                <div class="qr-payment-wrapper">
+                    <div class="qr-payment-header">
+                        <div class="qr-payment-title-group">
+                            <h2 class="qr-payment-title">QUÉT MÃ THANH TOÁN TRỰC TIẾP</h2>
+                            <p class="qr-payment-desc">Mở ứng dụng ngân hàng hoặc MoMo quét mã QR dưới đây để hoàn tất thanh toán.</p>
+                        </div>
+                        <div class="qr-tabs-group">
+                            <button type="button" class="btn-qr-tab @(_selectedMethod == "MOMO" ? "active-momo" : "")" @onclick='() => ChangePaymentMethod("MOMO")'>
+                                <span class="tab-icon-momo">M</span>
+                                <span>Ví MoMo</span>
+                            </button>
+                            <button type="button" class="btn-qr-tab @(_selectedMethod == "VIETQR" ? "active-vietqr" : "")" @onclick='() => ChangePaymentMethod("VIETQR")'>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                                </svg>
+                                <span>VietQR (Ngân hàng MB)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (_isLoadingQr)
+                    {
+                        <div class="qr-loading-box">
+                            <div class="qr-spinner"></div>
+                            <span>Đang khởi tạo mã QR thanh toán bảo mật...</span>
+                        </div>
+                    }
+                    else if (_qrData != null)
+                    {
+                        <div class="qr-card-body">
+                            <div class="qr-visual-col">
+                                <div class="qr-frame @(_selectedMethod == "MOMO" ? "frame-momo" : "frame-vietqr")">
+                                    @if (!string.IsNullOrEmpty(_qrData.QrDataUrl))
+                                    {
+                                        <img src="@_qrData.QrDataUrl" alt="Mã QR thanh toán" class="qr-image" />
+                                    }
+                                </div>
+                                <span class="qr-hint-text">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                    Mã QR tự động điền đúng số tiền & nội dung
+                                </span>
+                            </div>
+
+                            <div class="qr-details-col">
+                                <div class="payment-info-list">
+                                    <div class="info-row">
+                                        <span class="info-label">Kênh thanh toán:</span>
+                                        <span class="info-value font-bold">@_qrData.BankName</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Chủ tài khoản:</span>
+                                        <span class="info-value font-bold">@_qrData.AccountName</span>
+                                    </div>
+                                    <div class="info-row highlight-row">
+                                        <span class="info-label">@(_selectedMethod == "MOMO" ? "Số điện thoại MoMo" : "Số tài khoản nhận"):</span>
+                                        <div class="copyable-group">
+                                            <span class="info-value text-primary font-bold">@_qrData.AccountNumber</span>
+                                            <button type="button" class="btn-copy-chip" @onclick='() => CopyToClipboard(_qrData.AccountNumber, "Số tài khoản")' title="Sao chép">
+                                                Sao chép
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="info-row highlight-row">
+                                        <span class="info-label">Số tiền cần chuyển:</span>
+                                        <div class="copyable-group">
+                                            <span class="info-value text-danger font-bold">@_qrData.Amount.ToString("N0") ₫</span>
+                                            <button type="button" class="btn-copy-chip" @onclick='() => CopyToClipboard(_qrData.Amount.ToString("0"), "Số tiền")' title="Sao chép">
+                                                Sao chép
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="info-row highlight-row">
+                                        <span class="info-label">Nội dung chuyển tiền:</span>
+                                        <div class="copyable-group">
+                                            <span class="info-value text-dark font-bold">@_qrData.TransferContent</span>
+                                            <button type="button" class="btn-copy-chip" @onclick='() => CopyToClipboard(_qrData.TransferContent, "Nội dung chuyển khoản")' title="Sao chép">
+                                                Sao chép
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="qr-action-box">
+                                    @if (_isPaidConfirmed)
+                                    {
+                                        <div class="paid-success-alert-card">
+                                            <div class="paid-alert-header">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                                <span class="paid-alert-title">BẠN ĐÃ XÁC NHẬN CHUYỂN KHOẢN THÀNH CÔNG</span>
+                                            </div>
+                                            <p class="paid-alert-desc">Hệ thống đã ghi nhận thanh toán (Thu hộ 0đ). Bộ phận kho đang chuẩn bị đóng gói và giao hàng đến bạn sớm nhất!</p>
+                                            <button type="button" class="btn-paid-disabled" disabled>
+                                                ✓ ĐÃ XÁC NHẬN CHUYỂN KHOẢN (ĐÃ KHÓA NÚT)
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn-confirm-paid" @onclick="ConfirmPaidAsync" disabled="@_isConfirming">
+                                            @if (_isConfirming)
+                                            {
+                                                <span>ĐANG XÁC NHẬN...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>✓ TÔI ĐÃ CHUYỂN KHOẢN THÀNH CÔNG</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
 
             <div class="delivery-steps-box">
                 <div class="step-item active">
@@ -60,34 +191,32 @@
 
 <style>
     .order-success-page {
-        padding: 50px 0 80px 0;
+        padding: 40px 0 80px 0;
         background: #F8FAFC;
-        min-height: 80vh;
+        min-height: 85vh;
         display: flex;
         align-items: center;
     }
     .success-card {
-        max-width: 650px;
+        max-width: 760px;
         margin: 0 auto;
         background: #FFFFFF;
-        border-radius: 12px;
+        border-radius: 14px;
         border: 1px solid #E2E8F0;
-        padding: 48px 36px;
+        padding: 40px 32px;
         text-align: center;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
     }
     .success-icon-badge {
-        width: 80px;
-        height: 80px;
+        width: 76px;
+        height: 76px;
         border-radius: 50%;
-        background: #D1FAE5;
+        background: #ECFDF5;
+        border: 2px solid #A7F3D0;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 24px auto;
-    }
-    .badge-icon {
-        font-size: 2.5rem;
+        margin: 0 auto 20px auto;
     }
     .success-title {
         font-size: 1.85rem;
@@ -99,14 +228,14 @@
     .success-subtitle {
         font-size: 0.95rem;
         color: #64748B;
-        margin-bottom: 28px;
+        margin-bottom: 24px;
     }
     .order-reference-box {
-        background: #F8FAFC;
+        background: #F1F5F9;
         border: 1px dashed #CBD5E1;
         border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 32px;
+        padding: 14px;
+        margin-bottom: 28px;
     }
     .ref-label {
         display: block;
@@ -122,11 +251,262 @@
         color: #E11D48;
         letter-spacing: 0.03em;
     }
+
+    /* QR Payment Block */
+    .qr-payment-wrapper {
+        background: #FFFFFF;
+        border: 2px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
+        text-align: left;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    }
+    .qr-payment-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #E2E8F0;
+        margin-bottom: 20px;
+    }
+    .qr-payment-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin: 0 0 4px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+    .qr-payment-desc {
+        font-size: 0.88rem;
+        color: #64748B;
+        margin: 0;
+    }
+    .qr-tabs-group {
+        display: flex;
+        gap: 8px;
+    }
+    .btn-qr-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid #CBD5E1;
+        background: #F8FAFC;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-qr-tab:hover {
+        background: #F1F5F9;
+        border-color: #94A3B8;
+    }
+    .btn-qr-tab.active-momo {
+        background: #A50064;
+        color: #FFFFFF;
+        border-color: #A50064;
+    }
+    .btn-qr-tab.active-vietqr {
+        background: #004D99;
+        color: #FFFFFF;
+        border-color: #004D99;
+    }
+    .tab-icon-momo {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        background: #FFFFFF;
+        color: #A50064;
+        font-weight: 900;
+        font-size: 10px;
+        text-align: center;
+        line-height: 16px;
+    }
+
+    .qr-card-body {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 24px;
+        align-items: center;
+    }
+    @@media (max-width: 640px) {
+        .qr-card-body {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+    }
+    .qr-visual-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+    .qr-frame {
+        padding: 12px;
+        background: #FFFFFF;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border: 3px solid #E2E8F0;
+        transition: border-color 0.2s;
+    }
+    .qr-frame.frame-momo {
+        border-color: #FBCFE8;
+    }
+    .qr-frame.frame-vietqr {
+        border-color: #BAE6FD;
+    }
+    .qr-image {
+        width: 220px;
+        height: 220px;
+        display: block;
+        border-radius: 6px;
+    }
+    .qr-hint-text {
+        font-size: 0.78rem;
+        color: #64748B;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .qr-details-col {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .payment-info-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #F8FAFC;
+        border-radius: 10px;
+        padding: 14px 16px;
+        border: 1px solid #E2E8F0;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+    .info-label {
+        color: #64748B;
+    }
+    .info-value {
+        color: #0F172A;
+    }
+    .copyable-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-copy-chip {
+        padding: 2px 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        background: #FFFFFF;
+        color: #475569;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .btn-copy-chip:hover {
+        background: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
+    }
+    .text-primary { color: #2563EB !important; }
+    .text-danger { color: #E11D48 !important; }
+    .text-dark { color: #0F172A !important; }
+    .font-bold { font-weight: 700; }
+
+    .btn-confirm-paid {
+        width: 100%;
+        padding: 13px;
+        border-radius: 8px;
+        border: none;
+        background: #10B981;
+        color: #FFFFFF;
+        font-weight: 800;
+        font-size: 0.92rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+    .btn-confirm-paid:hover {
+        background: #059669;
+        transform: translateY(-1px);
+    }
+    .paid-success-alert-card {
+        background: #ECFDF5;
+        border: 1px solid #A7F3D0;
+        border-radius: 10px;
+        padding: 18px 20px;
+        text-align: left;
+    }
+    .paid-alert-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+    .paid-alert-title {
+        color: #065F46;
+        font-weight: 800;
+        font-size: 0.92rem;
+        letter-spacing: 0.01em;
+    }
+    .paid-alert-desc {
+        color: #047857;
+        font-size: 0.84rem;
+        margin-bottom: 12px;
+        line-height: 1.45;
+    }
+    .btn-paid-disabled {
+        width: 100%;
+        padding: 11px 16px;
+        border-radius: 6px;
+        border: 1px solid #6EE7B7;
+        background: #D1FAE5;
+        color: #065F46;
+        font-weight: 800;
+        font-size: 0.88rem;
+        cursor: not-allowed;
+        opacity: 0.9;
+    }
+
+    .qr-loading-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 30px;
+        color: #64748B;
+        font-size: 0.9rem;
+    }
+    .qr-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #E2E8F0;
+        border-top-color: #0F172A;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
     .delivery-steps-box {
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 32px;
+        margin-bottom: 28px;
         padding: 0 10px;
     }
     .step-item {
@@ -160,16 +540,17 @@
         flex: 1;
         height: 2px;
         background: #E2E8F0;
-        margin: 0 12px 20px 12px;
+        margin: 0 8px;
+        transform: translateY(-12px);
     }
     .pledge-reminder {
-        background: #FEF3C7;
-        color: #92400E;
+        background: #FFFBEB;
+        border: 1px solid #FDE68A;
+        border-radius: 8px;
         padding: 12px 18px;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        margin-bottom: 32px;
-        text-align: left;
+        font-size: 0.88rem;
+        color: #92400E;
+        margin-bottom: 30px;
     }
     .action-buttons-group {
         display: flex;
@@ -177,27 +558,20 @@
         justify-content: center;
     }
     .btn-continue-shopping {
-        background: #000000;
+        background: #111827;
         color: #FFFFFF !important;
-        padding: 13px 28px;
-        border-radius: 4px;
-        font-weight: 700;
+        padding: 13px 26px;
+        border-radius: 6px;
+        font-weight: 800;
         font-size: 0.92rem;
-        border: 1px solid #000000;
         text-decoration: none !important;
-        letter-spacing: 0.04em;
-        transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        display: inline-block;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     .btn-continue-shopping:hover {
         background: #000000 !important;
-        color: #FFFFFF !important;
-        text-decoration: none !important;
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-    }
-    .btn-continue-shopping:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
     .btn-view-orders {
         background: transparent;
@@ -218,4 +592,106 @@
 
 @code {
     [Parameter] public int? OrderId { get; set; }
+    [SupplyParameterFromQuery(Name = "payment")] public string? PaymentMethodQuery { get; set; }
+
+    private string _selectedMethod = "MOMO";
+    private QrPaymentResponseDto? _qrData;
+    private bool _isLoadingQr = false;
+    private bool _isConfirming = false;
+    private bool _isPaidConfirmed = false;
+
+    private bool IsQrPayment => !string.IsNullOrEmpty(PaymentMethodQuery) 
+        && (PaymentMethodQuery.Equals("MOMO", StringComparison.OrdinalIgnoreCase) 
+            || PaymentMethodQuery.Equals("VIETQR", StringComparison.OrdinalIgnoreCase)
+            || PaymentMethodQuery.Equals("QR", StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsQrPayment)
+        {
+            if (PaymentMethodQuery?.Equals("VIETQR", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                _selectedMethod = "VIETQR";
+            }
+            else
+            {
+                _selectedMethod = "MOMO";
+            }
+
+            await LoadQrPaymentAsync();
+        }
+    }
+
+    private async Task ChangePaymentMethod(string method)
+    {
+        if (_selectedMethod == method) return;
+        _selectedMethod = method;
+        await LoadQrPaymentAsync();
+    }
+
+    private async Task LoadQrPaymentAsync()
+    {
+        if (!OrderId.HasValue || OrderId.Value <= 0) return;
+
+        _isLoadingQr = true;
+        try
+        {
+            _qrData = await OrderApiClient.GetOrderPaymentQrAsync(OrderId.Value, _selectedMethod);
+            if (_qrData != null && _qrData.IsPaidConfirmed)
+            {
+                _isPaidConfirmed = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Lỗi khi tạo mã QR thanh toán: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingQr = false;
+        }
+    }
+
+    private async Task ConfirmPaidAsync()
+    {
+        if (!OrderId.HasValue) return;
+
+        _isConfirming = true;
+        try
+        {
+            var success = await OrderApiClient.ConfirmPaymentPaidAsync(OrderId.Value);
+            if (success)
+            {
+                _isPaidConfirmed = true;
+                if (_qrData != null) _qrData.IsPaidConfirmed = true;
+                StateHasChanged();
+                ToastService.ShowSuccess("Đã ghi nhận thanh toán thành công! Đơn hàng đang được điều phối.");
+            }
+            else
+            {
+                ToastService.ShowError("Chưa thể cập nhật trạng thái đơn hàng. Vui lòng thử lại!");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isConfirming = false;
+        }
+    }
+
+    private async Task CopyToClipboard(string text, string label)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            ToastService.ShowSuccess($"Đã sao chép {label} vào bộ nhớ tạm!");
+        }
+        catch
+        {
+            ToastService.ShowInfo($"Thông tin: {text}");
+        }
+    }
 }

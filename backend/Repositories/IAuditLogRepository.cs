@@ -7,5 +7,5 @@ namespace Backend.Repositories;
 public interface IAuditLogRepository
 {
     Task<int> CreateAuditLogAsync(CreateAuditLogRequestDto dto);
-    Task<IEnumerable<AuditLogDto>> GetAuditLogsAsync(string? loaiThaoTac = null, int limit = 100);
+    Task<IEnumerable<AuditLogDto>> GetAuditLogsAsync(string? loaiThaoTac = null, int? maChiNhanh = null, int limit = 100);
 }

@@ -11,6 +11,7 @@ public interface IWarehouseRepository
     Task<IEnumerable<LowStockAlertDto>> GetAllWarehouseVariantsAsync();
     Task<IEnumerable<SupplierDto>> GetSuppliersAsync();
     Task<SupplierDto> CreateSupplierAsync(CreateSupplierRequestDto request);
+    Task<bool> IsVariantHiddenAsync(int variantId);
 }
 
 public class WarehouseRepository : IWarehouseRepository
@@ -20,6 +21,19 @@ public class WarehouseRepository : IWarehouseRepository
     public WarehouseRepository(IDbConnectionFactory connectionFactory)
     {
         _connectionFactory = connectionFactory;
+    }
+
+    public async Task<bool> IsVariantHiddenAsync(int variantId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT TOP 1 CAST(CASE WHEN sp.da_xoa = 1 OR ISNULL(bt.da_xoa, 0) = 1 THEN 1 ELSE 0 END AS BIT)
+            FROM BienTheSanPham bt WITH (NOLOCK)
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
+            WHERE bt.ma_bien_the = @VariantId;
+        ";
+        var isHidden = await connection.ExecuteScalarAsync<bool?>(sql, new { VariantId = variantId });
+        return isHidden ?? false;
     }
 
     public async Task ImportStockAsync(ImportStockRequestDto request)
@@ -39,8 +53,29 @@ public class WarehouseRepository : IWarehouseRepository
     public async Task<IEnumerable<LowStockAlertDto>> GetLowStockAlertsAsync()
     {
         using var connection = _connectionFactory.CreateConnection();
-        const string sql = "SELECT * FROM vw_CanhBaoSapHetHang";
-        return await connection.QueryAsync<LowStockAlertDto>(sql);
+        const string sql = @"
+            SELECT 
+                bt.ma_bien_the AS MaBienThe,
+                sp.ten_san_pham AS TenSanPham,
+                bt.ma_sku AS MaSku,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                bt.so_luong_ton AS SoLuongTon,
+                bt.gia_nhap AS GiaNhap,
+                ISNULL(sp.da_xoa, 0) AS DaXoa
+            FROM vw_CanhBaoSapHetHang v
+            JOIN BienTheSanPham bt WITH (NOLOCK) ON v.ma_bien_the = bt.ma_bien_the
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham;
+        ";
+        try
+        {
+            return await connection.QueryAsync<LowStockAlertDto>(sql);
+        }
+        catch
+        {
+            const string fallbackSql = "SELECT *, 0 AS DaXoa FROM vw_CanhBaoSapHetHang";
+            return await connection.QueryAsync<LowStockAlertDto>(fallbackSql);
+        }
     }
 
     public async Task<IEnumerable<LowStockAlertDto>> GetAllWarehouseVariantsAsync()
@@ -54,10 +89,10 @@ public class WarehouseRepository : IWarehouseRepository
                 bt.mau_sac AS MauSac,
                 bt.kich_co AS KichCo,
                 bt.so_luong_ton AS SoLuongTon,
-                bt.gia_nhap AS GiaNhap
+                bt.gia_nhap AS GiaNhap,
+                ISNULL(sp.da_xoa, 0) AS DaXoa
             FROM BienTheSanPham bt WITH (NOLOCK)
             JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
-            WHERE sp.da_xoa = 0
             ORDER BY sp.ten_san_pham, bt.mau_sac, bt.kich_co;
         ";
         return await connection.QueryAsync<LowStockAlertDto>(sql);

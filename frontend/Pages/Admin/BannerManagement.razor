@@ -3,6 +3,9 @@
 @namespace Frontend.Pages.Admin
 @inject ICatalogApiClient CatalogApi
 @inject IToastService Toast
+@inject IAuthStateService AuthStateService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <div class="banners-admin-container">
     <div class="page-header">
@@ -649,7 +652,37 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (AuthStateService.IsAuthenticated && 
+            AuthStateService.UserRole != null && 
+            (AuthStateService.UserRole.Equals(RoleConstants.QuanLyChiNhanh, StringComparison.OrdinalIgnoreCase) ||
+             AuthStateService.UserRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase)))
+        {
+            Toast.ShowWarning("Tài khoản Quản lý chi nhánh không có quyền tùy biến Banner & Chiến dịch toàn chuỗi.");
+            Navigation.NavigateTo("/admin/orders");
+            return;
+        }
+
         await LoadBanners();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                if (!string.IsNullOrEmpty(role) && 
+                    (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) || 
+                     role.Equals(RoleConstants.QuanLyChiNhanh, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Toast.ShowWarning("Tài khoản Quản lý chi nhánh không có quyền tùy biến Banner & Chiến dịch toàn chuỗi.");
+                    Navigation.NavigateTo("/admin/orders");
+                    return;
+                }
+            }
+            catch { }
+        }
     }
 
     private async Task LoadBanners()

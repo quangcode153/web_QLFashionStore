@@ -1,6 +1,9 @@
 @page "/stores"
 @namespace Frontend.Pages
 @inject NavigationManager Navigation
+@using Frontend.Services
+@using global::Shared.DTOs.Warehouse
+@inject ICustomerApiClient CustomerApi
 
 <PageTitle>Hệ thống cửa hàng | QF Fashion</PageTitle>
 
@@ -16,10 +19,10 @@
         <!-- Header -->
         <div class="stores-header">
             <h1 class="stores-title">HỆ THỐNG CỬA HÀNG QF FASHION</h1>
-            <p class="stores-subtitle">Hơn 40 chi nhánh toàn quốc • Mở cửa 8:30 - 22:00 mỗi ngày</p>
+            <p class="stores-subtitle">@(_isLoading ? "Đang tải hệ thống cửa hàng..." : $"Hệ thống {_allStores.Count} chi nhánh toàn quốc • Mở cửa 8:30 - 22:00 mỗi ngày")</p>
         </div>
 
-        <!-- Filter Cities (Minimalist Clean Tab Bar) -->
+        <!-- Filter Cities (Tự động cập nhật theo các tỉnh/thành phố của chi nhánh trong CSDL) -->
         <div class="stores-filter-bar">
             @foreach (var city in _cities)
             {
@@ -234,24 +237,95 @@
 </style>
 
 @code {
+    private bool _isLoading = true;
     private string _selectedCity = "Tất cả";
-    private readonly List<string> _cities = new() { "Tất cả", "TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng", "Cần Thơ", "Biên Hòa" };
+    private List<string> _cities = new() { "Tất cả" };
 
-    private record StoreInfo(string Name, string City, string Address, string Phone);
+    public record StoreInfo(int Id, string Name, string City, string Address, string Phone);
 
-    private readonly List<StoreInfo> _allStores = new()
-    {
-        new("QF Lê Văn Sỹ", "TP. Hồ Chí Minh", "190 Lê Văn Sỹ, Phường 10, Quận Phú Nhuận, TP.HCM", "028 7307 1440"),
-        new("QF Quang Trung", "TP. Hồ Chí Minh", "504 Quang Trung, Phường 10, Quận Gò Vấp, TP.HCM", "028 7307 1441"),
-        new("QF Sư Vạn Hạnh", "TP. Hồ Chí Minh", "770F Sư Vạn Hạnh, Phường 12, Quận 10, TP.HCM", "028 7307 1442"),
-        new("QF Huỳnh Tấn Phát", "TP. Hồ Chí Minh", "40 Huỳnh Tấn Phát, Tân Thuận Tây, Quận 7, TP.HCM", "028 7307 1443"),
-        new("QF Cầu Giấy", "Hà Nội", "216 Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội", "024 7307 1450"),
-        new("QF Chùa Bộc", "Hà Nội", "112 Chùa Bộc, Phường Quang Trung, Quận Đống Đa, Hà Nội", "024 7307 1451"),
-        new("QF Lê Duẩn", "Đà Nẵng", "322 Lê Duẩn, Phường Tân Chính, Quận Thanh Khê, Đà Nẵng", "0236 730 1440"),
-        new("QF 3 Tháng 2", "Cần Thơ", "45 Đường 3 Tháng 2, Phường Xuân Khánh, Quận Ninh Kiều, Cần Thơ", "0292 730 1440"),
-        new("QF Đồng Khởi", "Biên Hòa", "283 Đồng Khởi, Phường Tân Mai, TP. Biên Hòa, Đồng Nai", "0251 730 1440")
-    };
+    private List<StoreInfo> _allStores = new();
 
     private IEnumerable<StoreInfo> FilteredStores =>
         _selectedCity == "Tất cả" ? _allStores : _allStores.Where(s => s.City == _selectedCity);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var branches = await CustomerApi.GetBranchesAsync();
+            if (branches != null && branches.Any())
+            {
+                // Chỉ hiển thị các chi nhánh bán lẻ đang hoạt động (loại trừ kho tổng online nội bộ)
+                _allStores = branches
+                    .Where(b => b.DangHoatDong && !b.IsOnlineWarehouse)
+                    .Select(b => new StoreInfo(
+                        b.MaChiNhanh,
+                        b.TenChiNhanh,
+                        ExtractCity(b.DiaChi, b.TenChiNhanh),
+                        b.DiaChi,
+                        !string.IsNullOrWhiteSpace(b.DienThoai) ? b.DienThoai : "1900 636 000"
+                    ))
+                    .OrderBy(s => s.City)
+                    .ThenBy(s => s.Name)
+                    .ToList();
+
+                // Tự động gom nhóm các thành phố từ dữ liệu CSDL thực tế
+                var distinctCities = _allStores
+                    .Select(s => s.City)
+                    .Where(c => !string.IsNullOrWhiteSpace(c))
+                    .Distinct()
+                    .ToList();
+
+                _cities = new List<string> { "Tất cả" };
+                _cities.AddRange(distinctCities);
+            }
+        }
+        catch
+        {
+            _allStores = new();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string ExtractCity(string address, string branchName)
+    {
+        var text = $"{branchName} {address}";
+
+        if (text.Contains("Hà Nội", StringComparison.OrdinalIgnoreCase) || text.Contains("Ha Noi", StringComparison.OrdinalIgnoreCase))
+            return "Hà Nội";
+        if (text.Contains("Hồ Chí Minh", StringComparison.OrdinalIgnoreCase) || text.Contains("TP.HCM", StringComparison.OrdinalIgnoreCase) || text.Contains("TP HCM", StringComparison.OrdinalIgnoreCase) || text.Contains("Sài Gòn", StringComparison.OrdinalIgnoreCase) || text.Contains("Q.10", StringComparison.OrdinalIgnoreCase) || text.Contains("Gò Vấp", StringComparison.OrdinalIgnoreCase) || text.Contains("Phú Nhuận", StringComparison.OrdinalIgnoreCase))
+            return "TP. Hồ Chí Minh";
+        if (text.Contains("Đà Nẵng", StringComparison.OrdinalIgnoreCase) || text.Contains("Da Nang", StringComparison.OrdinalIgnoreCase))
+            return "Đà Nẵng";
+        if (text.Contains("Cần Thơ", StringComparison.OrdinalIgnoreCase) || text.Contains("Can Tho", StringComparison.OrdinalIgnoreCase))
+            return "Cần Thơ";
+        if (text.Contains("Biên Hòa", StringComparison.OrdinalIgnoreCase) || text.Contains("Đồng Nai", StringComparison.OrdinalIgnoreCase))
+            return "Biên Hòa";
+        if (text.Contains("Hải Phòng", StringComparison.OrdinalIgnoreCase))
+            return "Hải Phòng";
+        if (text.Contains("Nha Trang", StringComparison.OrdinalIgnoreCase) || text.Contains("Khánh Hòa", StringComparison.OrdinalIgnoreCase))
+            return "Nha Trang";
+        if (text.Contains("Huế", StringComparison.OrdinalIgnoreCase) || text.Contains("Thừa Thiên", StringComparison.OrdinalIgnoreCase))
+            return "Huế";
+        if (text.Contains("Vũng Tàu", StringComparison.OrdinalIgnoreCase) || text.Contains("Bà Rịa", StringComparison.OrdinalIgnoreCase))
+            return "Vũng Tàu";
+
+        // Tự động bóc tách từ phần tử sau dấu phẩy cuối cùng trong địa chỉ
+        if (!string.IsNullOrWhiteSpace(address))
+        {
+            var parts = address.Split(new[] { ',', '-' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                var lastPart = parts[^1].Trim();
+                if (lastPart.Length >= 2 && lastPart.Length <= 30)
+                    return lastPart;
+            }
+        }
+
+        return "Toàn quốc";
+    }
 }

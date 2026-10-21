@@ -1,4 +1,5 @@
 @page "/pos"
+@layout EmptyLayout
 @namespace Frontend.Pages.Pos
 @inject IPosApiClient PosApiClient
 @inject IToastService Toast
@@ -22,7 +23,7 @@
                 <span class="separator">|</span>
                 <span>Cơ sở: <strong>@(_cashierBranchName ?? "QF Sư Vạn Hạnh (Q.10, TP.HCM)")</strong></span>
                 <span class="separator">|</span>
-                <RealtimeNotificationBell />
+                <RealtimeNotificationBell DropdownAlign="left" />
                 <span class="separator">|</span>
                 @if (_canAccessWarehouse)
                 {
@@ -289,6 +290,37 @@
 <PosReturnModal IsVisible="@_showReturnModal"
                 OnClose="CloseReturnModal"
                 OnReturnSuccess="HandleReturnSuccess" />
+
+<!-- Modal Chọn Phân Loại / Kích Cỡ Sản Phẩm Bán Nhanh -->
+@if (_showVariantModal && _selectedFastSaleProduct != null)
+{
+    <div class="pos-modal-backdrop" @onclick="CloseVariantModal">
+        <div class="pos-variant-modal" @onclick:stopPropagation="true">
+            <div class="pos-variant-modal-header">
+                <div>
+                    <h3 class="variant-modal-title">CHỌN PHÂN LOẠI / KÍCH CỠ</h3>
+                    <p class="variant-modal-sub">@_selectedFastSaleProduct.TenSanPham</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseVariantModal">&times;</button>
+            </div>
+            <div class="pos-variant-modal-body">
+                <div class="variants-quick-grid">
+                    @foreach (var v in _fastSaleVariants)
+                    {
+                        <button type="button" class="variant-select-chip" @onclick="() => SelectVariantAndAddToCart(v)">
+                            <div class="chip-title">@v.MauSac - Size @v.KichCo</div>
+                            <div class="chip-meta">
+                                <span class="chip-sku">@v.MaSku</span>
+                                <span class="chip-price">@v.GiaBan.ToString("N0") đ</span>
+                            </div>
+                            <span class="chip-stock">Tồn: @v.SoLuongTon</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .pos-layout {
@@ -856,6 +888,97 @@
         letter-spacing: 0.5px;
     }
 
+    /* Modal Chọn Biến Thể Bán Nhanh */
+    .pos-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+    .pos-variant-modal {
+        background: #ffffff;
+        border-radius: 8px;
+        width: 480px;
+        max-width: 90vw;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+    }
+    .pos-variant-modal-header {
+        padding: 16px 20px;
+        background: #0f172a;
+        color: #ffffff;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    .variant-modal-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: 0.5px;
+    }
+    .variant-modal-sub {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin: 4px 0 0 0;
+    }
+    .btn-close-modal {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        font-size: 1.5rem;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .btn-close-modal:hover { color: #ffffff; }
+    .pos-variant-modal-body {
+        padding: 20px;
+        max-height: 360px;
+        overflow-y: auto;
+    }
+    .variants-quick-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    .variant-select-chip {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 12px;
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .variant-select-chip:hover {
+        border-color: #0f172a;
+        background: #f1f5f9;
+        transform: translateY(-1px);
+    }
+    .chip-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #0f172a;
+    }
+    .chip-meta {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 4px;
+        font-size: 0.8rem;
+    }
+    .chip-sku { color: #64748b; }
+    .chip-price { font-weight: 700; color: #b91c1c; }
+    .chip-stock {
+        display: block;
+        font-size: 0.75rem;
+        color: #059669;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
     .text-center { text-align: center; }
     .text-right { text-align: right; }
 </style>
@@ -874,6 +997,9 @@
     private bool _isProcessingPayment = false;
     private bool _showPrintModal = false;
     private bool _showReturnModal = false;
+    private bool _showVariantModal = false;
+    private ProductListItemDto? _selectedFastSaleProduct;
+    private List<ProductVariantDto> _fastSaleVariants = new();
     private ReceiptPrintDto? _activeReceipt;
 
     private decimal SubTotal => _cartItems.Sum(x => x.ThanhTien);
@@ -928,6 +1054,23 @@
 
         await SignalRService.StartAsync();
         await LoadFastSaleProducts();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+                if (string.IsNullOrWhiteSpace(role) || !global::Shared.Constants.RoleConstants.IsStaff(role))
+                {
+                    Navigation.NavigateTo("/login?returnUrl=" + Uri.EscapeDataString(Navigation.Uri));
+                    return;
+                }
+            }
+            catch { }
+        }
     }
 
     private async Task HandleLogout()
@@ -1013,8 +1156,40 @@
         }
     }
 
-    private void HandleFastSaleSelect(ProductListItemDto prod)
+    private void CloseVariantModal()
     {
+        _showVariantModal = false;
+        _selectedFastSaleProduct = null;
+        _fastSaleVariants.Clear();
+    }
+
+    private void SelectVariantAndAddToCart(ProductVariantDto variant)
+    {
+        AddVariantToCart(variant);
+        CloseVariantModal();
+    }
+
+    private async Task HandleFastSaleSelect(ProductListItemDto prod)
+    {
+        try
+        {
+            var variants = await PosApiClient.GetProductVariantsAsync(prod.MaSanPham);
+            if (variants != null && variants.Any())
+            {
+                if (variants.Count == 1)
+                {
+                    AddVariantToCart(variants[0]);
+                    return;
+                }
+
+                _selectedFastSaleProduct = prod;
+                _fastSaleVariants = variants;
+                _showVariantModal = true;
+                return;
+            }
+        }
+        catch { }
+
         var existing = _cartItems.FirstOrDefault(x => x.MaSanPham == prod.MaSanPham);
         if (existing != null)
         {

@@ -5,6 +5,8 @@
 @inject IAdminApiClient AdminApi
 @inject IToastService Toast
 @inject ISignalRNotificationService SignalRService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="feedback-admin-container">
@@ -23,26 +25,48 @@
         </div>
     </div>
 
-    <!-- KPI Summary Pills -->
+    <!-- Banner điều hướng yêu cầu hoàn trả sang Cổng Đổi trả & Hoàn kho lỗi -->
+    <div class="return-dispatch-alert">
+        <div class="alert-content">
+            <div class="alert-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                </svg>
+            </div>
+            <div class="alert-text">
+                <strong>Phân luồng nghiệp vụ:</strong> Toàn bộ yêu cầu <strong>Đổi trả hàng & Hoàn kho lỗi</strong> được điều hành tập trung tại Cổng Đổi trả chuyên biệt.
+                @if (_returnTicketsCount > 0)
+                {
+                    <span class="return-count-badge">Có @_returnTicketsCount yêu cầu đổi trả</span>
+                }
+            </div>
+        </div>
+        <a href="/staff/order-support" class="btn-dispatch-link">
+            Đến Cổng Đổi trả & Hoàn kho lỗi »
+        </a>
+    </div>
+
+    <!-- KPI Summary Pills (Chỉ đếm các khiếu nại & góp ý dịch vụ) -->
     <div class="kpi-grid">
         <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>
-            <div class="kpi-label">Tổng số phản hồi</div>
-            <div class="kpi-value">@_feedbacks.Count</div>
-            <div class="kpi-sub">Tất cả danh mục</div>
+            <div class="kpi-label">Khiếu nại & Góp ý</div>
+            <div class="kpi-value">@ServiceFeedbacks.Count</div>
+            <div class="kpi-sub">Phản ánh dịch vụ & CSKH</div>
         </div>
         <div class="kpi-card text-danger @(_currentFilter == "Chưa xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Chưa xử lý"'>
             <div class="kpi-label">Chưa xử lý</div>
-            <div class="kpi-value text-danger">@_feedbacks.Count(f => f.TrangThai == "Chưa xử lý")</div>
+            <div class="kpi-value text-danger">@ServiceFeedbacks.Count(f => f.TrangThai == "Chưa xử lý")</div>
             <div class="kpi-sub">Cần giải quyết ngay</div>
         </div>
         <div class="kpi-card text-primary @(_currentFilter == "Đang xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Đang xử lý"'>
             <div class="kpi-label">Đang xử lý</div>
-            <div class="kpi-value text-primary">@_feedbacks.Count(f => f.TrangThai == "Đang xử lý")</div>
+            <div class="kpi-value text-primary">@ServiceFeedbacks.Count(f => f.TrangThai == "Đang xử lý")</div>
             <div class="kpi-sub">Đang liên hệ khách</div>
         </div>
         <div class="kpi-card text-success @(_currentFilter == "Đã giải quyết" ? "active" : "")" @onclick='() => _currentFilter = "Đã giải quyết"'>
             <div class="kpi-label">Đã giải quyết</div>
-            <div class="kpi-value text-success">@_feedbacks.Count(f => f.TrangThai == "Đã giải quyết")</div>
+            <div class="kpi-value text-success">@ServiceFeedbacks.Count(f => f.TrangThai == "Đã giải quyết")</div>
             <div class="kpi-sub">Hoàn tất hỗ trợ</div>
         </div>
     </div>
@@ -509,6 +533,64 @@
         color: #BE123C;
     }
 
+    .return-dispatch-alert {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        gap: 1rem;
+    }
+
+    .alert-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-icon {
+        color: #16a34a;
+        display: flex;
+        align-items: center;
+    }
+
+    .alert-text {
+        font-size: 0.85rem;
+        color: #166534;
+    }
+
+    .return-count-badge {
+        display: inline-block;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 12px;
+        margin-left: 6px;
+    }
+
+    .btn-dispatch-link {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 14px;
+        background: #16a34a;
+        color: #ffffff;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+    }
+
+    .btn-dispatch-link:hover {
+        background: #15803d;
+        color: #ffffff;
+    }
+
     .empty-state, .loading-state {
         padding: 48px 16px;
         text-align: center;
@@ -533,11 +615,24 @@
     private string _currentFilter = "ALL";
     private string _searchText = string.Empty;
 
+    private static bool IsReturnRequest(global::Shared.DTOs.Feedback.FeedbackDto f)
+    {
+        // Chỉ tách các phiếu chính thức thuộc nghiệp vụ đổi trả hàng sang cổng Đổi trả chuyên biệt
+        return string.Equals(f.LoaiPhanHoi?.Trim(), "Yêu cầu hoàn trả hàng", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Loại trừ yêu cầu hoàn trả (đã chuyển sang cổng Đổi trả chuyên biệt)
+    private List<global::Shared.DTOs.Feedback.FeedbackDto> ServiceFeedbacks => _feedbacks
+        .Where(f => !IsReturnRequest(f))
+        .ToList();
+
+    private int _returnTicketsCount => _feedbacks.Count(f => IsReturnRequest(f));
+
     private IEnumerable<global::Shared.DTOs.Feedback.FeedbackDto> FilteredFeedbacks
     {
         get
         {
-            var query = _feedbacks.AsEnumerable();
+            var query = ServiceFeedbacks.AsEnumerable();
 
             if (_currentFilter != "ALL")
             {
@@ -561,6 +656,31 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            var isAllowed = !string.IsNullOrEmpty(role) && (
+                role.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                role.Contains("Quản lý hệ thống", StringComparison.OrdinalIgnoreCase) ||
+                (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) && !role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase))
+            );
+
+            if (!isAllowed)
+            {
+                Toast.ShowWarning("Bạn không có quyền truy cập mục Khiếu nại & Góp ý.");
+                if (role != null && (role.Contains("Order Coordinator", StringComparison.OrdinalIgnoreCase) || role.Contains("Điều phối", StringComparison.OrdinalIgnoreCase)))
+                {
+                    Navigation.NavigateTo("/staff/order-support");
+                }
+                else
+                {
+                    Navigation.NavigateTo("/admin/orders");
+                }
+                return;
+            }
+        }
+        catch { }
+
         await LoadFeedbacks();
 
         // Đăng ký nhận sự kiện realtime từ SignalR khi có phản hồi mới từ khách hàng

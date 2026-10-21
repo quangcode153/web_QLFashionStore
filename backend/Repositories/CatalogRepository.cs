@@ -15,6 +15,14 @@ public interface ICatalogRepository
     Task<ProductVariantDto?> GetVariantBySkuAsync(string sku);
     Task<int> CreateProductAsync(CreateProductRequest request);
     Task<int> CreateProductVariantAsync(CreateProductVariantRequest request);
+    Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId);
+    Task<int> CreateCategoryAsync(CreateCategoryRequest request);
+    Task<int> CreateBrandAsync(CreateBrandRequest request);
+    Task<bool> ToggleProductStatusAsync(int productId);
+    Task<bool> ToggleVariantStatusAsync(int variantId);
+    Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
+    Task<bool> UpdateProductAsync(UpdateProductRequest request);
+    Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds);
 }
 
 public class CatalogRepository : ICatalogRepository
@@ -74,18 +82,23 @@ public class CatalogRepository : ICatalogRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
-                ma_bien_the AS MaBienThe,
-                ma_san_pham AS MaSanPham,
-                ten_san_pham AS TenSanPham,
-                ma_sku AS MaSku,
-                mau_sac AS MauSac,
-                kich_co AS KichCo,
-                gia_ban AS GiaBan,
-                so_luong_ton AS SoLuongTon,
-                tinh_trang_hang AS TinhTrangHang,
-                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = vw_ChiTietBienTheSanPham.ma_san_pham AND ha.la_anh_chinh = 1) AS HinhAnh
-            FROM vw_ChiTietBienTheSanPham
-            WHERE ma_sku = @Sku;
+                bt.ma_bien_the AS MaBienThe,
+                bt.ma_san_pham AS MaSanPham,
+                sp.ten_san_pham AS TenSanPham,
+                bt.ma_sku AS MaSku,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                bt.gia_ban AS GiaBan,
+                ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
+                CASE 
+                    WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
+                    ELSE N'Hết hàng'
+                END AS TinhTrangHang,
+                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = bt.ma_san_pham AND ha.la_anh_chinh = 1) AS HinhAnh
+            FROM BienTheSanPham bt WITH (NOLOCK)
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
+            LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = 9
+            WHERE bt.ma_sku = @Sku;
         ";
         return await connection.QueryFirstOrDefaultAsync<ProductVariantDto>(sql, new { Sku = sku.Trim() });
     }
@@ -113,7 +126,16 @@ public class CatalogRepository : ICatalogRepository
         dynamicParams.Add("@Offset", offset);
         dynamicParams.Add("@PageSize", pageSize);
 
-        var whereConditions = new List<string> { "sp.da_xoa = 0" };
+        var whereConditions = new List<string>();
+        if (query.DaXoa.HasValue)
+        {
+            whereConditions.Add("sp.da_xoa = @DaXoaFilter");
+            dynamicParams.Add("@DaXoaFilter", query.DaXoa.Value ? 1 : 0);
+        }
+        else if (!query.IncludeAll)
+        {
+            whereConditions.Add("sp.da_xoa = 0");
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -159,7 +181,7 @@ public class CatalogRepository : ICatalogRepository
             dynamicParams.Add("@CategoryId", query.CategoryId.Value);
         }
 
-        string whereClause = string.Join(" AND ", whereConditions);
+        string whereClause = whereConditions.Any() ? string.Join(" AND ", whereConditions) : "1 = 1";
 
         // Kiểm tra xem có lọc giá hay không
         bool hasPriceFilter = query.MinPrice.HasValue || query.MaxPrice.HasValue;
@@ -215,7 +237,8 @@ public class CatalogRepository : ICatalogRepository
                     sp.chat_lieu AS ChatLieu,
                     MIN(bt.gia_ban) AS GiaThapNhat,
                     MAX(bt.gia_ban) AS GiaCaoNhat,
-                    SUM(bt.so_luong_ton) AS TongTonKho
+                    SUM(bt.so_luong_ton) AS TongTonKho,
+                    ISNULL(sp.da_xoa, 0) AS DaXoa
                 FROM SanPham sp WITH (NOLOCK)
                 JOIN DanhMuc dm WITH (NOLOCK) ON sp.ma_danh_muc = dm.ma_danh_muc
                 JOIN ThuongHieu th WITH (NOLOCK) ON sp.ma_thuong_hieu = th.ma_thuong_hieu
@@ -226,7 +249,8 @@ public class CatalogRepository : ICatalogRepository
                     sp.ten_san_pham,
                     dm.ten_danh_muc,
                     th.ten_thuong_hieu,
-                    sp.chat_lieu
+                    sp.chat_lieu,
+                    sp.da_xoa
                 {havingClause}
             ),
             PagedSlice AS (
@@ -255,20 +279,50 @@ public class CatalogRepository : ICatalogRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
-                ma_bien_the AS MaBienThe,
-                ma_san_pham AS MaSanPham,
-                ten_san_pham AS TenSanPham,
-                ma_sku AS MaSku,
-                mau_sac AS MauSac,
-                kich_co AS KichCo,
-                gia_ban AS GiaBan,
-                so_luong_ton AS SoLuongTon,
-                tinh_trang_hang AS TinhTrangHang,
+                bt.ma_bien_the AS MaBienThe,
+                bt.ma_san_pham AS MaSanPham,
+                sp.ten_san_pham AS TenSanPham,
+                bt.ma_sku AS MaSku,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                bt.gia_ban AS GiaBan,
+                ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
+                ISNULL(bt.da_xoa, 0) AS DaXoa,
+                CASE 
+                    WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
+                    ELSE N'Hết hàng'
+                END AS TinhTrangHang,
                 (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh
-            FROM vw_ChiTietBienTheSanPham
-            WHERE ma_san_pham = @ProductId;
+            FROM BienTheSanPham bt WITH (NOLOCK)
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
+            LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = 9
+            WHERE bt.ma_san_pham = @ProductId AND sp.da_xoa = 0 AND ISNULL(bt.da_xoa, 0) = 0;
         ";
         return await connection.QueryAsync<ProductVariantDto>(sql, new { ProductId = productId });
+    }
+
+    public async Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT 
+                cn.ma_chi_nhanh AS MaChiNhanh,
+                cn.ten_chi_nhanh AS TenChiNhanh,
+                cn.dia_chi AS DiaChi,
+                ISNULL(cn.is_online_warehouse, 0) AS IsOnlineWarehouse,
+                bt.ma_bien_the AS MaBienThe,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                bt.ma_sku AS MaSku,
+                ISNULL(tk.so_luong_ton, 0) AS SoLuongTon
+            FROM ChiNhanh cn WITH (NOLOCK)
+            CROSS JOIN BienTheSanPham bt WITH (NOLOCK)
+            LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) 
+                ON cn.ma_chi_nhanh = tk.ma_chi_nhanh AND bt.ma_bien_the = tk.ma_bien_the
+            WHERE bt.ma_san_pham = @ProductId AND cn.dang_hoat_dong = 1
+            ORDER BY cn.is_online_warehouse DESC, cn.ma_chi_nhanh ASC, bt.mau_sac, bt.kich_co;
+        ";
+        return await connection.QueryAsync<ProductBranchStockDto>(sql, new { ProductId = productId });
     }
 
     public async Task<IEnumerable<ProductImageDto>> GetProductImagesAsync(int productId)
@@ -313,5 +367,145 @@ public class CatalogRepository : ICatalogRepository
             ORDER BY ten_thuong_hieu;
         ";
         return await connection.QueryAsync<BrandDto>(sql);
+    }
+
+    public async Task<int> CreateCategoryAsync(CreateCategoryRequest request)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            INSERT INTO DanhMuc (ten_danh_muc, ma_danh_muc_cha)
+            VALUES (@TenDanhMuc, @MaDanhMucCha);
+            SELECT CAST(SCOPE_IDENTITY() as int);
+        ";
+        return await connection.ExecuteScalarAsync<int>(sql, new { 
+            TenDanhMuc = request.TenDanhMuc.Trim(), 
+            request.MaDanhMucCha 
+        });
+    }
+
+    public async Task<int> CreateBrandAsync(CreateBrandRequest request)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            INSERT INTO ThuongHieu (ten_thuong_hieu, xuat_xu)
+            VALUES (@TenThuongHieu, @XuatXu);
+            SELECT CAST(SCOPE_IDENTITY() as int);
+        ";
+        return await connection.ExecuteScalarAsync<int>(sql, new { 
+            TenThuongHieu = request.TenThuongHieu.Trim(), 
+            XuatXu = string.IsNullOrWhiteSpace(request.XuatXu) ? "Việt Nam" : request.XuatXu.Trim() 
+        });
+    }
+
+    public async Task<bool> ToggleProductStatusAsync(int productId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE SanPham 
+            SET da_xoa = CASE WHEN ISNULL(da_xoa, 0) = 1 THEN 0 ELSE 1 END,
+                ngay_cap_nhat = GETDATE()
+            WHERE ma_san_pham = @ProductId;
+        ";
+        var affected = await connection.ExecuteAsync(sql, new { ProductId = productId });
+        return affected > 0;
+    }
+
+    public async Task<bool> ToggleVariantStatusAsync(int variantId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE BienTheSanPham 
+            SET da_xoa = CASE WHEN ISNULL(da_xoa, 0) = 1 THEN 0 ELSE 1 END,
+                ngay_cap_nhat = GETDATE()
+            WHERE ma_bien_the = @VariantId;
+        ";
+        var affected = await connection.ExecuteAsync(sql, new { VariantId = variantId });
+        return affected > 0;
+    }
+
+    public async Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT 
+                bt.ma_bien_the AS MaBienThe,
+                bt.ma_san_pham AS MaSanPham,
+                sp.ten_san_pham AS TenSanPham,
+                bt.ma_sku AS MaSku,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                bt.gia_ban AS GiaBan,
+                ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
+                ISNULL(bt.da_xoa, 0) AS DaXoa,
+                CASE 
+                    WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
+                    ELSE N'Hết hàng'
+                END AS TinhTrangHang,
+                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh
+            FROM BienTheSanPham bt WITH (NOLOCK)
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
+            LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = 9
+            WHERE bt.ma_san_pham = @ProductId;
+        ";
+        return await connection.QueryAsync<ProductVariantDto>(sql, new { ProductId = productId });
+    }
+
+    public async Task<bool> UpdateProductAsync(UpdateProductRequest request)
+    {
+        if (request == null || request.MaSanPham <= 0) return false;
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE SanPham 
+            SET ten_san_pham = @TenSanPham,
+                ma_danh_muc = @MaDanhMuc,
+                ma_thuong_hieu = @MaThuongHieu,
+                chat_lieu = @ChatLieu
+            WHERE ma_san_pham = @MaSanPham;
+
+            IF @AnhDaiDien IS NOT NULL AND LEN(TRIM(@AnhDaiDien)) > 0
+            BEGIN
+                IF EXISTS (SELECT 1 FROM HinhAnhSanPham WHERE ma_san_pham = @MaSanPham AND la_anh_chinh = 1)
+                BEGIN
+                    UPDATE HinhAnhSanPham 
+                    SET duong_dan_anh = @AnhDaiDien 
+                    WHERE ma_san_pham = @MaSanPham AND la_anh_chinh = 1;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO HinhAnhSanPham (ma_san_pham, duong_dan_anh, la_anh_chinh)
+                    VALUES (@MaSanPham, @AnhDaiDien, 1);
+                END
+            END
+        ";
+        var rows = await connection.ExecuteAsync(sql, request);
+        return rows > 0;
+    }
+
+    public async Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds)
+    {
+        if (variantIds == null || !variantIds.Any())
+            return Enumerable.Empty<VariantAvailabilityDto>();
+
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT 
+                bt.ma_bien_the AS MaBienThe,
+                sp.ten_san_pham AS TenSanPham,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                CAST(CASE WHEN sp.da_xoa = 1 OR ISNULL(bt.da_xoa, 0) = 1 THEN 1 ELSE 0 END AS BIT) AS DaAn
+            FROM BienTheSanPham bt WITH (NOLOCK)
+            JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
+            WHERE bt.ma_bien_the IN @VariantIds;
+        ";
+        var list = (await connection.QueryAsync<VariantAvailabilityDto>(sql, new { VariantIds = variantIds.Distinct() })).ToList();
+        foreach (var item in list)
+        {
+            if (item.DaAn)
+            {
+                item.ThongBao = "Sản phẩm tạm thời không cung cấp";
+            }
+        }
+        return list;
     }
 }

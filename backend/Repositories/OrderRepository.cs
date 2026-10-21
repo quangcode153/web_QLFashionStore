@@ -17,6 +17,8 @@ public interface IOrderRepository
     Task<ReceiptPrintDto?> GetReceiptDetailsAsync(int orderId);
     Task<(bool Success, string Message, ReturnOrderResultDto? Data)> ProcessOrderReturnAsync(int orderId, int variantId, int quantity, string? reason, int staffId);
     Task<OrderReturnLookupDto?> GetOrderForReturnLookupAsync(int orderId);
+    Task UpdateOrderShippingAddressAsync(int orderId, string address);
+    Task<string?> GetOrderShippingAddressAsync(int orderId);
 }
 
 public class OrderRepository : IOrderRepository
@@ -142,40 +144,49 @@ public class OrderRepository : IOrderRepository
         await connection.ExecuteAsync("dbo.sp_CapNhatTrangThaiHoaDon", parameters, commandType: CommandType.StoredProcedure);
     }
 
+    public async Task UpdateOrderShippingAddressAsync(int orderId, string address)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
+            "UPDATE HoaDon SET dia_chi_giao_hang = @address WHERE ma_hoa_don = @orderId",
+            new { address, orderId });
+    }
+
+    public async Task<string?> GetOrderShippingAddressAsync(int orderId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = "SELECT dia_chi_giao_hang FROM HoaDon WHERE ma_hoa_don = @orderId";
+        return await connection.QueryFirstOrDefaultAsync<string?>(sql, new { orderId });
+    }
+
     public async Task<IEnumerable<OrderSummaryDto>> GetAllOrdersAsync(int? branchId = null)
     {
         using var connection = _connectionFactory.CreateConnection();
         string sql = @"
             SELECT 
-                ma_hoa_don AS MaHoaDon,
-                ngay_lap_hoa_don AS NgayLapHoaDon,
-                ten_khach_hang AS TenKhachHang,
-                sdt_khach_hang AS SdtKhachHang,
-                ten_nhan_vien AS NguoiLapDon,
-                tien_hang AS TienHang,
-                tien_giam_gia AS TienGiamGia,
-                tong_thanh_toan AS TongThanhToan,
-                trang_thai AS TrangThai,
-                ma_chi_nhanh AS MaChiNhanh,
-                CASE ma_chi_nhanh
-                    WHEN 1 THEN N'QF Sư Vạn Hạnh (Q.10, TP.HCM)'
-                    WHEN 2 THEN N'QF Quang Trung (Q. Gò Vấp, TP.HCM)'
-                    WHEN 3 THEN N'QF Lê Văn Sỹ (Q. Phú Nhuận, TP.HCM)'
-                    WHEN 4 THEN N'QF Cầu Giấy (Q. Cầu Giấy, Hà Nội)'
-                    WHEN 5 THEN N'QF Chùa Bộc (Q. Đống Đa, Hà Nội)'
-                    WHEN 6 THEN N'QF Lê Duẩn (Q. Thanh Khê, Đà Nẵng)'
-                    WHEN 7 THEN N'QF Ninh Kiều (Q. Ninh Kiều, Cần Thơ)'
-                    WHEN 8 THEN N'QF Ba Mươi Tháng Tư (TP. Biên Hòa, Đồng Nai)'
-                    WHEN 9 THEN N'Kho Tổng QF Tân Bình (TP.HCM)'
-                    ELSE N'Chi nhánh #' + CAST(ma_chi_nhanh AS NVARCHAR(10))
-                END AS TenChiNhanh
-            FROM vw_QuanLyDonHang";
+                v.ma_hoa_don AS MaHoaDon,
+                v.ngay_lap_hoa_don AS NgayLapHoaDon,
+                v.ten_khach_hang AS TenKhachHang,
+                v.sdt_khach_hang AS SdtKhachHang,
+                v.ten_nhan_vien AS NguoiLapDon,
+                v.tien_hang AS TienHang,
+                v.tien_giam_gia AS TienGiamGia,
+                v.tong_thanh_toan AS TongThanhToan,
+                v.trang_thai AS TrangThai,
+                v.ma_chi_nhanh AS MaChiNhanh,
+                hd.dia_chi_giao_hang AS DiaChiGiaoHang,
+                ISNULL(hd.loai_don_hang, 'ONLINE') AS LoaiDonHang,
+                ISNULL(cn.ten_chi_nhanh, N'Chi nhánh #' + CAST(v.ma_chi_nhanh AS NVARCHAR(10))) AS TenChiNhanh,
+                ISNULL((SELECT SUM(dt.so_tien_hoan) FROM DonTraHang dt WHERE dt.ma_hoa_don = v.ma_hoa_don AND dt.trang_thai IN (N'Đã nhận hàng hoàn', N'Đã hoàn tiền', N'Đã xử lý')), 0) AS SoTienDaHoan
+            FROM vw_QuanLyDonHang v
+            LEFT JOIN HoaDon hd ON v.ma_hoa_don = hd.ma_hoa_don
+            LEFT JOIN ChiNhanh cn ON v.ma_chi_nhanh = cn.ma_chi_nhanh";
 
         if (branchId.HasValue && branchId.Value > 0)
         {
-            sql += " WHERE ma_chi_nhanh = @branchId";
+            sql += " WHERE v.ma_chi_nhanh = @branchId";
         }
-        sql += " ORDER BY ngay_lap_hoa_don DESC";
+        sql += " ORDER BY v.ngay_lap_hoa_don DESC";
 
         return await connection.QueryAsync<OrderSummaryDto>(sql, new { branchId });
     }
@@ -183,13 +194,28 @@ public class OrderRepository : IOrderRepository
     public async Task<IEnumerable<OrderDetailItemDto>> GetOrderDetailsAsync(int orderId)
     {
         using var connection = _connectionFactory.CreateConnection();
-        var parameters = new DynamicParameters();
-        parameters.Add("@MaHoaDon", orderId);
+        const string sql = @"
+            SELECT 
+                bt.ma_bien_the AS MaBienThe,
+                sp.ten_san_pham AS TenSanPham,
+                bt.mau_sac AS MauSac,
+                bt.kich_co AS KichCo,
+                ct.so_luong AS SoLuong,
+                ct.don_gia AS DonGia,
+                (ct.so_luong * ct.don_gia) AS ThanhTien,
+                ISNULL((
+                    SELECT SUM(dt.so_luong)
+                    FROM DonTraHang dt
+                    WHERE dt.ma_hoa_don = ct.ma_hoa_don 
+                      AND dt.ma_bien_the = ct.ma_bien_the 
+                      AND dt.trang_thai <> N'Từ chối'
+                ), 0) AS SoLuongDaTra
+            FROM ChiTietHoaDon ct
+            JOIN BienTheSanPham bt ON ct.ma_bien_the = bt.ma_bien_the
+            JOIN SanPham sp ON bt.ma_san_pham = sp.ma_san_pham
+            WHERE ct.ma_hoa_don = @OrderId;";
 
-        using var multi = await connection.QueryMultipleAsync("dbo.sp_InChiTietHoaDon", parameters, commandType: CommandType.StoredProcedure);
-        await multi.ReadFirstOrDefaultAsync();
-        var items = await multi.ReadAsync<OrderDetailItemDto>();
-        return items;
+        return await connection.QueryAsync<OrderDetailItemDto>(sql, new { OrderId = orderId });
     }
 
     public async Task<(bool Exists, int? CustomerId)> GetOrderOwnershipAsync(int orderId)

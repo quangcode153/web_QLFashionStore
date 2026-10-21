@@ -3,11 +3,21 @@ using System.Collections.Generic;
 
 namespace Shared.DTOs.Feedback;
 
+public class ReturnItemRequestDto
+{
+    public int MaBienThe { get; set; }
+    public int SoLuongTra { get; set; }
+    public string? TenSanPham { get; set; }
+    public string? MauSac { get; set; }
+    public string? KichCo { get; set; }
+}
+
 public class CreateReturnRequestDto
 {
     public int MaHoaDon { get; set; }
     public int MaBienThe { get; set; }
     public int SoLuongTra { get; set; }
+    public List<ReturnItemRequestDto> Items { get; set; } = new();
     public string LyDoTra { get; set; } = string.Empty;
     public string HoTen { get; set; } = string.Empty;
     public string DienThoai { get; set; } = string.Empty;

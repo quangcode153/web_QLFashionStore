@@ -15,4 +15,6 @@ public interface ICatalogApiClient
     Task<bool> CreateBannerAsync(CreateUpdateBannerDto dto);
     Task<bool> UpdateBannerAsync(int id, CreateUpdateBannerDto dto);
     Task<bool> DeleteBannerAsync(int id);
+    Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId);
+    Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds);
 }

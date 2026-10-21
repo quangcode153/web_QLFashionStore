@@ -51,6 +51,8 @@ agents.md
 Agent.md
 design.md
 Design.md
+task.md
+Task.md
 sqlbtl.sql
 Sqlbtl.sql
 *.sql
@@ -86,3 +88,7 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+Chat_bot/
+pair_ai.py
+__pycache__/
+*.pyc

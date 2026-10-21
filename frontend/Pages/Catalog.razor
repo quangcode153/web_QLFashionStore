@@ -5,6 +5,8 @@
 @inject ICartService CartService
 @inject IToastService Toast
 @inject NavigationManager NavManager
+@inject IAuthStateService AuthStateService
+@inject IJSRuntime JSRuntime
 @implements IDisposable
 
 <div class="catalog-page-container">
@@ -14,6 +16,18 @@
              1. HERO ASYMMETRIC BANNER (SCREENSHOT 1: WORK TO WEEKEND / MẶC ĐẸP ĐI LÀM TAN TẦM ĐI QUẨY)
              ========================================================================= -->
         <section class="yame-hero-section">
+            @if (CanEditBanner)
+            {
+                <div class="hero-admin-quickbar">
+                    <a href="/admin/banners" class="hero-admin-edit-badge" title="Tùy biến tiêu đề, ảnh và khuyến mãi banner trong trang quản trị">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Quản lý Banner & Chiến dịch</span>
+                    </a>
+                </div>
+            }
             <div class="hero-split-container">
                 <!-- Left Side: Editorial Model Photography -->
                 <div class="hero-media-panel">
@@ -907,6 +921,12 @@
     private int _currentBannerIndex = 0;
     private System.Threading.Timer? _bannerAutoplayTimer;
 
+    private bool CanEditBanner =>
+        AuthStateService != null &&
+        AuthStateService.IsAuthenticated &&
+        (AuthStateService.UserRole == RoleConstants.AdminChuoi ||
+         AuthStateService.UserRole == RoleConstants.QuanLyHeThong);
+
     private BannerDto CurrentBanner
     {
         get
@@ -1074,6 +1094,7 @@
             ResetInternalHomeState();
             _ = InvokeAsync(async () =>
             {
+                await LoadMetadataAsync();
                 await LoadProductsAsync();
                 StateHasChanged();
             });
@@ -1239,17 +1260,25 @@
             await Task.WhenAll(catTask, brandTask, bannerTask);
             Categories = (await catTask) ?? Enumerable.Empty<CategoryDto>();
             Brands = (await brandTask) ?? Enumerable.Empty<BrandDto>();
-            Banners = (await bannerTask) ?? Enumerable.Empty<BannerDto>();
-            if (Banners != null && Banners.Any())
+            var fetchedBanners = (await bannerTask)?.ToList();
+            if (fetchedBanners != null && fetchedBanners.Any())
             {
+                Banners = fetchedBanners;
                 StartBannerAutoplay();
             }
         }
         catch
         {
-            Categories = Enumerable.Empty<CategoryDto>();
-            Brands = Enumerable.Empty<BrandDto>();
-            Banners = Enumerable.Empty<BannerDto>();
+            try
+            {
+                var banners = (await CatalogApi.GetActiveBannersAsync())?.ToList();
+                if (banners != null && banners.Any())
+                {
+                    Banners = banners;
+                    StartBannerAutoplay();
+                }
+            }
+            catch { }
         }
     }
 
@@ -1489,10 +1518,17 @@
         public string Advice { get; set; } = string.Empty;
     }
 
-    private void ToggleAiModal()
+    private async Task ToggleAiModal()
     {
-        IsAiModalOpen = !IsAiModalOpen;
-        if (!IsAiModalOpen) ComputedSizeResult = null;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("qfOpenChat");
+        }
+        catch
+        {
+            IsAiModalOpen = !IsAiModalOpen;
+            if (!IsAiModalOpen) ComputedSizeResult = null;
+        }
     }
 
     private void CalculateSizeRecommendation()
@@ -1543,31 +1579,41 @@
     private bool IsCategoryPillActive(string pillType)
     {
         if (!Query.CategoryId.HasValue) return false;
-        var cat = Categories.FirstOrDefault(c => c.MaDanhMuc == Query.CategoryId.Value);
-        if (cat == null) return false;
-        var lower = cat.TenDanhMuc.ToLower();
+        var catId = Query.CategoryId.Value;
+        var cat = Categories.FirstOrDefault(c => c.MaDanhMuc == catId);
         return pillType switch
         {
-            "ao" => lower.Contains("áo") || lower.Contains("ao"),
-            "quan" => lower.Contains("quần") || lower.Contains("quan"),
-            "phukien" => lower.Contains("phụ kiện") || lower.Contains("phu kien"),
+            "ao" => catId == 4 || (cat != null && (cat.MaDanhMucCha == 4 || cat.TenDanhMuc.Equals("Áo Nam", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.StartsWith("Áo", StringComparison.OrdinalIgnoreCase))),
+            "quan" => catId == 5 || (cat != null && (cat.MaDanhMucCha == 5 || cat.TenDanhMuc.Equals("Quần Nam", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.StartsWith("Quần", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.Contains("Jean", StringComparison.OrdinalIgnoreCase))),
+            "phukien" => catId == 3 || (cat != null && (cat.MaDanhMucCha == 3 || cat.TenDanhMuc.Equals("Phụ kiện", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.Contains("Phụ kiện", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.Contains("Ví", StringComparison.OrdinalIgnoreCase) || cat.TenDanhMuc.Contains("Túi", StringComparison.OrdinalIgnoreCase))),
             _ => false
         };
     }
 
     private async Task SelectQuickPill(string pillType)
     {
-        var targetCat = Categories.FirstOrDefault(c =>
+        CategoryDto? targetCat = pillType switch
         {
-            var lower = c.TenDanhMuc.ToLower();
-            return pillType switch
-            {
-                "ao" => lower.Contains("áo") || lower.Contains("ao"),
-                "quan" => lower.Contains("quần") || lower.Contains("quan"),
-                "phukien" => lower.Contains("phụ kiện") || lower.Contains("phu kien"),
-                _ => false
-            };
-        });
+            "ao" => Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Áo Nam", StringComparison.OrdinalIgnoreCase))
+                 ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Áo", StringComparison.OrdinalIgnoreCase))
+                 ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Tất cả Áo", StringComparison.OrdinalIgnoreCase))
+                 ?? Categories.FirstOrDefault(c => (c.TenDanhMuc.ToLower().Contains("áo") || c.TenDanhMuc.ToLower().Contains("ao")) && (c.MaDanhMucCha == 1 || c.MaDanhMucCha == null || c.MaDanhMucCha == 0))
+                 ?? Categories.FirstOrDefault(c => c.MaDanhMuc == 4),
+
+            "quan" => Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Quần Nam", StringComparison.OrdinalIgnoreCase))
+                   ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Quần", StringComparison.OrdinalIgnoreCase))
+                   ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Tất cả Quần", StringComparison.OrdinalIgnoreCase))
+                   ?? Categories.FirstOrDefault(c => (c.TenDanhMuc.ToLower().Contains("quần") || c.TenDanhMuc.ToLower().Contains("quan")) && (c.MaDanhMucCha == 1 || c.MaDanhMucCha == null || c.MaDanhMucCha == 0))
+                   ?? Categories.FirstOrDefault(c => c.MaDanhMuc == 5),
+
+            "phukien" => Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Phụ Kiện", StringComparison.OrdinalIgnoreCase))
+                      ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Phụ kiện", StringComparison.OrdinalIgnoreCase))
+                      ?? Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Tất cả Phụ Kiện", StringComparison.OrdinalIgnoreCase))
+                      ?? Categories.FirstOrDefault(c => (c.TenDanhMuc.ToLower().Contains("phụ kiện") || c.TenDanhMuc.ToLower().Contains("phu kien")) && (c.MaDanhMucCha == 1 || c.MaDanhMucCha == null || c.MaDanhMucCha == 0))
+                      ?? Categories.FirstOrDefault(c => c.MaDanhMuc == 3),
+
+            _ => null
+        };
 
         if (targetCat != null)
         {
@@ -1575,7 +1621,14 @@
         }
         else
         {
-            await SelectCategory(null);
+            int? fallbackId = pillType switch
+            {
+                "ao" => 4,
+                "quan" => 5,
+                "phukien" => 3,
+                _ => null
+            };
+            await SelectCategory(fallbackId);
         }
     }
 
@@ -1666,7 +1719,7 @@
 
     private IEnumerable<CategoryFilterOption> GetAvailableCategoryOptions()
     {
-        return CurrentBranch switch
+        var baseOptions = CurrentBranch switch
         {
             CatalogBranch.Pant => new List<CategoryFilterOption>
             {
@@ -1719,6 +1772,50 @@
                 new() { Slug = "balo", Name = "— Balo & Túi Xách", CategoryId = 9 }
             }
         };
+
+        // ĐỘNG HÓA TỪ CSDL: Tự động gom thêm các danh mục con mới tạo
+        if (Categories != null && Categories.Any())
+        {
+            int? parentId = CurrentBranch switch
+            {
+                CatalogBranch.Pant => 5,
+                CatalogBranch.Shirt => 4,
+                CatalogBranch.Jean => 13,
+                CatalogBranch.Accessory => 3,
+                _ => null
+            };
+
+            var existingIds = baseOptions.Where(o => o.CategoryId.HasValue).Select(o => o.CategoryId!.Value).ToHashSet();
+
+            if (parentId.HasValue)
+            {
+                var extraSubCats = Categories.Where(c => c.MaDanhMucCha == parentId.Value && !existingIds.Contains(c.MaDanhMuc));
+                foreach (var cat in extraSubCats)
+                {
+                    baseOptions.Add(new CategoryFilterOption
+                    {
+                        Slug = $"cat-{cat.MaDanhMuc}",
+                        Name = cat.TenDanhMuc,
+                        CategoryId = cat.MaDanhMuc
+                    });
+                }
+            }
+            else if (CurrentBranch == CatalogBranch.All)
+            {
+                var extraCats = Categories.Where(c => c.MaDanhMucCha.HasValue && !existingIds.Contains(c.MaDanhMuc));
+                foreach (var cat in extraCats)
+                {
+                    baseOptions.Add(new CategoryFilterOption
+                    {
+                        Slug = $"cat-{cat.MaDanhMuc}",
+                        Name = $"— {cat.TenDanhMuc}",
+                        CategoryId = cat.MaDanhMuc
+                    });
+                }
+            }
+        }
+
+        return baseOptions;
     }
 
     private CategoryFilterOption? GetActiveOption()

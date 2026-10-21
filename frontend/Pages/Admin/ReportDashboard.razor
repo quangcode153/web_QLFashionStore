@@ -11,7 +11,6 @@
     <div class="dashboard-header">
         <div>
             <h2 class="dashboard-title">BÁO CÁO & TỔNG QUAN</h2>
-            <p class="dashboard-subtitle">Theo dõi doanh thu, hiệu suất bán hàng và phân tích xu hướng</p>
         </div>
         <div class="header-actions">
             <button type="button" class="btn btn-outline btn-refresh" @onclick="RefreshData" disabled="@_isLoading" title="Tải lại số liệu báo cáo mới nhất">
@@ -26,7 +25,7 @@
     <!-- KPIs Summary Cards -->
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">Doanh thu gần nhất</div>
+            <div class="kpi-label">Doanh thu hôm nay</div>
             <div class="kpi-value">@(LatestRevenue.ToString("N0")) đ</div>
             <div class="kpi-sub">Tổng số đơn: @LatestOrderCount</div>
         </div>
@@ -63,7 +62,6 @@
                 </h4>
                 <span class="badge-tag">Theo ngày</span>
             </div>
-            <p class="card-desc">Chọn một ngày trong quá khứ để xem số đơn, tiền hàng và doanh thu thực tế</p>
 
             <div class="filter-controls single-date-controls">
                 <div class="form-group flex-grow">
@@ -120,6 +118,10 @@
                                 <span class="stat-lbl">Khuyến mãi / Giảm</span>
                                 <span class="stat-val text-danger">-@_singleDateReport.TongTienKhuyenMai.ToString("N0") đ</span>
                             </div>
+                            <div class="single-stat-item">
+                                <span class="stat-lbl">Tiền hoàn trả</span>
+                                <span class="stat-val" style="color: #ea580c; font-weight: 700;">-@_singleDateReport.TongTienHoanTra.ToString("N0") đ</span>
+                            </div>
                         </div>
                     }
                     else
@@ -151,7 +153,6 @@
                 </h4>
                 <span class="badge-tag">Theo khoảng</span>
             </div>
-            <p class="card-desc">Tổng hợp số liệu kinh doanh trong kỳ từ ngày bắt đầu đến ngày kết thúc</p>
 
             <div class="filter-controls">
                 <div class="form-group">
@@ -186,8 +187,12 @@
                         <span>Tổng khuyến mãi:</span>
                         <strong class="text-danger">-@_financialReport.TongTienKhuyenMai.ToString("N0") đ</strong>
                     </div>
+                    <div class="range-stat">
+                        <span>Tổng hoàn trả:</span>
+                        <strong style="color: #ea580c;">-@_financialReport.TongTienHoanTra.ToString("N0") đ</strong>
+                    </div>
                     <div class="range-stat highlight">
-                        <span>Doanh thu thực tế:</span>
+                        <span>Doanh thu thuần (Net):</span>
                         <strong class="text-success">@_financialReport.TongDoanhThuThuc.ToString("N0") đ</strong>
                     </div>
                 </div>
@@ -202,9 +207,6 @@
             <div class="table-card-topbar">
                 <div>
                     <h4 class="card-title">Doanh Thu Theo Ngày</h4>
-                    <p class="card-subtitle-small">
-                        Hiển thị @(DisplayedDailyRevenues.Count) / @(_dailyRevenues.Count) ngày ghi nhận
-                    </p>
                 </div>
 
                 <!-- Thanh lọc số ngày gần nhất (Pill buttons) -->
@@ -240,14 +242,15 @@
                             <th class="text-center">Số đơn</th>
                             <th class="text-right">Tiền hàng</th>
                             <th class="text-right">Giảm giá</th>
-                            <th class="text-right">Doanh thu thực</th>
+                            <th class="text-right">Tiền hoàn</th>
+                            <th class="text-right">Doanh thu thuần</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (DisplayedDailyRevenues.Count == 0)
                         {
                             <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
+                                <td colspan="6" class="text-center text-muted py-4">
                                     Không tìm thấy dữ liệu ngày phù hợp
                                 </td>
                             </tr>
@@ -268,15 +271,13 @@
                                     </td>
                                     <td class="text-right">@r.TongTienHang.ToString("N0")</td>
                                     <td class="text-right text-danger">@(r.TongTienGiam > 0 ? $"-{r.TongTienGiam:N0}" : "0")</td>
+                                    <td class="text-right" style="color: #ea580c; font-weight: 600;">@(r.TongTienHoan > 0 ? $"-{r.TongTienHoan:N0}" : "0")</td>
                                     <td class="text-right font-weight-bold text-success">@r.DoanhThuThucTe.ToString("N0") đ</td>
                                 </tr>
                             }
                         }
                     </tbody>
                 </table>
-            </div>
-            <div class="table-scroll-hint">
-                <span>↕ Kéo cuộn danh sách lên / xuống để xem thêm các ngày đã qua</span>
             </div>
         </div>
 
@@ -285,7 +286,6 @@
             <div class="table-card-topbar">
                 <div>
                     <h4 class="card-title">Top Sản Phẩm Bán Chạy</h4>
-                    <p class="card-subtitle-small">Top 20 mặt hàng có doanh thu và số lượng bán cao nhất</p>
                 </div>
             </div>
             <div class="table-scroll-container">
@@ -332,7 +332,6 @@
                     </svg>
                     HIỆU SUẤT CHI NHÁNH & GIÁM SÁT KHO HÀNG ĐA ĐIỂM
                 </h3>
-                <p class="section-subtitle">Xác định chi nhánh dẫn đầu doanh số và theo dõi mức tồn kho từng điểm bán</p>
             </div>
             <div class="branch-summary-pills">
                 <span class="summary-pill">@_branchLeaderboard.Count điểm bán & kho</span>
@@ -346,7 +345,6 @@
                 <div class="table-card-topbar">
                     <div>
                         <h4 class="card-title">Bảng Xếp Hạng Doanh Số Chi Nhánh</h4>
-                        <p class="card-subtitle-small">Xếp theo tổng doanh thu hoàn thành từ cao xuống thấp</p>
                     </div>
                 </div>
 
@@ -427,7 +425,6 @@
                 <div class="table-card-topbar">
                     <div>
                         <h4 class="card-title">Giám Sát Sản Lượng & Tồn Kho Từng Kho</h4>
-                        <p class="card-subtitle-small">Theo dõi tổng mặt hàng, tồn kho và cảnh báo thiếu hàng</p>
                     </div>
                 </div>
 
@@ -1232,6 +1229,93 @@
         border-radius: 12px;
         font-size: 0.75rem;
         font-weight: 600;
+    }
+
+    /* RESPONSIVE TRÊN THIẾT BỊ DI ĐỘNG (MOBILE & TABLET) */
+    @@media (max-width: 768px) {
+        .dashboard-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            padding-bottom: 12px;
+        }
+
+        .dashboard-title {
+            font-size: 1.2rem;
+            text-align: left;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .btn-refresh {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .kpi-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .kpi-card {
+            padding: 14px;
+        }
+
+        .kpi-value {
+            font-size: 1.35rem;
+        }
+
+        .search-section-grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .range-filter-card {
+            padding: 14px;
+        }
+
+        .filter-controls {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .btn-search-single, .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .section-header-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .branch-summary-pills {
+            flex-wrap: wrap;
+        }
+
+        .table-card {
+            padding: 14px;
+        }
+
+        .table-card-topbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .pill-group {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .pill-btn {
+            flex: 1;
+            text-align: center;
+        }
     }
 </style>
 

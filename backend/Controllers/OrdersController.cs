@@ -36,7 +36,16 @@ public class OrdersController : ControllerBase
             userBranchId = branchId.Value;
         }
 
-        var result = await _orderService.GetAllOrdersAsync(branchId, userRole, userBranchId);
+        var isMultiBranchAdmin = string.Equals(userRole, RoleConstants.AdminChuoi, StringComparison.OrdinalIgnoreCase) 
+                              || string.Equals(userRole, RoleConstants.QuanLyHeThong, StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(userRole, "Administrator", StringComparison.OrdinalIgnoreCase);
+
+        // Với vai trò trực thuộc chi nhánh (Điều phối viên, Quản lý chi nhánh, Thu ngân):
+        // Luôn ép buộc branchId theo chi nhánh phân công của tài khoản (userBranchId)
+        int? effectiveQueryBranch = isMultiBranchAdmin ? branchId : userBranchId;
+
+        var result = await _orderService.GetAllOrdersAsync(effectiveQueryBranch, userRole, userBranchId);
         return Ok(result);
     }
 
@@ -107,6 +116,10 @@ public class OrdersController : ControllerBase
         }
 
         var result = await _orderService.UpdateOrderStatusAsync(id, normalizedStatus);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
         return Ok(result);
     }
 

@@ -33,6 +33,8 @@ public class FeedbackDto
     public string? TenChiNhanhHen { get; set; }
     public string? DiaChiChiNhanhHen { get; set; }
     public string? DiaChiNhanHangHoanVe { get; set; }
+    public int? MaChiNhanhDonHang { get; set; }
+    public string? TenChiNhanhDonHang { get; set; }
     public DateTime NgayGui { get; set; }
     public DateTime NgayCapNhat { get; set; }
 }

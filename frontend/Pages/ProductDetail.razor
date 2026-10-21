@@ -98,9 +98,15 @@
                         <label class="option-label">
                             Kích thước: <strong>@(SelectedSize ?? "Vui lòng chọn size")</strong>
                         </label>
-                        <button type="button" class="size-guide-link" @onclick="() => _showSizeGuideModal = true" style="background: none; border: none; cursor: pointer;">
-                            Bảng quy đổi kích cỡ
-                        </button>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button type="button" class="stylist-ai-link" @onclick="ConsultStylistAi" title="Nhờ Stylist AI tư vấn chọn size & tồn kho" style="background: none; border: none; cursor: pointer; color: #000000; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                Stylist AI tư vấn size
+                            </button>
+                            <span style="color: #CBD5E1; font-size: 11px;">|</span>
+                            <button type="button" class="size-guide-link" @onclick="() => _showSizeGuideModal = true" style="background: none; border: none; cursor: pointer;">
+                                Bảng quy đổi kích cỡ
+                            </button>
+                        </div>
                     </div>
                     <div class="swatches-container">
                         @foreach (var size in AvailableSizes)
@@ -123,16 +129,26 @@
                         </div>
                         @if (SelectedVariant.SoLuongTon > 0)
                         {
-                            <div class="stock-available">
-                                <span class="stock-dot in-stock"></span>
-                                <span>Còn lại @SelectedVariant.SoLuongTon sản phẩm</span>
+                            <div class="stock-available" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="stock-dot in-stock"></span>
+                                    <span>Tồn kho Online: Còn lại @SelectedVariant.SoLuongTon sản phẩm</span>
+                                </div>
+                                <button type="button" class="btn-branch-stock" @onclick="OpenBranchStockModal" style="background: none; border: 1px solid #CBD5E1; border-radius: 4px; padding: 4px 10px; font-size: 0.75rem; color: #334155; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                    Tra cứu tồn kho các chi nhánh
+                                </button>
                             </div>
                         }
                         else
                         {
-                            <div class="stock-out">
-                                <span class="stock-dot out-of-stock"></span>
-                                <span class="text-danger">Hết hàng</span>
+                            <div class="stock-out" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span class="stock-dot out-of-stock"></span>
+                                    <span class="text-danger">Kho Online: Hết hàng</span>
+                                </div>
+                                <button type="button" class="btn-branch-stock" @onclick="OpenBranchStockModal" style="background: none; border: 1px solid #CBD5E1; border-radius: 4px; padding: 4px 10px; font-size: 0.75rem; color: #334155; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                    Tra cứu tồn kho các chi nhánh
+                                </button>
                             </div>
                         }
                     }
@@ -287,6 +303,96 @@
                 <div style="text-align: right;">
                     <button type="button" @onclick="() => _showSizeGuideModal = false" style="background: #000000; color: #FFFFFF; border: none; padding: 10px 24px; border-radius: 4px; font-weight: 700; cursor: pointer;">
                         ĐÃ HIỂU
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal Tra Cứu Tồn Kho Từng Chi Nhánh (Minh bạch dữ liệu & Khách hàng) -->
+    @if (_showBranchStockModal)
+    {
+        <div class="branch-stock-modal-backdrop" @onclick="() => _showBranchStockModal = false" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1.5rem;">
+            <div class="branch-stock-modal-card" @onclick:stopPropagation="true" style="background: #FFFFFF; border-radius: 8px; max-width: 680px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid #E2E8F0;">
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0;">TỒN KHO THEO TỪNG CHI NHÁNH</h3>
+                        <p style="font-size: 0.8rem; color: #64748B; margin: 4px 0 0 0;">
+                            @ProductName @(SelectedVariant != null ? $"- Màu {SelectedVariant.MauSac} / Size {SelectedVariant.KichCo}" : "")
+                        </p>
+                    </div>
+                    <button type="button" @onclick="() => _showBranchStockModal = false" style="background: none; border: none; font-size: 1.25rem; cursor: pointer; color: #64748B;">✕</button>
+                </div>
+
+                <div style="padding: 1.25rem 1.5rem; overflow-y: auto; flex: 1;">
+                    @if (_loadingBranchStock)
+                    {
+                        <div style="text-align: center; padding: 2rem; color: #64748B;">
+                            Đang nạp dữ liệu tồn kho các chi nhánh...
+                        </div>
+                    }
+                    else if (!_branchStockList.Any())
+                    {
+                        <div style="text-align: center; padding: 2rem; color: #64748B;">
+                            Không có dữ liệu tồn kho cho sản phẩm này.
+                        </div>
+                    }
+                    else
+                    {
+                        var filteredStocks = SelectedVariant != null
+                            ? _branchStockList.Where(b => b.MaBienThe == SelectedVariant.MaBienThe).ToList()
+                            : _branchStockList.ToList();
+
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            @foreach (var group in filteredStocks.GroupBy(x => new { x.MaChiNhanh, x.TenChiNhanh, x.DiaChi, x.IsOnlineWarehouse }))
+                            {
+                                var totalStock = group.Sum(x => x.SoLuongTon);
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border: 1px solid @(group.Key.IsOnlineWarehouse ? "#000000" : "#E2E8F0"); border-radius: 6px; background: @(group.Key.IsOnlineWarehouse ? "#F8FAFC" : "#FFFFFF");">
+                                    <div>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <strong style="font-size: 0.9rem; color: #0F172A;">@group.Key.TenChiNhanh</strong>
+                                            @if (group.Key.IsOnlineWarehouse)
+                                            {
+                                                <span style="background: #000000; color: #FFFFFF; font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">KHO GIAO ONLINE</span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(group.Key.DiaChi))
+                                        {
+                                            <p style="font-size: 0.78rem; color: #64748B; margin: 2px 0 0 0;">@group.Key.DiaChi</p>
+                                        }
+                                        @if (SelectedVariant == null)
+                                        {
+                                            <div style="font-size: 0.75rem; color: #475569; margin-top: 4px;">
+                                                @string.Join(" • ", group.Select(v => $"{v.MauSac}/{v.KichCo}: {v.SoLuongTon} chiếc"))
+                                            </div>
+                                        }
+                                    </div>
+                                    <div style="text-align: right; flex-shrink: 0; margin-left: 12px;">
+                                        @if (totalStock > 0)
+                                        {
+                                            <span style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;">
+                                                Còn @totalStock chiếc
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span style="background: #F1F5F9; color: #94A3B8; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; border-radius: 20px;">
+                                                Hết hàng
+                                            </span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div style="padding: 1rem 1.5rem; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.75rem; color: #64748B;">
+                        Dữ liệu thời gian thực từ hệ thống kho đa chi nhánh
+                    </span>
+                    <button type="button" @onclick="() => _showBranchStockModal = false" style="background: #000000; color: #FFFFFF; border: none; padding: 8px 20px; border-radius: 4px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+                        ĐÓNG
                     </button>
                 </div>
             </div>
@@ -549,5 +655,41 @@
     private void GoToCatalog()
     {
         Navigation.NavigateTo("/catalog");
+    }
+
+    private async Task ConsultStylistAi()
+    {
+        try
+        {
+            var prompt = $"Mình đang xem sản phẩm '{ProductName}'. Mình cao và nặng bao nhiêu kg thì mặc size nào vừa vặn nhất, và hiện tại mẫu này còn màu gì và size nào trong kho ạ?";
+            await JSRuntime.InvokeVoidAsync("qfOpenChat", prompt);
+        }
+        catch
+        {
+            _showSizeGuideModal = true;
+        }
+    }
+
+    private bool _showBranchStockModal = false;
+    private bool _loadingBranchStock = false;
+    private List<ProductBranchStockDto> _branchStockList = new();
+
+    private async Task OpenBranchStockModal()
+    {
+        _showBranchStockModal = true;
+        _loadingBranchStock = true;
+        try
+        {
+            var data = await CatalogApi.GetProductBranchStockAsync(id);
+            _branchStockList = data.ToList();
+        }
+        catch
+        {
+            _branchStockList = new();
+        }
+        finally
+        {
+            _loadingBranchStock = false;
+        }
     }
 }

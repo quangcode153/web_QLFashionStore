@@ -25,17 +25,20 @@ public interface IOrderService
 public class OrderService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
+    private readonly ICatalogRepository? _catalogRepository;
     private readonly IHubContext<NotificationHub>? _notificationHub;
     private readonly IHubContext<InventoryHub>? _inventoryHub;
 
     public OrderService(
         IOrderRepository orderRepository,
         IHubContext<NotificationHub>? notificationHub = null,
-        IHubContext<InventoryHub>? inventoryHub = null)
+        IHubContext<InventoryHub>? inventoryHub = null,
+        ICatalogRepository? catalogRepository = null)
     {
         _orderRepository = orderRepository;
         _notificationHub = notificationHub;
         _inventoryHub = inventoryHub;
+        _catalogRepository = catalogRepository;
     }
 
     public async Task<ApiResponse<OrderReturnLookupDto>> GetOrderForReturnLookupAsync(int orderId)
@@ -84,6 +87,20 @@ public class OrderService : IOrderService
             return ApiResponse<int>.Fail("Mã biến thể và số lượng sản phẩm phải lớn hơn 0.");
         }
 
+        if (_catalogRepository != null)
+        {
+            var variantIds = request.Items.Select(i => i.MaBienThe).Distinct();
+            var availability = await _catalogRepository.CheckVariantsAvailabilityAsync(variantIds);
+            var unavailable = availability.FirstOrDefault(x => x.DaAn);
+            if (unavailable != null)
+            {
+                var variantDesc = (!string.IsNullOrWhiteSpace(unavailable.MauSac) || !string.IsNullOrWhiteSpace(unavailable.KichCo))
+                    ? $" ({unavailable.MauSac} - {unavailable.KichCo})"
+                    : "";
+                return ApiResponse<int>.Fail($"Sản phẩm '{unavailable.TenSanPham}'{variantDesc} tạm thời không cung cấp.");
+            }
+        }
+
         try
         {
             var orderId = (request.MaChiNhanh.HasValue && request.MaChiNhanh.Value > 0)
@@ -98,6 +115,11 @@ public class OrderService : IOrderService
             if (!string.IsNullOrWhiteSpace(request.TrangThai))
             {
                 await _orderRepository.UpdateOrderStatusAsync(orderId, request.TrangThai);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DiaChiGiaoHang))
+            {
+                await _orderRepository.UpdateOrderShippingAddressAsync(orderId, request.DiaChiGiaoHang);
             }
 
             if (_notificationHub != null)
@@ -153,32 +175,41 @@ public class OrderService : IOrderService
             return ApiResponse<bool>.Fail($"Đơn hàng #{orderId} đã hủy, không thể thay đổi trạng thái.");
         }
 
-        await _orderRepository.UpdateOrderStatusAsync(orderId, normalizedStatus);
-        return ApiResponse<bool>.Ok(true, $"Cập nhật trạng thái thành '{normalizedStatus}' thành công");
+        if (string.Equals(currentStatus, "Đã hoàn trả", StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiResponse<bool>.Fail($"Đơn hàng #{orderId} đã hoàn trả, không thể thay đổi trạng thái.");
+        }
+
+        try
+        {
+            await _orderRepository.UpdateOrderStatusAsync(orderId, normalizedStatus);
+            return ApiResponse<bool>.Ok(true, $"Cập nhật trạng thái thành '{normalizedStatus}' thành công");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi khi cập nhật trạng thái đơn hàng: {ex.Message}");
+        }
     }
 
     public async Task<ApiResponse<IEnumerable<OrderSummaryDto>>> GetAllOrdersAsync(int? branchId = null, string? userRole = null, int? userBranchId = null)
     {
         int? effectiveBranchId;
 
-        bool isMultiBranchAdmin = userRole == Shared.Constants.RoleConstants.AdminChuoi 
-                               || userRole == Shared.Constants.RoleConstants.QuanLyHeThong;
-
-        bool isOrderCoordinator = userRole == Shared.Constants.RoleConstants.OrderCoordinator;
+        bool isMultiBranchAdmin = string.Equals(userRole, Shared.Constants.RoleConstants.AdminChuoi, StringComparison.OrdinalIgnoreCase) 
+                               || string.Equals(userRole, Shared.Constants.RoleConstants.QuanLyHeThong, StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase)
+                               || string.Equals(userRole, "Administrator", StringComparison.OrdinalIgnoreCase);
 
         if (isMultiBranchAdmin)
         {
-            // Admin thì vào khu vực chi nhánh 1 là được (nếu không chọn chi nhánh cụ thể khác)
-            effectiveBranchId = (branchId.HasValue && branchId.Value > 0) ? branchId.Value : 1;
-        }
-        else if (isOrderCoordinator)
-        {
-            // Order Coordinator có quyền xem toàn chuỗi (null) hoặc chi nhánh chỉ định (ví dụ kho online 9)
+            // Admin toàn chuỗi: Nếu truyền chi nhánh cụ thể (> 0) thì lọc theo chi nhánh đó; nếu null hoặc 0 ("Tất cả chi nhánh") thì truy vấn toàn bộ hệ thống
             effectiveBranchId = (branchId.HasValue && branchId.Value > 0) ? branchId.Value : null;
         }
         else
         {
-            // Quản lý chi nhánh / Nhân viên: chỉ quản lý các đơn hàng do khách tại chi nhánh của mình
+            // Quản lý chi nhánh / Điều phối viên (Order Coordinator) / Nhân viên:
+            // Chỉ được xem và điều phối các đơn hàng thuộc chi nhánh mình đang quản lý (userBranchId).
+            // Ví dụ: Điều phối viên chi nhánh online chỉ xử lý các đơn hàng onl của kho online. Tương tự các chi nhánh khác.
             effectiveBranchId = (userBranchId.HasValue && userBranchId.Value > 0) ? userBranchId.Value : 1;
         }
 

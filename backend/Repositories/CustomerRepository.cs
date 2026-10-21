@@ -75,15 +75,28 @@ public class CustomerRepository : ICustomerRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
-                ma_hoa_don AS MaHoaDon,
-                ngay_lap_hoa_don AS NgayLapHoaDon,
-                tien_hang AS TienHang,
-                tien_giam_gia AS TienGiamGia,
-                tong_thanh_toan AS TongThanhToan,
-                trang_thai AS TrangThai,
-                so_mat_hang AS SoMatHang
-            FROM dbo.fn_LichSuMuaHangKhachHang(@CustomerId)
-            ORDER BY ngay_lap_hoa_don DESC;";
+                hd.ma_hoa_don AS MaHoaDon,
+                hd.ngay_lap_hoa_don AS NgayLapHoaDon,
+                hd.tien_hang AS TienHang,
+                hd.tien_giam_gia AS TienGiamGia,
+                hd.tong_thanh_toan AS TongThanhToan,
+                hd.trang_thai AS TrangThai,
+                hd.so_mat_hang AS SoMatHang,
+                (
+                    SELECT TOP 1 dt.trang_thai
+                    FROM DonTraHang dt
+                    WHERE dt.ma_hoa_don = hd.ma_hoa_don
+                    ORDER BY 
+                        CASE 
+                            WHEN dt.trang_thai IN (N'Cần duyệt', N'Đang xử lý') THEN 1 
+                            ELSE 2 
+                        END,
+                        dt.ma_don_tra DESC
+                ) AS TrangThaiHoanTra,
+                ISNULL((SELECT SUM(ct.so_luong) FROM ChiTietHoaDon ct WHERE ct.ma_hoa_don = hd.ma_hoa_don), 0) AS TongSoLuongDaMua,
+                ISNULL((SELECT SUM(dt.so_luong) FROM DonTraHang dt WHERE dt.ma_hoa_don = hd.ma_hoa_don AND dt.trang_thai <> N'Từ chối'), 0) AS TongSoLuongDaTra
+            FROM dbo.fn_LichSuMuaHangKhachHang(@CustomerId) hd
+            ORDER BY hd.ngay_lap_hoa_don DESC;";
 
         return await connection.QueryAsync<CustomerOrderHistoryItemDto>(sql, new { CustomerId = customerId });
     }

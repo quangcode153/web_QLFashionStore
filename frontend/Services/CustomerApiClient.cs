@@ -107,6 +107,7 @@ public class CustomerApiClient : ICustomerApiClient
 
     public async Task<global::Shared.DTOs.Common.ApiResponse<int>> SubmitFeedbackAsync(global::Shared.DTOs.Feedback.CreateFeedbackRequestDto request)
     {
+        await AttachAuthHeaderAsync();
         try
         {
             var res = await _httpClient.PostAsJsonAsync("api/feedback", request);

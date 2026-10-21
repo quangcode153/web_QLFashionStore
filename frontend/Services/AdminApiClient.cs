@@ -173,7 +173,30 @@ public class AdminApiClient : IAdminApiClient
         try
         {
             var res = await _http.PostAsJsonAsync("api/warehouse/import", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                try
+                {
+                    var errorRes = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                    if (errorRes != null && !string.IsNullOrWhiteSpace(errorRes.Message))
+                    {
+                        throw new InvalidOperationException(errorRes.Message);
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Ignore JSON parse errors and return false
+                }
+            }
             return res.IsSuccessStatusCode;
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch
         {
@@ -191,6 +214,37 @@ public class AdminApiClient : IAdminApiClient
         catch
         {
             return new List<BranchDto>();
+        }
+    }
+
+    public async Task<ApiResponse<int>> CreateBranchAsync(CreateBranchDto dto)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/branches", dto);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
+            return result ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ máy chủ.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<int>.Fail($"Lỗi khi tạo chi nhánh: {ex.Message}");
+        }
+    }
+
+    public async Task<List<BranchInventoryDto>?> GetBranchInventoryAsync(int branchId, string? search = null)
+    {
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(search) 
+                ? $"api/branches/{branchId}/inventory"
+                : $"api/branches/{branchId}/inventory?search={Uri.EscapeDataString(search.Trim())}";
+            var res = await _http.GetFromJsonAsync<ApiResponse<List<BranchInventoryDto>>>(url);
+            return res?.Data ?? new List<BranchInventoryDto>();
+        }
+        catch
+        {
+            return new List<BranchInventoryDto>();
         }
     }
 
@@ -238,16 +292,103 @@ public class AdminApiClient : IAdminApiClient
         }
     }
 
-    public async Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page = 1, int pageSize = 10)
+    public Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page, int pageSize) 
+        => GetProductsAsync(page, pageSize, null, true, null);
+
+    public async Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page = 1, int pageSize = 10, bool? daXoa = null, bool includeAll = false, string? search = null)
     {
         try
         {
-            var res = await _http.GetFromJsonAsync<ApiResponse<PagedResult<ProductListItemDto>>>($"api/products?pageNumber={page}&pageSize={pageSize}");
+            var url = $"api/products?pageNumber={page}&pageSize={pageSize}";
+            if (daXoa.HasValue)
+                url += $"&daXoa={daXoa.Value.ToString().ToLowerInvariant()}";
+            if (includeAll)
+                url += "&includeAll=true";
+            if (!string.IsNullOrWhiteSpace(search))
+                url += $"&search={Uri.EscapeDataString(search.Trim())}";
+
+            var res = await _http.GetFromJsonAsync<ApiResponse<PagedResult<ProductListItemDto>>>(url);
             return res?.Data;
         }
         catch
         {
             return new PagedResult<ProductListItemDto>();
+        }
+    }
+
+    public async Task<ApiResponse<bool>> UpdateProductAsync(int id, UpdateProductRequest request)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/products/{id}", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                var errContent = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+                return errContent ?? ApiResponse<bool>.Fail($"Cập nhật thất bại (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Ok(true, "Cập nhật sản phẩm thành công.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> ToggleProductStatusAsync(int productId)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PatchAsync($"api/products/{productId}/toggle-status", null);
+            if (!res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    return ApiResponse<bool>.Fail("Bạn không có quyền thay đổi trạng thái sản phẩm (Chỉ Admin toàn chuỗi mới được phép).");
+                return ApiResponse<bool>.Fail($"Lỗi thao tác (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Fail("Không nhận được phản hồi.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> ToggleVariantStatusAsync(int variantId)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PatchAsync($"api/products/variants/{variantId}/toggle-status", null);
+            if (!res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    return ApiResponse<bool>.Fail("Bạn không có quyền thay đổi trạng thái biến thể (Chỉ Admin toàn chuỗi mới được phép).");
+                return ApiResponse<bool>.Fail($"Lỗi thao tác (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Fail("Không nhận được phản hồi.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    public async Task<List<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<IEnumerable<ProductVariantDto>>>($"api/products/{productId}/variants/admin");
+            return res?.Data?.ToList() ?? new List<ProductVariantDto>();
+        }
+        catch
+        {
+            return new List<ProductVariantDto>();
         }
     }
 
@@ -257,6 +398,26 @@ public class AdminApiClient : IAdminApiClient
         try
         {
             var res = await _http.PostAsJsonAsync("api/products", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    return ApiResponse<int>.Fail("Bạn không có quyền hạn tạo sản phẩm (403 Forbidden).");
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return ApiResponse<int>.Fail("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại (401 Unauthorized).");
+
+                var errorText = await res.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(errorText))
+                {
+                    try
+                    {
+                        var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<int>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                            return errObj;
+                    }
+                    catch { }
+                }
+                return ApiResponse<int>.Fail($"Lỗi máy chủ (HTTP {(int)res.StatusCode} - {res.ReasonPhrase})");
+            }
             var content = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
             return content ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ hệ thống.");
         }
@@ -285,6 +446,26 @@ public class AdminApiClient : IAdminApiClient
         try
         {
             var res = await _http.PostAsJsonAsync("api/products/variants", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                    return ApiResponse<int>.Fail("Bạn không có quyền hạn tạo biến thể (403 Forbidden).");
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    return ApiResponse<int>.Fail("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại (401 Unauthorized).");
+
+                var errorText = await res.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(errorText))
+                {
+                    try
+                    {
+                        var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<int>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                            return errObj;
+                    }
+                    catch { }
+                }
+                return ApiResponse<int>.Fail($"Lỗi máy chủ (HTTP {(int)res.StatusCode} - {res.ReasonPhrase})");
+            }
             var content = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
             return content ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ hệ thống.");
         }
@@ -317,6 +498,60 @@ public class AdminApiClient : IAdminApiClient
         catch
         {
             return new List<BrandDto>();
+        }
+    }
+
+    public async Task<ApiResponse<int>> CreateCategoryAsync(CreateCategoryRequest request)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/categories", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorText = await res.Content.ReadAsStringAsync();
+                try
+                {
+                    var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<int>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                        return errObj;
+                }
+                catch { }
+                return ApiResponse<int>.Fail($"Lỗi máy chủ khi tạo danh mục (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
+            return content ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ hệ thống.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<int>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<int>> CreateBrandAsync(CreateBrandRequest request)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/brands", request);
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorText = await res.Content.ReadAsStringAsync();
+                try
+                {
+                    var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<int>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                        return errObj;
+                }
+                catch { }
+                return ApiResponse<int>.Fail($"Lỗi máy chủ khi tạo thương hiệu (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
+            return content ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ hệ thống.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<int>.Fail($"Lỗi kết nối: {ex.Message}");
         }
     }
 
@@ -545,7 +780,7 @@ public class AdminApiClient : IAdminApiClient
         }
     }
 
-    public async Task<List<global::Shared.DTOs.Audit.AuditLogDto>?> GetAuditLogsAsync(string? loaiThaoTac = null, int limit = 100)
+    public async Task<List<global::Shared.DTOs.Audit.AuditLogDto>?> GetAuditLogsAsync(string? loaiThaoTac = null, int? maChiNhanh = null, int limit = 100)
     {
         await AttachAuthHeaderAsync();
         try
@@ -555,12 +790,17 @@ public class AdminApiClient : IAdminApiClient
             {
                 url += $"&loaiThaoTac={Uri.EscapeDataString(loaiThaoTac)}";
             }
+            if (maChiNhanh.HasValue && maChiNhanh.Value > 0)
+            {
+                url += $"&maChiNhanh={maChiNhanh.Value}";
+            }
             var res = await _http.GetFromJsonAsync<ApiResponse<List<global::Shared.DTOs.Audit.AuditLogDto>>>(url);
             return res?.Data ?? new List<global::Shared.DTOs.Audit.AuditLogDto>();
         }
-        catch
+        catch (Exception ex)
         {
-            return new List<global::Shared.DTOs.Audit.AuditLogDto>();
+            Console.WriteLine($"[AdminApiClient] Lỗi tải nhật ký kiểm toán: {ex.Message}");
+            throw;
         }
     }
 

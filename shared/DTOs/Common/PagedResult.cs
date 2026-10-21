@@ -32,4 +32,6 @@ public class ProductQueryParameters
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }
     public string? SortBy { get; set; } = "newest";
+    public bool? DaXoa { get; set; }
+    public bool IncludeAll { get; set; } = false;
 }

@@ -2,10 +2,11 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
-using Shared.DTOs.Common;
-using Shared.DTOs.Customer;
-using Shared.DTOs.Order;
-using Shared.DTOs.Promotion;
+using global::Shared.DTOs.Common;
+using global::Shared.DTOs.Customer;
+using global::Shared.DTOs.Order;
+using global::Shared.DTOs.Payment;
+using global::Shared.DTOs.Promotion;
 
 namespace Frontend.Services;
 
@@ -54,13 +55,21 @@ public class OrderApiClient : IOrderApiClient
                         TrangThai = "Chờ xử lý"
                     };
                 }
+                throw new InvalidOperationException(apiRes?.Message ?? "Tạo đơn hàng không thành công.");
             }
-
-            return null;
+            else
+            {
+                var errRes = await response.Content.ReadFromJsonAsync<ApiResponse<int>>();
+                throw new InvalidOperationException(errRes?.Message ?? "Không thể tạo đơn hàng. Vui lòng kiểm tra lại thông tin.");
+            }
         }
-        catch
+        catch (InvalidOperationException)
         {
-            return null;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Lỗi kết nối máy chủ: {ex.Message}");
         }
     }
 
@@ -74,6 +83,32 @@ public class OrderApiClient : IOrderApiClient
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<QrPaymentResponseDto?> GetOrderPaymentQrAsync(int orderId, string method = "MOMO")
+    {
+        try
+        {
+            var res = await _httpClient.GetFromJsonAsync<ApiResponse<QrPaymentResponseDto>>($"api/payment/qr-order/{orderId}?method={method}");
+            return res?.Data;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> ConfirmPaymentPaidAsync(int orderId)
+    {
+        try
+        {
+            var res = await _httpClient.PostAsync($"api/payment/confirm-paid/{orderId}", null);
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
         }
     }
 }

@@ -25,6 +25,7 @@ public class ReportRepository : IReportRepository
                 tong_so_don AS TongSoDon,
                 tong_tien_hang AS TongTienHang,
                 tong_tien_giam AS TongTienGiam,
+                tong_tien_hoan AS TongTienHoan,
                 doanh_thu_thuc_te AS DoanhThuThucTe
             FROM vw_DoanhThuTheoNgay
             ORDER BY ngay_ban DESC;
@@ -73,16 +74,13 @@ public class ReportRepository : IReportRepository
                     cn.ma_chi_nhanh AS MaChiNhanh,
                     cn.ten_chi_nhanh AS TenChiNhanh,
                     cn.loai_chi_nhanh AS LoaiChiNhanh,
-                    CASE 
-                        WHEN cn.loai_chi_nhanh = N'Kho tổng online' OR cn.ma_chi_nhanh = 9 THEN CAST(1 AS BIT) 
-                        ELSE CAST(0 AS BIT) 
-                    END AS IsOnlineWarehouse,
+                    cn.is_online_warehouse AS IsOnlineWarehouse,
                     COUNT(hd.ma_hoa_don) AS TongSoDon,
                     ISNULL(SUM(hd.tong_thanh_toan), 0) AS TongDoanhThu
                 FROM ChiNhanh cn
                 LEFT JOIN HoaDon hd ON cn.ma_chi_nhanh = hd.ma_chi_nhanh AND hd.trang_thai = N'Đã hoàn thành'
                 WHERE cn.dang_hoat_dong = 1
-                GROUP BY cn.ma_chi_nhanh, cn.ten_chi_nhanh, cn.loai_chi_nhanh
+                GROUP BY cn.ma_chi_nhanh, cn.ten_chi_nhanh, cn.loai_chi_nhanh, cn.is_online_warehouse
             ),
             GrandTotal AS (
                 SELECT ISNULL(SUM(TongDoanhThu), 0) AS AllRevenue FROM BranchTotals
@@ -112,10 +110,7 @@ public class ReportRepository : IReportRepository
             SELECT 
                 cn.ma_chi_nhanh AS MaChiNhanh,
                 cn.ten_chi_nhanh AS TenChiNhanh,
-                CASE 
-                    WHEN cn.loai_chi_nhanh = N'Kho tổng online' OR cn.ma_chi_nhanh = 9 THEN CAST(1 AS BIT) 
-                    ELSE CAST(0 AS BIT) 
-                END AS IsOnlineWarehouse,
+                cn.is_online_warehouse AS IsOnlineWarehouse,
                 COUNT(DISTINCT tk.ma_bien_the) AS TongSoMatHang,
                 ISNULL(SUM(tk.so_luong_ton), 0) AS TongSoLuongTon,
                 ISNULL(SUM(CASE WHEN tk.so_luong_ton <= 10 THEN 1 ELSE 0 END), 0) AS SoMatHangSapHet,
@@ -124,7 +119,7 @@ public class ReportRepository : IReportRepository
             LEFT JOIN TonKhoChiNhanh tk ON cn.ma_chi_nhanh = tk.ma_chi_nhanh
             LEFT JOIN BienTheSanPham bt ON tk.ma_bien_the = bt.ma_bien_the
             WHERE cn.dang_hoat_dong = 1
-            GROUP BY cn.ma_chi_nhanh, cn.ten_chi_nhanh, cn.loai_chi_nhanh
+            GROUP BY cn.ma_chi_nhanh, cn.ten_chi_nhanh, cn.is_online_warehouse, cn.loai_chi_nhanh
             ORDER BY cn.ma_chi_nhanh ASC;
         ";
         return await connection.QueryAsync<BranchInventorySummaryDto>(sql);

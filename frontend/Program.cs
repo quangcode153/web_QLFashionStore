@@ -17,6 +17,7 @@ builder.Services.AddScoped(sp =>
 builder.Services.AddScoped<Frontend.Services.IToastService, Frontend.Services.ToastService>();
 builder.Services.AddScoped<Frontend.Services.IAuthStateService, Frontend.Services.AuthStateService>();
 builder.Services.AddScoped<Frontend.Services.ICatalogApiClient, Frontend.Services.CatalogApiClient>();
+builder.Services.AddScoped<Frontend.Services.IPolicyApiClient, Frontend.Services.PolicyApiClient>();
 builder.Services.AddScoped<Frontend.Services.ICartService, Frontend.Services.CartService>();
 builder.Services.AddScoped<Frontend.Services.IOrderApiClient, Frontend.Services.OrderApiClient>();
 builder.Services.AddScoped<Frontend.Services.ICustomerApiClient, Frontend.Services.CustomerApiClient>();

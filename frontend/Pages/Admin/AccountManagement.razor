@@ -24,10 +24,13 @@
             </p>
         </div>
         <div class="header-actions">
-            <a href="/admin/customers" class="btn-nav-customers" title="Chuyển sang Quản lý tài khoản khách hàng">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                <span>Tài khoản khách hàng & VIP &rarr;</span>
-            </a>
+            @if (_isMultiBranchAdmin)
+            {
+                <button type="button" class="btn-secondary-action btn-add-branch" @onclick="OpenCreateBranchModal" title="Mở chi nhánh mới & Tạo tài khoản quản lý">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path></svg>
+                    <span>+ Mở chi nhánh & Cấp quản lý</span>
+                </button>
+            }
             <button class="btn-primary-action" @onclick="OpenCreateModal" title="Thêm tài khoản mới" aria-label="Thêm tài khoản mới">
                 <span class="plus-char">+</span>
                 <span>@(_isMultiBranchAdmin ? "Cấp tài khoản mới" : "Thêm nhân viên chi nhánh")</span>
@@ -50,13 +53,17 @@
                         Quản lý chi nhánh
                     </button>
                 }
+                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.OrderCoordinator ? "active" : "")" 
+                        @onclick="() => FilterRole(RoleConstants.OrderCoordinator)">
+                    Order Coordinator
+                </button>
                 <button class="tab-btn @(_selectedRoleFilter == RoleConstants.ThuKho ? "active" : "")" 
                         @onclick="() => FilterRole(RoleConstants.ThuKho)">
                     Thủ kho
                 </button>
                 <button class="tab-btn @(_selectedRoleFilter == RoleConstants.NhanVien ? "active" : "")" 
                         @onclick="() => FilterRole(RoleConstants.NhanVien)">
-                    Nhân viên & Thu ngân
+                    Nhân viên bán hàng (Thu ngân)
                 </button>
             </div>
         </div>
@@ -109,6 +116,10 @@
                                         @if (acc.VaiTro == RoleConstants.ThuKho)
                                         {
                                             @(acc.IsOnlineWarehouse || acc.LoaiThuKho == "ONLINE" ? "Thủ kho Online (Kho Tổng)" : "Thủ kho Chi nhánh")
+                                        }
+                                        else if (acc.VaiTro == RoleConstants.NhanVien || acc.VaiTro == RoleConstants.NhanVienBanHang || acc.VaiTro == RoleConstants.ThuNgan)
+                                        {
+                                            <span>Nhân viên bán hàng (Thu ngân)</span>
                                         }
                                         else
                                         {
@@ -175,15 +186,15 @@
                             @if (_isMultiBranchAdmin)
                             {
                                 <option value="@RoleConstants.QuanLyChiNhanh">Quản lý chi nhánh</option>
+                                <option value="@RoleConstants.OrderCoordinator">Order Coordinator (Điều phối đơn hàng)</option>
                                 <option value="@RoleConstants.ThuKho">Thủ kho</option>
-                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng</option>
-                                <option value="@RoleConstants.ThuNgan">Thu ngân</option>
+                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng (Thu ngân)</option>
                             }
                             else
                             {
+                                <option value="@RoleConstants.OrderCoordinator">Order Coordinator (Điều phối đơn hàng)</option>
                                 <option value="@RoleConstants.ThuKho">Thủ kho chi nhánh</option>
-                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng</option>
-                                <option value="@RoleConstants.ThuNgan">Thu ngân</option>
+                                <option value="@RoleConstants.NhanVien">Nhân viên bán hàng (Thu ngân)</option>
                             }
                         </select>
                         <small class="form-hint">
@@ -198,71 +209,47 @@
                         </small>
                     </div>
 
-                    <!-- Phân loại Thủ kho (Online vs Chi nhánh) -->
-                    @if (_createModel.VaiTro == RoleConstants.ThuKho)
+                    <!-- Mô tả nhiệm vụ Order Coordinator -->
+                    @if (_createModel.VaiTro == RoleConstants.OrderCoordinator)
                     {
-                        <div class="form-group highlight-box">
-                            <label class="form-label">Phân loại thủ kho <span class="required">*</span></label>
-                            @if (_isMultiBranchAdmin)
-                            {
-                                <div class="radio-group-container">
-                                    <label class="radio-option">
-                                        <input type="radio" name="loaiThuKho" value="ONLINE" 
-                                               checked="@(_createModel.LoaiThuKho == "ONLINE")" 
-                                               @onchange='() => SelectWarehouseKeeperType("ONLINE")' />
-                                        <div class="radio-text">
-                                            <strong>Thủ kho Online (Kho Tổng QF)</strong>
-                                            <span>Quản lý xuất nhập hàng cho kênh mua sắm trực tuyến website</span>
-                                        </div>
-                                    </label>
-                                    <label class="radio-option">
-                                        <input type="radio" name="loaiThuKho" value="CHI_NHANH" 
-                                               checked="@(_createModel.LoaiThuKho == "CHI_NHANH")" 
-                                               @onchange='() => SelectWarehouseKeeperType("CHI_NHANH")' />
-                                        <div class="radio-text">
-                                            <strong>Thủ kho Chi nhánh</strong>
-                                            <span>Quản lý kho hàng tại cửa hàng/chi nhánh bán lẻ cụ thể</span>
-                                        </div>
-                                    </label>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="static-branch-notice">
-                                    <span class="badge-branch-scoped">Thủ kho chi nhánh cơ sở</span>
-                                    <p>Tài khoản này sẽ phụ trách kho hàng của chi nhánh <strong>@(_userBranchName ?? _createModel.ChiNhanh)</strong>.</p>
-                                </div>
-                            }
+                        <div class="form-group highlight-box coordinator-info-box">
+                            <div class="coordinator-info-header">
+                                <span class="badge-coordinator-icon">🚚</span>
+                                <strong>Nhiệm vụ Điều phối viên đơn hàng (Order Coordinator)</strong>
+                            </div>
+                            <p class="coordinator-info-desc">
+                                Tài khoản này phụ trách điều phối tiến trình giao vận (chuyển trạng thái <em>Đang giao hàng</em> khi bàn giao cho bưu tá), giám sát lộ trình đơn hàng online và trực tiếp xử lý các yêu cầu đổi trả hàng của khách hàng.
+                            </p>
                         </div>
                     }
 
-                    <!-- Lựa chọn Chi nhánh -->
+                    <!-- Lựa chọn Chi nhánh Làm Việc / Phân Công -->
                     <div class="form-group">
                         <label class="form-label">
                             @if (_createModel.VaiTro == RoleConstants.QuanLyChiNhanh)
                             {
                                 <span>Chi nhánh phân công quản lý <span class="required">*</span></span>
                             }
-                            else if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                            else if (_createModel.VaiTro == RoleConstants.ThuKho)
                             {
-                                <span>Kho hàng phụ trách</span>
+                                <span>Kho hàng / Chi nhánh phụ trách <span class="required">*</span></span>
+                            }
+                            else if (_createModel.VaiTro == RoleConstants.OrderCoordinator)
+                            {
+                                <span>Chi nhánh phụ trách điều phối đơn hàng <span class="required">*</span></span>
                             }
                             else
                             {
-                                <span>Chi nhánh làm việc <span class="required">*</span></span>
+                                <span>Chi nhánh làm việc (Cửa hàng bán lẻ POS) <span class="required">*</span></span>
                             }
                         </label>
 
-                        @if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                        @if (_isMultiBranchAdmin)
                         {
-                            <input type="text" class="form-control" value="Kho Tổng QF Tân Bình (TP.HCM) - Kho Online" readonly disabled />
-                        }
-                        else if (_isMultiBranchAdmin)
-                        {
-                            <select class="form-control" @bind="_createModel.MaChiNhanh" @bind:after="OnBranchSelected" required>
+                            <select class="form-control select-branch-control" @bind="_createModel.MaChiNhanh" @bind:after="OnBranchSelected" required>
                                 @foreach (var branch in GetSelectableBranches())
                                 {
-                                    <option value="@branch.MaChiNhanh">@branch.TenChiNhanh</option>
+                                    <option value="@branch.MaChiNhanh">@branch.TenChiNhanh @(branch.IsOnlineWarehouse ? " 🌐 (Kho Tổng Online / Chi nhánh Online)" : "")</option>
                                 }
                             </select>
                         }
@@ -272,9 +259,13 @@
                         }
                         
                         <small class="form-hint">
-                            @if (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                            @if (_createModel.VaiTro == RoleConstants.NhanVien || _createModel.VaiTro == RoleConstants.NhanVienBanHang || _createModel.VaiTro == RoleConstants.ThuNgan)
                             {
-                                <span>Kho trung tâm phục vụ xử lý và vận chuyển đơn đặt hàng trên Web.</span>
+                                <span>Nhân viên bán hàng/thu ngân chỉ công tác tại các cửa hàng vật lý có quầy POS (Chi nhánh Online không có POS bán lẻ).</span>
+                            }
+                            else if (_createModel.MaChiNhanh == 9 || _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh)?.IsOnlineWarehouse == true)
+                            {
+                                <span>Chi nhánh Online là cơ sở phụ trách kho hàng, xử lý đóng gói và điều phối toàn bộ các đơn đặt hàng Online trên Website.</span>
                             }
                             else if (_isMultiBranchAdmin)
                             {
@@ -312,6 +303,107 @@
                     <button type="button" class="btn btn-outline" @onclick="CloseCreateModal">Hủy bỏ</button>
                     <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
                         @(_isSubmitting ? "Đang xử lý..." : "Xác nhận tạo tài khoản")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+<!-- Modal Mở Chi Nhánh Mới & Thiết Lập Quản Lý Chi Nhánh (Chỉ Admin Chuỗi) -->
+@if (_showCreateBranchModal)
+{
+    <div class="modal-overlay" @onclick="CloseCreateBranchModal">
+        <div class="modal-card modal-card-wide" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #0f172a;">🏢 MỞ CHI NHÁNH MỚI & THIẾT LẬP QUẢN LÝ</h3>
+                    <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: #64748b;">Hệ thống tự động kích hoạt tạo kho và khởi tạo tài khoản Quản lý chi nhánh phụ trách</p>
+                </div>
+                <button type="button" class="btn-close" @onclick="CloseCreateBranchModal" title="Đóng">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <EditForm Model="@_newBranchModel" OnValidSubmit="HandleCreateBranchAndManager">
+                @if (!string.IsNullOrEmpty(_branchModalError))
+                {
+                    <div class="modal-alert-error">
+                        @_branchModalError
+                    </div>
+                }
+
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                    <!-- KHỐI 1: THÔNG TIN CHI NHÁNH MỚI -->
+                    <div class="section-group-banner">
+                        <span class="section-group-num">1</span>
+                        <div class="section-group-titles">
+                            <strong>Thông tin Chi nhánh mới</strong>
+                            <span>Cơ sở bán lẻ hoặc kho trực thuộc chuỗi</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tên chi nhánh mới <span class="required">*</span></label>
+                            <input type="text" class="form-control" placeholder="VD: QF Hải Phòng" @bind="_newBranchModel.TenChiNhanh" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Số điện thoại hotline chi nhánh</label>
+                            <input type="tel" class="form-control" placeholder="VD: 0225 730 1440" @bind="_newBranchModel.DienThoai" />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Địa chỉ chi nhánh cụ thể <span class="required">*</span></label>
+                        <input type="text" class="form-control" placeholder="VD: 125 Lạch Tray, Phường Lạch Tray, Quận Ngô Quyền, TP. Hải Phòng" @bind="_newBranchModel.DiaChi" required />
+                        <small class="form-hint">Địa chỉ đầy đủ giúp hệ thống tự động bóc tách Tỉnh/Thành phố và hiển thị bản đồ điều hướng cho khách hàng.</small>
+                    </div>
+
+                    <!-- KHỐI 2: THÔNG TIN TÀI KHOẢN QUẢN LÝ CHI NHÁNH -->
+                    <div class="section-group-banner" style="margin-top: 18px;">
+                        <span class="section-group-num">2</span>
+                        <div class="section-group-titles">
+                            <strong>Tài khoản Quản lý Chi nhánh (Branch Manager)</strong>
+                            <span>Nhân sự chịu trách nhiệm vận hành cơ sở mới này</span>
+                        </div>
+                    </div>
+
+                    <div class="form-row-grid">
+                        <div class="form-group">
+                            <label class="form-label">Họ và tên Quản lý <span class="required">*</span></label>
+                            <input type="text" class="form-control" placeholder="VD: Nguyễn Văn Hải" @bind="_branchManagerModel.TenNhanVien" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Số điện thoại Quản lý <span class="required">*</span></label>
+                            <input type="tel" class="form-control" placeholder="VD: 0912345678" @bind="_branchManagerModel.DienThoai" required />
+                        </div>
+                    </div>
+
+                    <div class="form-row-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tên đăng nhập <span class="required">*</span></label>
+                            <input type="text" class="form-control" placeholder="VD: manager_haiphong" @bind="_branchManagerModel.TenDangNhap" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mật khẩu khởi tạo <span class="required">*</span></label>
+                            <input type="password" class="form-control" placeholder="Tối thiểu 6 ký tự" @bind="_branchManagerModel.MatKhau" required />
+                        </div>
+                    </div>
+
+                    <div class="auto-notice-box">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span>Sau khi xác nhận, hệ thống sẽ tự động gán tài khoản trên làm <strong>Quản lý chi nhánh</strong> của cơ sở này, đồng thời tự động khởi tạo dữ liệu kho 351 sản phẩm.</span>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" @onclick="CloseCreateBranchModal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary" disabled="@_isSubmittingBranch">
+                        @(_isSubmittingBranch ? "Đang khởi tạo chi nhánh..." : "Xác nhận tạo Chi nhánh & Cấp quyền")
                     </button>
                 </div>
             </EditForm>
@@ -379,27 +471,6 @@
         font-weight: 300;
         line-height: 1;
         margin-top: -2px;
-    }
-
-    .btn-nav-customers {
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 14px;
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
-        border-radius: 7px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        color: #334155;
-        transition: all 0.15s ease;
-    }
-
-    .btn-nav-customers:hover {
-        background: #f8fafc;
-        border-color: #0f172a;
-        color: #0f172a;
     }
 
     .card {
@@ -506,6 +577,31 @@
     .role-manager { background: #fef3c7; color: #b45309; }
     .role-staff { background: #dbeafe; color: #1d4ed8; }
     .role-warehouse { background: #f3e8ff; color: #7e22ce; }
+    .role-coordinator { background: #e0e7ff; color: #4338ca; font-weight: 700; }
+
+    .coordinator-info-box {
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+    }
+
+    .coordinator-info-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #5b21b6;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+
+    .coordinator-info-desc {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #4c1d95;
+        line-height: 1.45;
+    }
 
     .status-badge {
         display: inline-block;
@@ -740,6 +836,83 @@
 
     .btn-outline { background: white; border: 1px solid #cbd5e1; color: #0f172a; }
     .btn-outline:hover { background: #f8fafc; }
+
+    .btn-secondary-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: #ffffff;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+    .btn-secondary-action:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 5px -1px rgba(15, 23, 42, 0.1);
+    }
+    .modal-card-wide {
+        max-width: 640px;
+        width: 95%;
+    }
+    .section-group-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-left: 3px solid #0f172a;
+        border-radius: 0 6px 6px 0;
+        margin-bottom: 12px;
+    }
+    .section-group-num {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        background: #0f172a;
+        color: #ffffff;
+        border-radius: 50%;
+        font-size: 0.75rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .section-group-titles strong {
+        display: block;
+        font-size: 0.85rem;
+        color: #0f172a;
+    }
+    .section-group-titles span {
+        display: block;
+        font-size: 0.72rem;
+        color: #64748b;
+    }
+    .form-row-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .auto-notice-box {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        color: #1e40af;
+        font-size: 0.78rem;
+        line-height: 1.4;
+        margin-top: 10px;
+    }
 </style>
 
 @code {
@@ -752,37 +925,33 @@
     private bool _isSubmitting = false;
     private string? _modalError = null;
 
+    // Quản lý Modal Mở Chi Nhánh Mới & Cấp Quản Lý
+    private bool _showCreateBranchModal = false;
+    private bool _isSubmittingBranch = false;
+    private string? _branchModalError = null;
+    private CreateBranchDto _newBranchModel = new();
+    private CreateStaffAccountDto _branchManagerModel = new();
+
     private int? _userBranchId = null;
     private string? _userBranchName = null;
-
-    private readonly List<BranchDto> _defaultFallbackBranches = new()
-    {
-        new BranchDto { MaChiNhanh = 1, TenChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)", DiaChi = "Sư Vạn Hạnh, Q.10, TP.HCM" },
-        new BranchDto { MaChiNhanh = 2, TenChiNhanh = "QF Quang Trung (Q. Gò Vấp, TP.HCM)", DiaChi = "Quang Trung, Q. Gò Vấp, TP.HCM" },
-        new BranchDto { MaChiNhanh = 3, TenChiNhanh = "QF Lê Văn Sỹ (Q. Phú Nhuận, TP.HCM)", DiaChi = "Lê Văn Sỹ, Q. Phú Nhuận, TP.HCM" },
-        new BranchDto { MaChiNhanh = 4, TenChiNhanh = "QF Cầu Giấy (Q. Cầu Giấy, Hà Nội)", DiaChi = "Cầu Giấy, Q. Cầu Giấy, Hà Nội" },
-        new BranchDto { MaChiNhanh = 5, TenChiNhanh = "QF Chùa Bộc (Q. Đống Đa, Hà Nội)", DiaChi = "Chùa Bộc, Q. Đống Đa, Hà Nội" },
-        new BranchDto { MaChiNhanh = 6, TenChiNhanh = "QF Lê Duẩn (Q. Thanh Khê, Đà Nẵng)", DiaChi = "Lê Duẩn, Q. Thanh Khê, Đà Nẵng" },
-        new BranchDto { MaChiNhanh = 7, TenChiNhanh = "QF Ninh Kiều (Q. Ninh Kiều, Cần Thơ)", DiaChi = "Ninh Kiều, Q. Ninh Kiều, Cần Thơ" },
-        new BranchDto { MaChiNhanh = 8, TenChiNhanh = "QF Ba Mươi Tháng Tư (TP. Biên Hòa, Đồng Nai)", DiaChi = "30/4, TP. Biên Hòa, Đồng Nai" },
-        new BranchDto { MaChiNhanh = 9, TenChiNhanh = "Kho Tổng QF Tân Bình (TP.HCM)", DiaChi = "Tân Bình, TP.HCM", IsOnlineWarehouse = true }
-    };
 
     private CreateStaffAccountDto _createModel = new() 
     { 
         VaiTro = RoleConstants.QuanLyChiNhanh,
         LoaiThuKho = "CHI_NHANH",
         MaChiNhanh = 1,
-        ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)"
+        ChiNhanh = ""
     };
 
     private List<AccountSummaryDto> FilteredAccounts => string.IsNullOrEmpty(_selectedRoleFilter)
         ? _accounts
-        : _selectedRoleFilter == RoleConstants.ThuKho
-            ? _accounts.Where(x => x.VaiTro == RoleConstants.ThuKho).ToList()
-            : (_selectedRoleFilter == RoleConstants.NhanVien || _selectedRoleFilter == RoleConstants.NhanVienBanHang)
-                ? _accounts.Where(x => RoleConstants.IsGeneralStaff(x.VaiTro) && x.VaiTro != RoleConstants.ThuKho).ToList()
-                : _accounts.Where(x => x.VaiTro == _selectedRoleFilter).ToList();
+        : _selectedRoleFilter == RoleConstants.OrderCoordinator
+            ? _accounts.Where(x => x.VaiTro == RoleConstants.OrderCoordinator).ToList()
+            : _selectedRoleFilter == RoleConstants.ThuKho
+                ? _accounts.Where(x => x.VaiTro == RoleConstants.ThuKho).ToList()
+                : (_selectedRoleFilter == RoleConstants.NhanVien || _selectedRoleFilter == RoleConstants.NhanVienBanHang || _selectedRoleFilter == RoleConstants.ThuNgan)
+                    ? _accounts.Where(x => RoleConstants.IsGeneralStaff(x.VaiTro) && x.VaiTro != RoleConstants.ThuKho && x.VaiTro != RoleConstants.OrderCoordinator).ToList()
+                    : _accounts.Where(x => x.VaiTro == _selectedRoleFilter).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -827,15 +996,12 @@
         try
         {
             var apiBranches = await AdminApi.GetBranchesAsync();
-            if (apiBranches != null && apiBranches.Any())
-            {
-                _branches = apiBranches;
-                return;
-            }
+            _branches = apiBranches ?? new List<BranchDto>();
         }
-        catch { }
-
-        _branches = _defaultFallbackBranches;
+        catch
+        {
+            _branches = new List<BranchDto>();
+        }
     }
 
     private async Task LoadAccounts()
@@ -844,18 +1010,12 @@
         try
         {
             var list = await AdminApi.GetAccountsAsync();
-            if (list != null && list.Any())
-            {
-                _accounts = list;
-            }
-            else
-            {
-                _accounts = GetDefaultDemoAccounts();
-            }
+            _accounts = list ?? new List<AccountSummaryDto>();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            _accounts = GetDefaultDemoAccounts();
+            _accounts = new List<AccountSummaryDto>();
+            Toast.ShowError($"Lỗi nạp danh sách tài khoản: {ex.Message}");
         }
         finally
         {
@@ -865,77 +1025,22 @@
 
     private List<BranchDto> GetSelectableBranches()
     {
-        return _branches.Where(b => !b.IsOnlineWarehouse).ToList();
-    }
-
-    private List<AccountSummaryDto> GetDefaultDemoAccounts()
-    {
-        return new List<AccountSummaryDto>
+        if (_createModel.VaiTro == RoleConstants.NhanVien || 
+            _createModel.VaiTro == RoleConstants.NhanVienBanHang || 
+            _createModel.VaiTro == RoleConstants.ThuNgan)
         {
-            new AccountSummaryDto
-            {
-                MaTaiKhoan = 1,
-                TenDangNhap = "admin",
-                MaNhanVien = 1,
-                TenNhanVien = "Nguyễn Văn An",
-                DienThoai = "0901111111",
-                VaiTro = RoleConstants.AdminChuoi,
-                ChiNhanh = "Toàn hệ thống (Hội sở)",
-                DangHoatDong = true
-            },
-            new AccountSummaryDto
-            {
-                MaTaiKhoan = 2,
-                TenDangNhap = "manager_q10",
-                MaNhanVien = 2,
-                TenNhanVien = "Hoàng Thị Mai",
-                DienThoai = "0904445555",
-                VaiTro = RoleConstants.QuanLyChiNhanh,
-                MaChiNhanh = 1,
-                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
-                DangHoatDong = true
-            },
-            new AccountSummaryDto
-            {
-                MaTaiKhoan = 3,
-                TenDangNhap = "thukho_online",
-                MaNhanVien = 3,
-                TenNhanVien = "Phạm Đình Kho",
-                DienThoai = "0907778888",
-                VaiTro = RoleConstants.ThuKho,
-                LoaiThuKho = "ONLINE",
-                MaChiNhanh = 9,
-                ChiNhanh = "Kho Tổng QF Tân Bình (TP.HCM)",
-                IsOnlineWarehouse = true,
-                DangHoatDong = true
-            },
-            new AccountSummaryDto
-            {
-                MaTaiKhoan = 4,
-                TenDangNhap = "thukho_q10",
-                MaNhanVien = 4,
-                TenNhanVien = "Lê Văn Lưu",
-                DienThoai = "0906663333",
-                VaiTro = RoleConstants.ThuKho,
-                LoaiThuKho = "CHI_NHANH",
-                MaChiNhanh = 1,
-                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
-                IsOnlineWarehouse = false,
-                DangHoatDong = true
-            },
-            new AccountSummaryDto
-            {
-                MaTaiKhoan = 5,
-                TenDangNhap = "cashier01",
-                MaNhanVien = 5,
-                TenNhanVien = "Trần Thị Bích",
-                DienThoai = "0902222222",
-                VaiTro = RoleConstants.NhanVien,
-                MaChiNhanh = 1,
-                ChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)",
-                DangHoatDong = true
-            }
-        };
+            // Chi nhánh Online không có nhân viên bán hàng/thu ngân POS tại quầy
+            return _branches
+                .Where(b => !b.IsOnlineWarehouse && b.MaChiNhanh != 9)
+                .OrderBy(b => b.MaChiNhanh)
+                .ToList();
+        }
+
+        // Quản lý chi nhánh, Thủ kho, Điều phối viên: Có thể phân công tại Chi nhánh Online #9 hoặc bất kỳ chi nhánh nào
+        return _branches
+            .OrderByDescending(b => b.IsOnlineWarehouse || b.MaChiNhanh == 9)
+            .ThenBy(b => b.MaChiNhanh)
+            .ToList();
     }
 
     private void FilterRole(string? role)
@@ -945,9 +1050,9 @@
 
     private void OpenCreateModal()
     {
-        var defaultBranch = _branches.FirstOrDefault(b => !b.IsOnlineWarehouse) ?? _branches.FirstOrDefault();
-        var defaultBranchId = defaultBranch?.MaChiNhanh ?? 1;
-        var defaultBranchName = defaultBranch?.TenChiNhanh ?? "QF Sư Vạn Hạnh (Q.10, TP.HCM)";
+        var defaultBranch = _branches.FirstOrDefault(b => !b.IsOnlineWarehouse && b.MaChiNhanh != 9) ?? _branches.FirstOrDefault();
+        var defaultBranchId = defaultBranch?.MaChiNhanh ?? 0;
+        var defaultBranchName = defaultBranch?.TenChiNhanh ?? "Chi nhánh mặc định";
 
         if (!_isMultiBranchAdmin && _userBranchId.HasValue)
         {
@@ -973,63 +1078,17 @@
 
     private void OnRoleChanged()
     {
-        if (_createModel.VaiTro == RoleConstants.ThuKho)
+        var selectable = GetSelectableBranches();
+        if (!selectable.Any(b => b.MaChiNhanh == _createModel.MaChiNhanh))
         {
-            if (_isMultiBranchAdmin)
+            var fallback = selectable.FirstOrDefault();
+            if (fallback != null)
             {
-                SelectWarehouseKeeperType(_createModel.LoaiThuKho ?? "ONLINE");
-            }
-            else
-            {
-                SelectWarehouseKeeperType("CHI_NHANH");
+                _createModel.MaChiNhanh = fallback.MaChiNhanh;
+                _createModel.ChiNhanh = fallback.TenChiNhanh;
             }
         }
-        else
-        {
-            if (!_isMultiBranchAdmin && _userBranchId.HasValue)
-            {
-                _createModel.MaChiNhanh = _userBranchId.Value;
-                _createModel.ChiNhanh = _userBranchName ?? "Chi nhánh hiện tại";
-            }
-            else
-            {
-                var branch = _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh) 
-                          ?? _branches.FirstOrDefault(b => !b.IsOnlineWarehouse);
-                if (branch != null)
-                {
-                    _createModel.MaChiNhanh = branch.MaChiNhanh;
-                    _createModel.ChiNhanh = branch.TenChiNhanh;
-                }
-            }
-        }
-    }
-
-    private void SelectWarehouseKeeperType(string loai)
-    {
-        _createModel.LoaiThuKho = loai;
-        if (loai == "ONLINE")
-        {
-            var onlineBranch = _branches.FirstOrDefault(b => b.IsOnlineWarehouse);
-            _createModel.MaChiNhanh = onlineBranch?.MaChiNhanh ?? 9;
-            _createModel.ChiNhanh = onlineBranch?.TenChiNhanh ?? "Kho Tổng QF Tân Bình (TP.HCM)";
-        }
-        else
-        {
-            if (!_isMultiBranchAdmin && _userBranchId.HasValue)
-            {
-                _createModel.MaChiNhanh = _userBranchId.Value;
-                _createModel.ChiNhanh = _userBranchName ?? "Chi nhánh hiện tại";
-            }
-            else
-            {
-                var retail = _branches.FirstOrDefault(b => !b.IsOnlineWarehouse);
-                if (retail != null)
-                {
-                    _createModel.MaChiNhanh = retail.MaChiNhanh;
-                    _createModel.ChiNhanh = retail.TenChiNhanh;
-                }
-            }
-        }
+        UpdateLoaiThuKho();
     }
 
     private void OnBranchSelected()
@@ -1038,6 +1097,27 @@
         if (branch != null)
         {
             _createModel.ChiNhanh = branch.TenChiNhanh;
+        }
+        UpdateLoaiThuKho();
+    }
+
+    private void UpdateLoaiThuKho()
+    {
+        var isOnline = _createModel.MaChiNhanh == 9 || _branches.FirstOrDefault(b => b.MaChiNhanh == _createModel.MaChiNhanh)?.IsOnlineWarehouse == true;
+        _createModel.LoaiThuKho = isOnline ? "ONLINE" : "CHI_NHANH";
+    }
+
+    private void SelectWarehouseKeeperType(string loai)
+    {
+        _createModel.LoaiThuKho = loai;
+        if (loai == "ONLINE")
+        {
+            var onlineBranch = _branches.FirstOrDefault(b => b.IsOnlineWarehouse || b.MaChiNhanh == 9);
+            if (onlineBranch != null)
+            {
+                _createModel.MaChiNhanh = onlineBranch.MaChiNhanh;
+                _createModel.ChiNhanh = onlineBranch.TenChiNhanh;
+            }
         }
     }
 
@@ -1075,7 +1155,8 @@
         }
 
         // Mô phỏng tạo tài khoản thành công ngay trên frontend (chế độ demo/offline)
-        var isOnline = _createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE";
+        var isOnline = (_createModel.VaiTro == RoleConstants.ThuKho && _createModel.LoaiThuKho == "ONLINE")
+                    || _branches.Any(b => b.MaChiNhanh == _createModel.MaChiNhanh && b.IsOnlineWarehouse);
         var newAcc = new AccountSummaryDto
         {
             MaTaiKhoan = _accounts.Count > 0 ? _accounts.Max(a => a.MaTaiKhoan) + 1 : 1,
@@ -1117,7 +1198,107 @@
             RoleConstants.AdminChuoi or RoleConstants.QuanLyHeThong => "role-admin",
             RoleConstants.QuanLyChiNhanh => "role-manager",
             RoleConstants.ThuKho => "role-warehouse",
+            RoleConstants.OrderCoordinator => "role-coordinator",
             _ => "role-staff"
         };
+    }
+
+    private void OpenCreateBranchModal()
+    {
+        if (!_isMultiBranchAdmin) return;
+        _newBranchModel = new CreateBranchDto { LoaiChiNhanh = "Cửa hàng bán lẻ" };
+        _branchManagerModel = new CreateStaffAccountDto
+        {
+            VaiTro = RoleConstants.QuanLyChiNhanh,
+            LoaiThuKho = "CHI_NHANH"
+        };
+        _branchModalError = null;
+        _showCreateBranchModal = true;
+    }
+
+    private void CloseCreateBranchModal()
+    {
+        _showCreateBranchModal = false;
+        _branchModalError = null;
+    }
+
+    private async Task HandleCreateBranchAndManager()
+    {
+        if (!_isMultiBranchAdmin) return;
+
+        if (string.IsNullOrWhiteSpace(_newBranchModel.TenChiNhanh))
+        {
+            _branchModalError = "Vui lòng nhập tên chi nhánh mới.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_newBranchModel.DiaChi))
+        {
+            _branchModalError = "Vui lòng nhập địa chỉ chi nhánh mới.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_branchManagerModel.TenNhanVien))
+        {
+            _branchModalError = "Vui lòng nhập họ tên Quản lý chi nhánh.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_branchManagerModel.TenDangNhap))
+        {
+            _branchModalError = "Vui lòng nhập tên đăng nhập cho Quản lý chi nhánh.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_branchManagerModel.MatKhau) || _branchManagerModel.MatKhau.Length < 6)
+        {
+            _branchModalError = "Mật khẩu khởi tạo phải có tối thiểu 6 ký tự.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_branchManagerModel.DienThoai))
+        {
+            _branchModalError = "Vui lòng nhập số điện thoại cho Quản lý chi nhánh.";
+            return;
+        }
+
+        _isSubmittingBranch = true;
+        _branchModalError = null;
+
+        try
+        {
+            // Bước 1: Tạo chi nhánh mới
+            var branchRes = await AdminApi.CreateBranchAsync(_newBranchModel);
+            if (!branchRes.Success || branchRes.Data <= 0)
+            {
+                _branchModalError = branchRes.Message ?? "Không thể tạo chi nhánh mới.";
+                return;
+            }
+
+            int newBranchId = branchRes.Data;
+
+            // Bước 2: Tạo tài khoản Quản lý cho chi nhánh vừa tạo
+            _branchManagerModel.MaChiNhanh = newBranchId;
+            _branchManagerModel.ChiNhanh = _newBranchModel.TenChiNhanh;
+            _branchManagerModel.VaiTro = RoleConstants.QuanLyChiNhanh;
+            _branchManagerModel.LoaiThuKho = "CHI_NHANH";
+
+            var accRes = await AdminApi.CreateStaffAccountAsync(_branchManagerModel);
+            if (!accRes.Success)
+            {
+                Toast.ShowWarning($"Chi nhánh {_newBranchModel.TenChiNhanh} đã tạo thành công, nhưng tạo tài khoản bị lỗi: {accRes.Message}");
+            }
+            else
+            {
+                Toast.ShowSuccess($"Đã tạo chi nhánh '{_newBranchModel.TenChiNhanh}' và cấp tài khoản Quản lý '{_branchManagerModel.TenDangNhap}' thành công!");
+            }
+
+            _showCreateBranchModal = false;
+            await LoadBranches();
+            await LoadAccounts();
+        }
+        catch (Exception ex)
+        {
+            _branchModalError = $"Lỗi xử lý: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingBranch = false;
+        }
     }
 }

@@ -26,6 +26,8 @@ public interface IAdminApiClient
     Task<SupplierDto?> CreateSupplierAsync(CreateSupplierRequestDto request);
     Task<bool> ImportStockAsync(ImportStockRequestDto request);
     Task<List<BranchDto>?> GetBranchesAsync();
+    Task<ApiResponse<int>> CreateBranchAsync(CreateBranchDto dto);
+    Task<List<BranchInventoryDto>?> GetBranchInventoryAsync(int branchId, string? search = null);
 
     Task<List<OrderSummaryDto>?> GetAllOrdersAsync();
     Task<List<OrderSummaryDto>?> GetAllOrdersAsync(int? branchId);
@@ -33,12 +35,19 @@ public interface IAdminApiClient
     Task<List<OrderDetailItemDto>?> GetOrderDetailsAsync(int orderId);
 
     // Quản lý sản phẩm & Biến thể (FR-03)
-    Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page = 1, int pageSize = 10);
+    Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page, int pageSize);
+    Task<PagedResult<ProductListItemDto>?> GetProductsAsync(int page = 1, int pageSize = 10, bool? daXoa = null, bool includeAll = false, string? search = null);
     Task<ApiResponse<int>> CreateProductAsync(CreateProductRequest request);
+    Task<ApiResponse<bool>> UpdateProductAsync(int id, UpdateProductRequest request);
     Task<List<ProductVariantDto>> GetProductVariantsAsync(int productId);
+    Task<List<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
+    Task<ApiResponse<bool>> ToggleProductStatusAsync(int productId);
+    Task<ApiResponse<bool>> ToggleVariantStatusAsync(int variantId);
     Task<ApiResponse<int>> CreateProductVariantAsync(CreateProductVariantRequest request);
     Task<List<CategoryDto>> GetCategoriesAsync();
     Task<List<BrandDto>> GetBrandsAsync();
+    Task<ApiResponse<int>> CreateCategoryAsync(CreateCategoryRequest request);
+    Task<ApiResponse<int>> CreateBrandAsync(CreateBrandRequest request);
 
     // Quản lý tài khoản & Phân quyền (RBAC)
     Task<List<AccountSummaryDto>?> GetAccountsAsync();
@@ -59,8 +68,7 @@ public interface IAdminApiClient
     Task<bool> UpdateFeedbackStatusAsync(int id, string status, string? notes = null);
     Task<ApiResponse<bool>> ProcessReturnRequestAsync(int id, global::Shared.DTOs.Feedback.ProcessReturnRequestDto request);
 
-    // Nhật ký hệ thống & Biến động (Audit Logs)
-    Task<List<global::Shared.DTOs.Audit.AuditLogDto>?> GetAuditLogsAsync(string? loaiThaoTac = null, int limit = 100);
+    Task<List<global::Shared.DTOs.Audit.AuditLogDto>?> GetAuditLogsAsync(string? loaiThaoTac = null, int? maChiNhanh = null, int limit = 100);
 
     // Thông báo nội bộ (Internal Announcements)
     Task<List<global::Shared.DTOs.Announcement.InternalAnnouncementDto>?> GetAnnouncementsAsync(string? phamVi = null, int? maChiNhanh = null);

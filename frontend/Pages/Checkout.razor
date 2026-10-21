@@ -1,10 +1,16 @@
 @page "/checkout"
 @namespace Frontend.Pages
+@using Frontend.Services
+@using global::Shared.DTOs.Catalog
+@using global::Shared.DTOs.Order
+@using Microsoft.JSInterop
 @inject ICartService CartService
 @inject IOrderApiClient OrderApiClient
+@inject ICatalogApiClient CatalogApi
 @inject IToastService ToastService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
+
 
 <div class="checkout-page-wrapper">
     <div class="yame-container">
@@ -112,21 +118,36 @@
                                 </div>
                             </label>
 
-                            <label class="payment-option @(_paymentMethod == "QR" ? "selected" : "")">
+                            <label class="payment-option @(_paymentMethod == "MOMO" ? "selected" : "")">
                                 <input type="radio" 
                                        name="paymentMethod" 
-                                       value="QR" 
-                                       checked="@(_paymentMethod == "QR")" 
-                                       @onchange="@(() => _paymentMethod = "QR")" />
+                                       value="MOMO" 
+                                       checked="@(_paymentMethod == "MOMO")" 
+                                       @onchange="@(() => _paymentMethod = "MOMO")" />
+                                <div class="payment-meta">
+                                    <span class="payment-name" style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="display: inline-block; width: 18px; height: 18px; border-radius: 4px; background: #A50064; color: white; font-weight: 800; font-size: 11px; text-align: center; line-height: 18px;">M</span>
+                                        Ví Điện Tử MoMo (Quét mã QR tiện lợi)
+                                    </span>
+                                    <span class="payment-desc">Quét mã bằng app MoMo, tự động điền SĐT và số tiền đơn hàng</span>
+                                </div>
+                            </label>
+
+                            <label class="payment-option @(_paymentMethod == "VIETQR" || _paymentMethod == "QR" ? "selected" : "")">
+                                <input type="radio" 
+                                       name="paymentMethod" 
+                                       value="VIETQR" 
+                                       checked="@(_paymentMethod == "VIETQR" || _paymentMethod == "QR")" 
+                                       @onchange="@(() => _paymentMethod = "VIETQR")" />
                                 <div class="payment-meta">
                                     <span class="payment-name">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;">
                                             <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
                                             <line x1="1" y1="10" x2="23" y2="10"></line>
                                         </svg>
-                                        Chuyển khoản QR ngân hàng (VietQR / Napas247)
+                                        Chuyển khoản QR (VietQR chuẩn ngân hàng 24/7)
                                     </span>
-                                    <span class="payment-desc">Quét mã QR tự động xác nhận đơn hàng qua app ngân hàng</span>
+                                    <span class="payment-desc">Quét mã bằng MB, Vietcombank, Techcombank, ACB... không cần nhập số tài khoản</span>
                                 </div>
                             </label>
                         </div>
@@ -225,11 +246,18 @@
                             </div>
                         </div>
 
+                        @if (_hasUnavailableItems)
+                        {
+                            <div class="checkout-unavailable-alert" style="background:#FFF1F2; border:1px solid #FECDD3; border-radius:6px; padding:12px; margin-bottom:14px; color:#9F1239; font-size:0.88rem; line-height:1.4;">
+                                ⚠️ Trong đơn hàng có <strong>@_unavailableMessage</strong>. Vui lòng <a href="/cart" style="color:#E11D48; font-weight:700; text-decoration:underline;">quay lại giỏ hàng</a> để loại bỏ món này trước khi đặt hàng.
+                            </div>
+                        }
+
                         <!-- Submit Order Button -->
                         <button type="button" 
                                 class="btn-submit-order" 
                                 @onclick="SubmitOrderAsync" 
-                                disabled="@_isSubmitting">
+                                disabled="@(_isSubmitting || _hasUnavailableItems)">
                             @if (_isSubmitting)
                             {
                                 <span>ĐANG XỬ LÝ ĐƠN HÀNG...</span>
@@ -539,10 +567,14 @@
     private bool _isSubmitting = false;
     private bool _isOrderPlaced = false;
     private string? _validationError;
+    private bool _hasUnavailableItems = false;
+    private string? _unavailableMessage;
 
     protected override async Task OnInitializedAsync()
     {
         await CartService.InitializeAsync();
+        await CheckCartAvailabilityAsync();
+
         // Try to load VIP profile to apply VIP discount automatically
         try
         {
@@ -568,6 +600,34 @@
         catch
         {
             // Anonymous / non-VIP checkout
+        }
+    }
+
+    private async Task CheckCartAvailabilityAsync()
+    {
+        if (CartService.Items.Any())
+        {
+            try
+            {
+                var ids = CartService.Items.Select(x => x.MaBienThe).Distinct().ToList();
+                var results = await CatalogApi.CheckVariantsAvailabilityAsync(ids);
+                var unavailable = results.FirstOrDefault(x => x.DaAn);
+                if (unavailable != null)
+                {
+                    _hasUnavailableItems = true;
+                    _unavailableMessage = $"Sản phẩm '{unavailable.TenSanPham}' tạm thời không cung cấp";
+                    _validationError = $"{_unavailableMessage}. Vui lòng quay lại giỏ hàng để cập nhật.";
+                }
+                else
+                {
+                    _hasUnavailableItems = false;
+                    _unavailableMessage = null;
+                }
+            }
+            catch
+            {
+                // Fail-safe
+            }
         }
     }
 
@@ -655,17 +715,34 @@
             return;
         }
 
+        await CheckCartAvailabilityAsync();
+        if (_hasUnavailableItems)
+        {
+            _validationError = $"{_unavailableMessage}. Vui lòng quay lại giỏ hàng để xóa.";
+            ToastService.ShowError(_validationError);
+            return;
+        }
+
         _validationError = null;
         _isSubmitting = true;
 
         try
         {
+            string paymentTag = _paymentMethod switch
+            {
+                "MOMO" => "[PTTT: VÍ MOMO - ĐÃ THANH TOÁN QR (THU HỘ 0Đ)]",
+                "VIETQR" => "[PTTT: VIETQR MBBANK - ĐÃ CHUYỂN KHOẢN (THU HỘ 0Đ)]",
+                _ => "[PTTT: COD - THU TIỀN KHI GIAO HÀNG]"
+            };
+            string noteText = string.IsNullOrWhiteSpace(_note) ? "" : $" (Ghi chú: {_note.Trim()})";
+
             var request = new CreateOrderRequestDto
             {
                 MaKhachHang = _customerProfile?.MaKhachHang,
                 MaNhanVien = 1, // Web order online channel
                 MaChiNhanh = 9, // Kênh mua sắm trực tuyến xuất kho từ Kho Tổng Online QF Tân Bình
                 MaGiamGia = (_voucherResult != null && _voucherResult.Valid) ? _voucherResult.MaGiamGia : null,
+                DiaChiGiaoHang = $"{paymentTag} {_fullName.Trim()} - {_phoneNumber.Trim()} - {_address.Trim()}{noteText}",
                 Items = CartService.Items.Select(i => new CreateOrderItemDto
                 {
                     MaBienThe = i.MaBienThe,
@@ -679,7 +756,7 @@
                 _isOrderPlaced = true;
                 await CartService.ClearCartAsync();
                 ToastService.ShowSuccess("Đặt hàng thành công!");
-                Navigation.NavigateTo($"/order-success/{order.MaHoaDon}");
+                Navigation.NavigateTo($"/order-success/{order.MaHoaDon}?payment={_paymentMethod}");
             }
             else
             {

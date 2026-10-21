@@ -19,4 +19,5 @@ public interface IPosApiClient
     Task<ReceiptPrintDto?> GetReceiptPrintAsync(int orderId);
     Task<OrderReturnLookupDto?> GetOrderForReturnLookupAsync(int orderId);
     Task<ApiResponse<int>?> ProcessReturnAsync(int orderId, ReturnOrderRequestDto request);
+    Task<List<ProductVariantDto>?> GetProductVariantsAsync(int productId);
 }

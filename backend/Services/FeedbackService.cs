@@ -104,19 +104,25 @@ public class FeedbackService : IFeedbackService
             return ApiResponse<int>.Fail("Dữ liệu yêu cầu hoàn trả hàng không được để trống.");
         }
 
-        if (request.SoLuongTra <= 0)
+        var returnItems = (request.Items != null && request.Items.Any())
+            ? request.Items
+            : new List<ReturnItemRequestDto> { new() { MaBienThe = request.MaBienThe, SoLuongTra = request.SoLuongTra } };
+
+        foreach (var item in returnItems)
         {
-            return ApiResponse<int>.Fail("Số lượng hoàn trả phải lớn hơn 0.");
+            if (item.SoLuongTra <= 0)
+            {
+                return ApiResponse<int>.Fail("Số lượng hoàn trả của mỗi sản phẩm phải lớn hơn 0.");
+            }
+            if (item.MaBienThe <= 0)
+            {
+                return ApiResponse<int>.Fail("Mã biến thể sản phẩm không hợp lệ.");
+            }
         }
 
         if (request.MaHoaDon <= 0)
         {
             return ApiResponse<int>.Fail("Mã hóa đơn không hợp lệ.");
-        }
-
-        if (request.MaBienThe <= 0)
-        {
-            return ApiResponse<int>.Fail("Mã biến thể sản phẩm không hợp lệ.");
         }
 
         if (string.IsNullOrWhiteSpace(request.HoTen))
@@ -160,27 +166,8 @@ public class FeedbackService : IFeedbackService
         {
             int feedbackId = await _feedbackRepository.CreateReturnRequestAsync(request, customerId);
 
-            // Tự động sinh thông báo nội bộ cho chi nhánh được hẹn trước (Fail-Safe)
-            if (_announcementRepository != null && hinhThuc.Equals("Đến chi nhánh", StringComparison.OrdinalIgnoreCase) && request.MaChiNhanhHen.HasValue)
-            {
-                try
-                {
-                    var announcement = new CreateAnnouncementRequestDto
-                    {
-                        TieuDe = $"[Đổi trả hàng] Khách hẹn tại chi nhánh - Đơn #{request.MaHoaDon}",
-                        NoiDung = $"Khách hàng {request.HoTen.Trim()} (SĐT: {request.DienThoai.Trim()}) hẹn mang sản phẩm (Biến thể #{request.MaBienThe}, SL: {request.SoLuongTra}) đến chi nhánh để làm thủ tục đổi trả. Lý do: {request.LyDoTra.Trim()}",
-                        MucDoUuTien = "Quan trọng",
-                        PhamViGui = "Nội bộ chi nhánh",
-                        MaChiNhanh = request.MaChiNhanhHen.Value,
-                        MaNguoiGui = 1
-                    };
-                    await _announcementRepository.CreateAnnouncementAsync(announcement);
-                }
-                catch
-                {
-                    // Fail-safe: lỗi hệ thống thông báo phụ không làm gián đoạn việc đăng ký của khách
-                }
-            }
+            // Yêu cầu đổi trả được lưu trực tiếp vào bảng Phản hồi/Yêu cầu đổi trả chuyên biệt,
+            // không tự ý phát sinh Thông báo nội bộ từ cấp trên.
 
             // Bắn tín hiệu SignalR tức thời tới chuông thông báo Topbar của Admin & CSKH
             if (_notificationHub != null)

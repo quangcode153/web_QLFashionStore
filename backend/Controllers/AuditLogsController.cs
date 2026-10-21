@@ -17,9 +17,34 @@ public class AuditLogsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAuditLogs([FromQuery] string? loaiThaoTac = null, [FromQuery] int limit = 100)
+    public async Task<IActionResult> GetAuditLogs([FromQuery] string? loaiThaoTac = null, [FromQuery] int? maChiNhanh = null, [FromQuery] int limit = 100)
     {
-        var result = await _auditLogService.GetLogsAsync(loaiThaoTac, limit);
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+        var isChainAdmin = string.IsNullOrEmpty(userRole) ||
+                           userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                           userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase) ||
+                           userRole.Contains("hệ thống", StringComparison.OrdinalIgnoreCase);
+
+        int? effectiveBranchId = maChiNhanh;
+
+        // Nếu không phải Quản lý chuỗi (Admin), bắt buộc chỉ được xem nhật ký của chi nhánh mình đang quản lý
+        if (!isChainAdmin && !string.IsNullOrEmpty(userRole))
+        {
+            var branchClaim = User.FindFirst("branchId")?.Value ?? User.FindFirst("ma_chi_nhanh")?.Value;
+            if (int.TryParse(branchClaim, out var bId) && bId > 0)
+            {
+                effectiveBranchId = bId;
+            }
+        }
+
+        Console.WriteLine($"[AuditLogsController] Incoming request: UserRole='{userRole}', isChainAdmin={isChainAdmin}, effectiveBranchId={effectiveBranchId}, limit={limit}");
+        foreach (var c in User.Claims)
+        {
+            Console.WriteLine($"  Claim: {c.Type} = {c.Value}");
+        }
+
+        var result = await _auditLogService.GetLogsAsync(loaiThaoTac, effectiveBranchId, limit);
+        Console.WriteLine($"[AuditLogsController] Returned logs count: {result.Data?.Count()}");
         return Ok(result);
     }
 

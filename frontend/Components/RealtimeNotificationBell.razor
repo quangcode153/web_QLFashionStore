@@ -19,9 +19,9 @@
 
     @if (_isOpen)
     {
-        <div class="notification-dropdown">
+        <div class="notification-dropdown dropdown-align-@(DropdownAlign.ToLowerInvariant())">
             <div class="dropdown-header">
-                <div class="header-left">
+                <div class="bell-header-left">
                     <span class="dropdown-title">Thông báo từ cấp trên</span>
                     <span class="notif-count-pill">@NotificationList.Count</span>
                 </div>
@@ -175,15 +175,31 @@
 
     .notification-dropdown {
         position: absolute;
-        right: 0;
         top: calc(100% + 8px);
-        width: 360px;
+        width: 440px;
+        max-width: min(440px, calc(100vw - 32px));
         background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-        z-index: 1000;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        box-shadow: 0 14px 35px -5px rgba(0, 0, 0, 0.16), 0 8px 12px -6px rgba(0, 0, 0, 0.08);
+        z-index: 9999;
         overflow: hidden;
+    }
+
+    .dropdown-align-right {
+        right: 0;
+        left: auto;
+    }
+
+    .dropdown-align-left {
+        left: 0;
+        right: auto;
+    }
+
+    .dropdown-align-center {
+        left: 50%;
+        transform: translateX(-50%);
+        right: auto;
     }
 
     .dropdown-header {
@@ -195,7 +211,7 @@
         align-items: center;
     }
 
-    .header-left {
+    .bell-header-left {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -332,22 +348,24 @@
     }
 
     .notif-title {
-        font-size: 0.82rem;
+        font-size: 0.86rem;
         font-weight: 700;
         color: #0f172a;
-        margin-bottom: 2px;
-        line-height: 1.3;
+        margin-bottom: 3px;
+        line-height: 1.35;
+        word-break: break-word;
     }
 
     .notif-message {
-        font-size: 0.75rem;
+        font-size: 0.78rem;
         color: #475569;
-        line-height: 1.35;
+        line-height: 1.45;
         overflow: hidden;
         text-overflow: ellipsis;
         display: -webkit-box;
-        -webkit-line-clamp: 2;
+        -webkit-line-clamp: 4;
         -webkit-box-orient: vertical;
+        word-break: break-word;
     }
 
     .notif-time {
@@ -458,6 +476,7 @@
 </style>
 
 @code {
+    [Parameter] public string DropdownAlign { get; set; } = "right";
     [Inject] private IServiceProvider ServiceProvider { get; set; } = default!;
     private ISignalRNotificationService? SignalRService => ServiceProvider.GetService(typeof(ISignalRNotificationService)) as ISignalRNotificationService;
 

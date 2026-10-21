@@ -41,10 +41,7 @@ public class AnnouncementService : IAnnouncementService
 
         try
         {
-            if (request.PhamViGui != null && request.PhamViGui.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) && !request.MaChiNhanh.HasValue)
-            {
-                request.MaChiNhanh = 1;
-            }
+
 
             var id = await _announcementRepository.CreateAnnouncementAsync(request);
 

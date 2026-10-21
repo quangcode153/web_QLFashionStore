@@ -25,6 +25,14 @@ public class CustomerOrderHistoryItemDto
     public decimal TongThanhToan { get; set; }
     public string TrangThai { get; set; } = string.Empty;
     public int SoMatHang { get; set; }
+    public string? TrangThaiHoanTra { get; set; }
+    public int TongSoLuongDaMua { get; set; }
+    public int TongSoLuongDaTra { get; set; }
+    public bool ConHangCoTheHoan => 
+        (TongSoLuongDaMua > 0 ? (TongSoLuongDaMua > TongSoLuongDaTra) : (SoMatHang > 0 && TongSoLuongDaTra == 0)) && 
+        (TrangThai == "Đã hoàn thành" || TrangThai == "Hoàn thành") && 
+        TrangThaiHoanTra != "Cần duyệt" && 
+        TrangThaiHoanTra != "Đang xử lý";
 }
 
 public class RankEvaluationResultDto

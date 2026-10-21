@@ -18,6 +18,48 @@
 
         <h1 class="orders-page-title">LỊCH SỬ ĐƠN HÀNG CỦA BẠN</h1>
 
+        @if (_orders != null && _orders.Any())
+        {
+            <div class="customer-order-tabs">
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == null ? "active" : "")" 
+                        data-tab="Tất cả"
+                        @onclick="() => FilterOrdersByTab(null)">
+                    Tất cả (@_orders.Count)
+                </button>
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == "Chờ xử lý" ? "active" : "")" 
+                        data-tab="Chờ xử lý"
+                        @onclick='() => FilterOrdersByTab("Chờ xử lý")'>
+                    Chờ xử lý (@_orders.Count(x => x.TrangThai == "Chờ xử lý"))
+                </button>
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == "Đang giao hàng" ? "active" : "")" 
+                        data-tab="Đang giao hàng"
+                        @onclick='() => FilterOrdersByTab("Đang giao hàng")'>
+                    Đang giao hàng (@_orders.Count(x => x.TrangThai == "Đang giao hàng"))
+                </button>
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == "Đã hoàn thành" ? "active" : "")" 
+                        data-tab="Thành công"
+                        @onclick='() => FilterOrdersByTab("Đã hoàn thành")'>
+                    Thành công (@_orders.Count(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && !IsOrderReturnedOrPending(x)))
+                </button>
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == "Đã hoàn trả" ? "active" : "")" 
+                        data-tab="Đã hoàn trả"
+                        @onclick='() => FilterOrdersByTab("Đã hoàn trả")'>
+                    Đã hoàn trả (@_orders.Count(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả"))
+                </button>
+                <button type="button" 
+                        class="order-tab-btn @(_selectedStatusTab == "Đã hủy" ? "active" : "")" 
+                        data-tab="Đã hủy"
+                        @onclick='() => FilterOrdersByTab("Đã hủy")'>
+                    Đã hủy (@_orders.Count(x => x.TrangThai == "Đã hủy"))
+                </button>
+            </div>
+        }
+
         @if (_isLoading)
         {
             <div class="orders-loading-state">
@@ -40,6 +82,12 @@
                 <a href="/catalog" class="btn-explore-shop">KHÁM PHÁ CỬA HÀNG NGAY</a>
             </div>
         }
+        else if (!FilteredOrders.Any())
+        {
+            <div class="orders-empty-state" style="padding: 40px 20px;">
+                <p class="empty-desc" style="margin-bottom: 0;">Không có đơn hàng nào trong mục này.</p>
+            </div>
+        }
         else
         {
             <div class="orders-table-card">
@@ -53,7 +101,7 @@
                 </div>
 
                 <div class="orders-table-body">
-                    @foreach (var order in _orders)
+                    @foreach (var order in FilteredOrders)
                     {
                         <div class="order-row">
                             <span class="cell-id">#DH-@order.MaHoaDon</span>
@@ -61,9 +109,30 @@
                             <span class="cell-qty">@order.SoMatHang sản phẩm</span>
                             <span class="cell-total">@order.TongThanhToan.ToString("N0") ₫</span>
                             <span class="cell-status">
-                                <span class="status-badge @GetStatusBadgeClass(order.TrangThai)">
-                                    @order.TrangThai
-                                </span>
+                                @if (IsOrderReturnPending(order))
+                                {
+                                    <span class="status-badge status-return-pending">
+                                        Đang hoàn trả
+                                    </span>
+                                }
+                                else if (IsOrderReturned(order) && !order.ConHangCoTheHoan)
+                                {
+                                    <span class="status-badge status-returned">
+                                        Đã hoàn trả
+                                    </span>
+                                }
+                                else if (order.TongSoLuongDaTra > 0 && order.ConHangCoTheHoan)
+                                {
+                                    <span class="status-badge status-returned" title="Đã hoàn một phần (@order.TongSoLuongDaTra/@order.TongSoLuongDaMua sp)">
+                                        Hoàn 1 phần (@order.TongSoLuongDaTra/@order.TongSoLuongDaMua)
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="status-badge @GetStatusBadgeClass(order.TrangThai)">
+                                        @order.TrangThai
+                                    </span>
+                                }
                             </span>
                             <span class="cell-action">
                                 <button type="button" 
@@ -71,7 +140,15 @@
                                         @onclick="() => OpenOrderDetailsModalAsync(order)">
                                     Chi tiết
                                 </button>
-                                @if (order.TrangThai == "Đã hoàn thành" || order.TrangThai == "Hoàn thành")
+                                @if (order.TrangThai == "Chờ xử lý" || order.TrangThai == "Chờ thanh toán")
+                                {
+                                    <a href="/order-success/@order.MaHoaDon?payment=MOMO" 
+                                       class="btn-pay-qr" 
+                                       title="Quét mã MoMo hoặc VietQR thanh toán">
+                                        💳 Thanh toán QR
+                                    </a>
+                                }
+                                @if (order.ConHangCoTheHoan)
                                 {
                                     <button type="button" 
                                             class="btn-open-return-modal" 
@@ -178,41 +255,88 @@
                     else
                     {
                         <div class="return-form-group">
-                            <label class="form-label">1. Chọn sản phẩm bạn muốn hoàn trả (*):</label>
-                            <div class="return-items-picker">
-                                @foreach (var item in _returnItems)
+                            <div class="return-picker-header">
+                                <label class="form-label mb-0">1. Chọn sản phẩm bạn muốn hoàn trả (*):</label>
+                                @{
+                                    var selectableCount = _returnItems?.Count(i => !i.DaTraHet) ?? 0;
+                                }
+                                @if (selectableCount > 1)
                                 {
-                                    <label class="return-item-choice @(_selectedVariantId == item.MaBienThe ? "selected" : "")">
-                                        <input type="radio" 
-                                               name="selectedReturnItem" 
-                                               value="@item.MaBienThe" 
-                                               checked="@(_selectedVariantId == item.MaBienThe)"
-                                               @onchange="() => OnSelectReturnVariant(item)" />
-                                        <div class="item-choice-info">
-                                            <div class="item-choice-title">@item.TenSanPham</div>
-                                            <div class="item-choice-meta">Phân loại: <strong>@item.MauSac / @item.KichCo</strong> | Đã mua: <strong>@item.SoLuong</strong> sp</div>
-                                        </div>
-                                        <div class="item-choice-price">@item.DonGia.ToString("N0") ₫</div>
-                                    </label>
+                                    <button type="button" class="btn-select-all-returns" @onclick="ToggleSelectAllReturns">
+                                        @(_selectedVariantIds.Count == selectableCount ? "Bỏ chọn tất cả" : "Chọn tất cả sản phẩm khả dụng")
+                                    </button>
                                 }
                             </div>
+                            <div class="return-items-picker">
+                                @foreach (var item in _returnItems!)
+                                {
+                                    var isSelected = _selectedVariantIds.Contains(item.MaBienThe);
+                                    var isItemDisabled = item.DaTraHet;
+                                    <div class="return-item-choice @(isItemDisabled ? "disabled-item" : (isSelected ? "selected" : ""))" 
+                                         @onclick="() => { if (!isItemDisabled) ToggleReturnItemSelection(item); }">
+                                        <input type="checkbox" 
+                                               class="return-item-checkbox" 
+                                               checked="@isSelected"
+                                               disabled="@isItemDisabled"
+                                               @onclick:stopPropagation
+                                               @onchange="() => { if (!isItemDisabled) ToggleReturnItemSelection(item); }" />
+                                        <div class="item-choice-info">
+                                            <div class="item-choice-title">
+                                                @item.TenSanPham
+                                                @if (isItemDisabled)
+                                                {
+                                                    <span class="badge-fully-returned">Đã hoàn tất</span>
+                                                }
+                                            </div>
+                                            <div class="item-choice-meta">
+                                                Phân loại: <strong>@item.MauSac / @item.KichCo</strong> | Đã mua: <strong>@item.SoLuong</strong> sp
+                                                @if (item.SoLuongDaTra > 0)
+                                                {
+                                                    <span class="text-returned-info"> | Đã hoàn: <strong>@item.SoLuongDaTra</strong> sp</span>
+                                                }
+                                                @if (!isItemDisabled)
+                                                {
+                                                    <span class="text-available-info"> | Có thể hoàn: <strong>@item.SoLuongConLai</strong> sp</span>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="item-choice-right" @onclick:stopPropagation>
+                                            <div class="item-choice-price">@item.DonGia.ToString("N0") ₫</div>
+                                            @if (isSelected && !isItemDisabled)
+                                            {
+                                                <div class="item-choice-qty-control">
+                                                    <span class="qty-mini-label">SL hoàn:</span>
+                                                    <div class="qty-stepper-compact">
+                                                        <button type="button" class="btn-stepper-ctrl" @onclick="() => DecreaseItemQty(item)">−</button>
+                                                        <input type="number" 
+                                                               class="stepper-input-ctrl font-mono" 
+                                                               min="1" 
+                                                               max="@item.SoLuongConLai" 
+                                                               value="@GetReturnQty(item.MaBienThe)" 
+                                                               @onchange="(e) => OnChangeReturnQty(item, e)" />
+                                                        <button type="button" class="btn-stepper-ctrl" @onclick="() => IncreaseItemQty(item)">+</button>
+                                                    </div>
+                                                    <span class="qty-max-hint">/ @item.SoLuongConLai sp</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            @if (_selectedVariantIds.Any())
+                            {
+                                <div class="return-summary-pill">
+                                    <span>Đã chọn: <strong>@_selectedVariantIds.Count</strong> mặt hàng (Tổng SL hoàn: <strong>@TotalReturnQty</strong> sp)</span>
+                                    <span class="refund-estimate">Dự kiến hoàn trả: <strong>@TotalRefundAmount.ToString("N0") ₫</strong></span>
+                                </div>
+                            }
                         </div>
 
-                        @if (_selectedVariantId > 0)
+                        @if (_selectedVariantIds.Any())
                         {
                             <div class="return-grid-2col">
                                 <div class="return-form-group">
-                                    <label class="form-label">2. Số lượng hoàn trả (*):</label>
-                                    <input type="number" 
-                                           class="form-control-input" 
-                                           min="1" 
-                                           max="@_maxReturnQty" 
-                                           @bind="_returnQty" />
-                                    <small class="field-hint">Tối đa @_maxReturnQty sản phẩm theo hóa đơn mua.</small>
-                                </div>
-
-                                <div class="return-form-group">
-                                    <label class="form-label">Họ và tên người gửi (*):</label>
+                                    <label class="form-label">2. Họ và tên người gửi (*):</label>
                                     <input type="text" class="form-control-input" placeholder="Họ và tên của bạn..." @bind="_returnCustomerName" />
                                 </div>
 
@@ -221,7 +345,7 @@
                                     <input type="tel" class="form-control-input" placeholder="Số điện thoại..." @bind="_returnCustomerPhone" />
                                 </div>
 
-                                <div class="return-form-group">
+                                <div class="return-form-group full-col">
                                     <label class="form-label">Email thông báo kết quả (tùy chọn):</label>
                                     <input type="email" class="form-control-input" placeholder="Địa chỉ email..." @bind="_returnCustomerEmail" />
                                 </div>
@@ -280,8 +404,7 @@
                                             }
                                             else
                                             {
-                                                <option value="1">Chi nhánh 1 - QF Sư Vạn Hạnh (Q.10, TP.HCM)</option>
-                                                <option value="2">Chi nhánh 2 - QF Quang Trung (Q.Gò Vấp, TP.HCM)</option>
+                                                <option value="0">Đang tải danh sách chi nhánh...</option>
                                             }
                                         </select>
                                         @if (SelectedBranch != null)
@@ -312,8 +435,15 @@
                     <button type="button" 
                             class="btn-modal-submit-return" 
                             @onclick="SubmitReturnRequestAsync" 
-                            disabled="@(_isSubmittingReturn || _selectedVariantId <= 0)">
-                        @(_isSubmittingReturn ? "Đang gửi..." : "GỬI YÊU CẦU HOÀN TRẢ")
+                            disabled="@(_isSubmittingReturn || !_selectedVariantIds.Any())">
+                        @if (_isSubmittingReturn)
+                        {
+                            <span>Đang gửi yêu cầu...</span>
+                        }
+                        else
+                        {
+                            <span>GỬI YÊU CẦU HOÀN TRẢ @(_selectedVariantIds.Count > 1 ? $"({_selectedVariantIds.Count} MẶT HÀNG)" : "")</span>
+                        }
                     </button>
                 </div>
             </div>
@@ -432,6 +562,25 @@
         font-weight: 800;
         color: #E11D48;
     }
+    .btn-pay-qr {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px 10px;
+        background: #A50064;
+        color: #FFFFFF !important;
+        border-radius: 4px;
+        font-weight: 700;
+        font-size: 0.78rem;
+        text-decoration: none !important;
+        transition: all 0.2s;
+        margin-left: 4px;
+    }
+    .btn-pay-qr:hover {
+        background: #880052;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(165, 0, 100, 0.3);
+    }
     .status-badge {
         display: inline-block;
         padding: 5px 10px;
@@ -442,6 +591,14 @@
     .status-badge.status-completed {
         background: #D1FAE5;
         color: #059669;
+    }
+    .status-badge.status-returned {
+        background: #EDE9FE;
+        color: #7C3AED;
+    }
+    .status-badge.status-return-pending {
+        background: #FFEDD5;
+        color: #C2410C;
     }
     .status-badge.status-processing {
         background: #FEF3C7;
@@ -454,6 +611,35 @@
     .status-badge.status-default {
         background: #F1F5F9;
         color: #475569;
+    }
+
+    /* Customer Order Tabs */
+    .customer-order-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+    .order-tab-btn {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #64748B;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .order-tab-btn:hover {
+        border-color: #CBD5E1;
+        color: #0F172A;
+        background: #F8FAFC;
+    }
+    .order-tab-btn.active {
+        background: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
     }
     .btn-view-order-details {
         background: transparent;
@@ -614,6 +800,24 @@
     .return-form-group { margin-bottom: 16px; }
     .return-form-group.full-col { grid-column: 1 / -1; }
     .form-label { display: block; font-weight: 700; font-size: 0.88rem; color: #1E293B; margin-bottom: 6px; }
+    .form-label.mb-0 { margin-bottom: 0; }
+    .return-picker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .btn-select-all-returns {
+        background: none;
+        border: none;
+        color: #E11D48;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+    }
+    .btn-select-all-returns:hover { color: #BE123C; }
     .return-items-picker { display: flex; flex-direction: column; gap: 8px; }
     .return-item-choice {
         display: flex;
@@ -624,15 +828,116 @@
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.15s;
+        user-select: none;
+    }
+    .return-item-choice:hover {
+        border-color: #CBD5E1;
+        background: #F8FAFC;
     }
     .return-item-choice.selected {
         border-color: #E11D48;
         background: #FFF1F2;
     }
+    .return-item-choice.disabled-item {
+        background: #F8FAFC;
+        opacity: 0.65;
+        cursor: not-allowed;
+        border-color: #E2E8F0;
+    }
+    .badge-fully-returned {
+        display: inline-block;
+        font-size: 0.72rem;
+        background: #F1F5F9;
+        color: #64748B;
+        padding: 2px 7px;
+        border-radius: 4px;
+        margin-left: 8px;
+        font-weight: 600;
+    }
+    .text-returned-info {
+        color: #BE123C;
+        font-weight: 600;
+    }
+    .text-available-info {
+        color: #047857;
+        font-weight: 600;
+    }
+    .return-item-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: #E11D48;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
     .item-choice-info { flex: 1; }
     .item-choice-title { font-weight: 700; font-size: 0.92rem; color: #0F172A; }
     .item-choice-meta { font-size: 0.82rem; color: #64748B; margin-top: 2px; }
+    .item-choice-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex-shrink: 0;
+    }
     .item-choice-price { font-weight: 700; color: #0F172A; font-size: 0.9rem; }
+    .item-choice-qty-control {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: #FFFFFF;
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 1px solid #FECDD3;
+    }
+    .qty-mini-label { font-size: 0.74rem; font-weight: 600; color: #9F1239; }
+    .qty-stepper-compact {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid #CBD5E1;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #FFFFFF;
+    }
+    .btn-stepper-ctrl {
+        background: #F1F5F9;
+        border: none;
+        width: 22px;
+        height: 22px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #334155;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.1s;
+    }
+    .btn-stepper-ctrl:hover { background: #E2E8F0; }
+    .stepper-input-ctrl {
+        width: 36px;
+        height: 22px;
+        text-align: center;
+        border: none;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0F172A;
+        outline: none;
+    }
+    .qty-max-hint { font-size: 0.72rem; color: #64748B; }
+    .return-summary-pill {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #FFF1F2;
+        border: 1px dashed #FECDD3;
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin-top: 10px;
+        font-size: 0.84rem;
+        color: #9F1239;
+    }
+    .return-summary-pill strong { color: #BE123C; }
+    .refund-estimate strong { font-size: 0.92rem; }
     .return-grid-2col {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -739,6 +1044,8 @@
     private List<OrderDetailItemDto>? _returnItems;
     private bool _isLoadingReturnItems = false;
     private int _selectedVariantId = 0;
+    private HashSet<int> _selectedVariantIds = new();
+    private Dictionary<int, int> _returnQuantities = new();
     private int _returnQty = 1;
     private int _maxReturnQty = 1;
     private string _returnReason = string.Empty;
@@ -746,6 +1053,49 @@
     private string _returnCustomerPhone = string.Empty;
     private string _returnCustomerEmail = string.Empty;
     private bool _isSubmittingReturn = false;
+
+    // Filter Tabs & Return Checks
+    private string? _selectedStatusTab = null;
+
+    private void FilterOrdersByTab(string? tab)
+    {
+        _selectedStatusTab = tab;
+    }
+
+    private bool IsOrderReturned(CustomerOrderHistoryItemDto order) =>
+        order.TrangThai == "Đã hoàn trả" || 
+        order.TrangThaiHoanTra == "Đã nhận hàng hoàn" || 
+        order.TrangThaiHoanTra == "Đã xử lý" ||
+        order.TrangThaiHoanTra == "Đã hoàn tất";
+
+    private bool IsOrderReturnPending(CustomerOrderHistoryItemDto order) =>
+        order.TrangThaiHoanTra == "Cần duyệt" || 
+        order.TrangThaiHoanTra == "Đang xử lý" || 
+        order.TrangThaiHoanTra == "Đã duyệt";
+
+    private bool IsOrderReturnedOrPending(CustomerOrderHistoryItemDto order) =>
+        IsOrderReturned(order) || IsOrderReturnPending(order);
+
+    private IEnumerable<CustomerOrderHistoryItemDto> FilteredOrders
+    {
+        get
+        {
+            if (_orders == null) return Enumerable.Empty<CustomerOrderHistoryItemDto>();
+            if (string.IsNullOrEmpty(_selectedStatusTab)) return _orders;
+
+            if (_selectedStatusTab == "Đã hoàn thành")
+            {
+                return _orders.Where(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && (x.TongSoLuongDaMua > x.TongSoLuongDaTra));
+            }
+
+            if (_selectedStatusTab == "Đã hoàn trả")
+            {
+                return _orders.Where(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả" || x.TongSoLuongDaTra > 0);
+            }
+
+            return _orders.Where(x => x.TrangThai == _selectedStatusTab);
+        }
+    }
 
     // Return Method & Branch Selection
     private string _returnMethod = "Thu hồi tại nhà";
@@ -808,6 +1158,8 @@
         _returnOrder = order;
         _isLoadingReturnItems = true;
         _selectedVariantId = 0;
+        _selectedVariantIds.Clear();
+        _returnQuantities.Clear();
         _returnQty = 1;
         _maxReturnQty = 1;
         _returnReason = string.Empty;
@@ -841,7 +1193,19 @@
             _returnItems = await CustomerApi.GetOrderDetailsAsync(order.MaHoaDon);
             if (_returnItems != null && _returnItems.Any())
             {
-                OnSelectReturnVariant(_returnItems.First());
+                var returnableItems = _returnItems.Where(i => !i.DaTraHet).ToList();
+                foreach (var it in returnableItems)
+                {
+                    _returnQuantities[it.MaBienThe] = 1;
+                }
+                var first = returnableItems.FirstOrDefault();
+                if (first != null)
+                {
+                    _selectedVariantIds.Add(first.MaBienThe);
+                    _selectedVariantId = first.MaBienThe;
+                    _maxReturnQty = first.SoLuongConLai > 0 ? first.SoLuongConLai : 1;
+                    _returnQty = 1;
+                }
             }
         }
         finally
@@ -850,22 +1214,110 @@
         }
     }
 
-    private void OnSelectReturnVariant(OrderDetailItemDto item)
+    private void ToggleReturnItemSelection(OrderDetailItemDto item)
     {
-        _selectedVariantId = item.MaBienThe;
-        _maxReturnQty = item.SoLuong > 0 ? item.SoLuong : 1;
-        _returnQty = 1;
+        if (item.DaTraHet) return;
+
+        if (_selectedVariantIds.Contains(item.MaBienThe))
+        {
+            _selectedVariantIds.Remove(item.MaBienThe);
+        }
+        else
+        {
+            _selectedVariantIds.Add(item.MaBienThe);
+            if (!_returnQuantities.ContainsKey(item.MaBienThe))
+            {
+                _returnQuantities[item.MaBienThe] = 1;
+            }
+        }
+        _selectedVariantId = _selectedVariantIds.FirstOrDefault();
+        _maxReturnQty = item.SoLuongConLai > 0 ? item.SoLuongConLai : 1;
+        _returnQty = GetReturnQty(_selectedVariantId);
     }
+
+    private void ToggleSelectAllReturns()
+    {
+        if (_returnItems == null || !_returnItems.Any()) return;
+
+        var returnableItems = _returnItems.Where(i => !i.DaTraHet).ToList();
+        if (_selectedVariantIds.Count == returnableItems.Count)
+        {
+            _selectedVariantIds.Clear();
+            _selectedVariantId = 0;
+        }
+        else
+        {
+            foreach (var it in returnableItems)
+            {
+                _selectedVariantIds.Add(it.MaBienThe);
+                if (!_returnQuantities.ContainsKey(it.MaBienThe))
+                {
+                    _returnQuantities[it.MaBienThe] = 1;
+                }
+            }
+            _selectedVariantId = _selectedVariantIds.FirstOrDefault();
+        }
+    }
+
+    private int GetReturnQty(int variantId)
+    {
+        return _returnQuantities.TryGetValue(variantId, out var qty) ? qty : 1;
+    }
+
+    private void DecreaseItemQty(OrderDetailItemDto item)
+    {
+        if (item.DaTraHet) return;
+        var current = GetReturnQty(item.MaBienThe);
+        if (current > 1)
+        {
+            _returnQuantities[item.MaBienThe] = current - 1;
+            if (item.MaBienThe == _selectedVariantId) _returnQty = current - 1;
+        }
+    }
+
+    private void IncreaseItemQty(OrderDetailItemDto item)
+    {
+        if (item.DaTraHet) return;
+        var current = GetReturnQty(item.MaBienThe);
+        var max = item.SoLuongConLai > 0 ? item.SoLuongConLai : 1;
+        if (current < max)
+        {
+            _returnQuantities[item.MaBienThe] = current + 1;
+            if (item.MaBienThe == _selectedVariantId) _returnQty = current + 1;
+        }
+    }
+
+    private void OnChangeReturnQty(OrderDetailItemDto item, Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        if (item.DaTraHet) return;
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            var max = item.SoLuongConLai > 0 ? item.SoLuongConLai : 1;
+            var clamped = Math.Clamp(val, 1, max);
+            _returnQuantities[item.MaBienThe] = clamped;
+            if (item.MaBienThe == _selectedVariantId) _returnQty = clamped;
+        }
+    }
+
+    private int TotalReturnQty => _returnItems?
+        .Where(i => _selectedVariantIds.Contains(i.MaBienThe))
+        .Sum(i => GetReturnQty(i.MaBienThe)) ?? 0;
+
+    private decimal TotalRefundAmount => _returnItems?
+        .Where(i => _selectedVariantIds.Contains(i.MaBienThe))
+        .Sum(i => i.DonGia * GetReturnQty(i.MaBienThe)) ?? 0m;
 
     private void CloseReturnModal()
     {
         _returnOrder = null;
         _returnItems = null;
+        _selectedVariantIds.Clear();
+        _returnQuantities.Clear();
     }
 
     private async Task SubmitReturnRequestAsync()
     {
-        if (_returnOrder == null || _selectedVariantId <= 0) return;
+        if (_returnOrder == null || !_selectedVariantIds.Any()) return;
 
         if (string.IsNullOrWhiteSpace(_returnCustomerName))
         {
@@ -900,11 +1352,23 @@
         _isSubmittingReturn = true;
         try
         {
+            var selectedList = _returnItems?
+                .Where(i => _selectedVariantIds.Contains(i.MaBienThe))
+                .ToList() ?? new();
+
             var req = new global::Shared.DTOs.Feedback.CreateReturnRequestDto
             {
                 MaHoaDon = _returnOrder.MaHoaDon,
-                MaBienThe = _selectedVariantId,
-                SoLuongTra = _returnQty,
+                MaBienThe = selectedList.First().MaBienThe,
+                SoLuongTra = selectedList.Sum(i => GetReturnQty(i.MaBienThe)),
+                Items = selectedList.Select(i => new global::Shared.DTOs.Feedback.ReturnItemRequestDto
+                {
+                    MaBienThe = i.MaBienThe,
+                    SoLuongTra = GetReturnQty(i.MaBienThe),
+                    TenSanPham = i.TenSanPham,
+                    MauSac = i.MauSac,
+                    KichCo = i.KichCo
+                }).ToList(),
                 LyDoTra = _returnReason.Trim(),
                 HoTen = _returnCustomerName.Trim(),
                 DienThoai = _returnCustomerPhone.Trim(),
@@ -917,8 +1381,10 @@
             var res = await CustomerApi.SubmitReturnRequestAsync(req);
             if (res.Success)
             {
-                Toast.ShowSuccess("Gửi yêu cầu hoàn trả hàng thành công! Đã chuyển tiếp vào hệ thống Khiếu nại & CSKH để giải quyết.");
+                var itemText = selectedList.Count > 1 ? $"{selectedList.Count} sản phẩm" : "sản phẩm";
+                Toast.ShowSuccess($"Đã lập 1 phiếu hoàn trả thành công cho {itemText} (Đơn #DH-{_returnOrder.MaHoaDon})! Đã chuyển tiếp vào hệ thống Khiếu nại & CSKH để giải quyết.");
                 CloseReturnModal();
+                await LoadOrdersAsync();
             }
             else
             {

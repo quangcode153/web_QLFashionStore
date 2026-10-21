@@ -67,27 +67,41 @@ public static class DatabaseInitializer
                     logger.LogDebug("Không thể đọc sys.dm_exec_connections: {Msg}", exTransport.Message);
                 }
 
-                // 2. Kiểm tra bảng 'SanPham' mà không dùng NOLOCK trên metadata
+                // 2. Tạo bảng quản lý phiên bản migration nếu chưa có
+                using (var cmdMig = dbConn.CreateCommand())
+                {
+                    cmdMig.CommandTimeout = 15;
+                    cmdMig.CommandText = @"
+                        IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = '__SchemaMigrations')
+                        BEGIN
+                            CREATE TABLE __SchemaMigrations (
+                                MigrationId NVARCHAR(150) PRIMARY KEY,
+                                AppliedAt DATETIME DEFAULT GETDATE()
+                            );
+                        END;";
+                    cmdMig.ExecuteNonQuery();
+                }
+
+                // 3. Kiểm tra xem CSDL đã được khởi tạo schema cơ bản chưa
                 var swQuery = System.Diagnostics.Stopwatch.StartNew();
                 using var cmdCheckTable = dbConn.CreateCommand();
                 cmdCheckTable.CommandTimeout = 15;
-                cmdCheckTable.CommandText = "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT COUNT(1) FROM sys.tables WHERE name = 'SanPham';";
+                cmdCheckTable.CommandText = "SELECT COUNT(1) FROM sys.tables WHERE name = 'SanPham';";
                 int tableCount = Convert.ToInt32(cmdCheckTable.ExecuteScalar());
                 swQuery.Stop();
                 logger.LogInformation("Kiểm tra bảng metadata hoàn tất trong {QueryMs} ms (Số bảng SanPham: {Count}).", swQuery.ElapsedMilliseconds, tableCount);
 
                 if (tableCount == 0)
                 {
-                    logger.LogInformation("Cơ sở dữ liệu '{Db}' chưa có bảng, bắt đầu sinh schema từ sqlbtl.sql...", targetDatabase);
+                    logger.LogInformation("Cơ sở dữ liệu '{Db}' chưa có bảng, bắt đầu sinh schema hoàn chỉnh từ sqlbtl.sql...", targetDatabase);
 
-                    // Tìm file sqlbtl.sql ở thư mục gốc
+                    // Tìm file sqlbtl.sql ở thư mục gốc hoặc các thư mục liên quan
                     string currentDir = AppDomain.CurrentDomain.BaseDirectory;
                     string sqlFilePath = Path.Combine(currentDir, "..", "..", "..", "..", "sqlbtl.sql");
                     sqlFilePath = Path.GetFullPath(sqlFilePath);
 
                     if (!File.Exists(sqlFilePath))
                     {
-                        // Thử tìm ở thư mục cha trực tiếp
                         sqlFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "sqlbtl.sql"));
                         if (!File.Exists(sqlFilePath))
                         {
@@ -102,12 +116,14 @@ public static class DatabaseInitializer
                         // Tách script thành từng lô lệnh (batch) ngăn cách bởi GO
                         var batches = Regex.Split(fullSql, @"^\s*GO\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
 
+                        int batchIndex = 0;
                         foreach (var batch in batches)
                         {
+                            batchIndex++;
                             string trimmedBatch = batch.Trim();
                             if (string.IsNullOrWhiteSpace(trimmedBatch)) continue;
 
-                            // Bỏ qua các lệnh quản lý cấp database (USE, CREATE, DROP, ALTER DATABASE, SINGLE_USER)
+                            // Bỏ qua các lệnh quản lý cấp database
                             if (trimmedBatch.StartsWith("USE ", StringComparison.OrdinalIgnoreCase) ||
                                 trimmedBatch.Contains("CREATE DATABASE", StringComparison.OrdinalIgnoreCase) ||
                                 trimmedBatch.Contains("DROP DATABASE", StringComparison.OrdinalIgnoreCase) ||
@@ -125,8 +141,19 @@ public static class DatabaseInitializer
                             }
                             catch (Exception ex)
                             {
-                                logger.LogWarning("Bỏ qua lỗi batch hoặc đối tượng đã tồn tại: {Msg}", ex.Message);
+                                logger.LogWarning("Bỏ qua lỗi batch {Index} hoặc đối tượng đã tồn tại: {Msg}", batchIndex, ex.Message);
                             }
+                        }
+
+                        // Ghi nhận Migration hoàn tất
+                        using (var cmdRecord = dbConn.CreateCommand())
+                        {
+                            cmdRecord.CommandText = @"
+                                IF NOT EXISTS (SELECT 1 FROM __SchemaMigrations WHERE MigrationId = 'V2.0_InitialCompleteSchema')
+                                BEGIN
+                                    INSERT INTO __SchemaMigrations (MigrationId, AppliedAt) VALUES ('V2.0_InitialCompleteSchema', GETDATE());
+                                END;";
+                            cmdRecord.ExecuteNonQuery();
                         }
 
                         // Đảm bảo CSDL luôn ở chế độ MULTI_USER
@@ -136,7 +163,7 @@ public static class DatabaseInitializer
                             cmdMulti.ExecuteNonQuery();
                         }
 
-                        logger.LogInformation("Sinh toàn bộ bảng, Views, Functions, Procedures, Triggers từ code thành công!");
+                        logger.LogInformation("Sinh toàn bộ 24 bảng, 6 Views, 5 Functions, 9 Procedures, 6 Triggers, RBAC và Seed Data từ sqlbtl.sql thành công!");
                     }
                     else
                     {
@@ -145,169 +172,147 @@ public static class DatabaseInitializer
                 }
                 else
                 {
-                    logger.LogInformation("Cơ sở dữ liệu '{Db}' đã có sẵn cấu trúc bảng ({Count} bảng chính).", targetDatabase, tableCount);
-                }
+                    logger.LogInformation("Cơ sở dữ liệu '{Db}' đã có sẵn cấu trúc bảng ({Count} bảng chính). Kiểm tra và nạp migration gia tăng idempotent...", targetDatabase, tableCount);
 
-                // 3. Đảm bảo bảng ThongBao_NguoiDoc luôn tồn tại để quản lý trạng thái đã đọc theo tài khoản
-                try
-                {
-                    using var cmdEnsure = dbConn.CreateCommand();
-                    cmdEnsure.CommandText = @"
-                        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ThongBao_NguoiDoc')
-                        BEGIN
-                            CREATE TABLE ThongBao_NguoiDoc (
-                                ma_thong_bao INT NOT NULL,
-                                ma_tai_khoan INT NOT NULL,
-                                ngay_doc DATETIME DEFAULT GETDATE(),
-                                CONSTRAINT PK_ThongBao_NguoiDoc PRIMARY KEY (ma_thong_bao, ma_tai_khoan),
-                                CONSTRAINT FK_ThongBao_NguoiDoc_ThongBao FOREIGN KEY (ma_thong_bao) REFERENCES ThongBaoNoiBo(ma_thong_bao) ON DELETE CASCADE,
-                                CONSTRAINT FK_ThongBao_NguoiDoc_TaiKhoan FOREIGN KEY (ma_tai_khoan) REFERENCES TaiKhoan(ma_tai_khoan) ON DELETE CASCADE
-                            );
-                        END";
-                    cmdEnsure.ExecuteNonQuery();
-                }
-                catch (Exception exTable)
-                {
-                    logger.LogDebug("Kiểm tra bảng ThongBao_NguoiDoc: {Msg}", exTable.Message);
-                }
+                    // Tự động kiểm tra và cập nhật các bảng/cột mới an toàn cho CSDL đang hoạt động
+                    ApplyIncrementalMigrations(dbConn, logger);
 
-                // 4. Đảm bảo cấu trúc Đa Chi Nhánh (ChiNhanh & TonKhoChiNhanh) luôn toàn vẹn
-                try
-                {
-                    using var cmdBranch = dbConn.CreateCommand();
-                    cmdBranch.CommandTimeout = 30;
-                    cmdBranch.CommandText = @"
-                        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChiNhanh')
-                        BEGIN
-                            CREATE TABLE ChiNhanh (
-                                ma_chi_nhanh INT PRIMARY KEY IDENTITY(1,1),
-                                ten_chi_nhanh NVARCHAR(150) NOT NULL,
-                                dia_chi NVARCHAR(255) NOT NULL,
-                                dien_thoai VARCHAR(20) NULL,
-                                loai_chi_nhanh NVARCHAR(50) DEFAULT N'Cửa hàng bán lẻ',
-                                dang_hoat_dong BIT DEFAULT 1,
-                                ngay_tao DATETIME DEFAULT GETDATE()
-                            );
-                        END;
-
-                        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TonKhoChiNhanh')
-                        BEGIN
-                            CREATE TABLE TonKhoChiNhanh (
-                                ma_chi_nhanh INT NOT NULL,
-                                ma_bien_the INT NOT NULL,
-                                so_luong_ton INT NOT NULL DEFAULT 0,
-                                muc_canh_bao INT NOT NULL DEFAULT 10,
-                                ngay_cap_nhat DATETIME DEFAULT GETDATE(),
-                                CONSTRAINT PK_TonKhoChiNhanh PRIMARY KEY (ma_chi_nhanh, ma_bien_the),
-                                CONSTRAINT FK_TonKhoChiNhanh_ChiNhanh FOREIGN KEY (ma_chi_nhanh) REFERENCES ChiNhanh(ma_chi_nhanh),
-                                CONSTRAINT FK_TonKhoChiNhanh_BienThe FOREIGN KEY (ma_bien_the) REFERENCES BienTheSanPham(ma_bien_the)
-                            );
-                        END;
-                    ";
-                    cmdBranch.ExecuteNonQuery();
-                }
-                catch (Exception exBranch)
-                {
-                    logger.LogDebug("Kiểm tra cấu trúc Đa Chi Nhánh: {Msg}", exBranch.Message);
-                }
-
-                // 5. Đảm bảo cấu trúc Nâng cấp: Trạng thái Đang giao hàng, Kho hàng lỗi, Đổi trả & Vai trò Order Coordinator
-                try
-                {
-                    using var cmdUpgrade = dbConn.CreateCommand();
-                    cmdUpgrade.CommandTimeout = 30;
-                    cmdUpgrade.CommandText = @"
-                        -- 5.1 Cập nhật ràng buộc trạng thái đơn hàng (HoaDon)
-                        IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_TrangThaiHoaDon')
-                        BEGIN
-                            ALTER TABLE HoaDon DROP CONSTRAINT CK_TrangThaiHoaDon;
-                        END;
-                        ALTER TABLE HoaDon ADD CONSTRAINT CK_TrangThaiHoaDon 
-                            CHECK (trang_thai IN (N'Chờ xử lý', N'Đang giao hàng', N'Đã hoàn thành', N'Đã hủy'));
-
-                        -- 5.2 Bổ sung cột loai_don_hang và dia_chi_giao_hang cho HoaDon
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('HoaDon') AND name = 'loai_don_hang')
-                        BEGIN
-                            ALTER TABLE HoaDon ADD loai_don_hang NVARCHAR(20) DEFAULT 'ONLINE';
-                        END;
-
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('HoaDon') AND name = 'dia_chi_giao_hang')
-                        BEGIN
-                            ALTER TABLE HoaDon ADD dia_chi_giao_hang NVARCHAR(255) NULL;
-                        END;
-
-                        -- 5.3 Bổ sung cột so_luong_loi cho BienTheSanPham
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('BienTheSanPham') AND name = 'so_luong_loi')
-                        BEGIN
-                            ALTER TABLE BienTheSanPham ADD so_luong_loi INT DEFAULT 0;
-                        END;
-
-                        IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_SoLuongLoi')
-                        BEGIN
-                            ALTER TABLE BienTheSanPham ADD CONSTRAINT CK_SoLuongLoi CHECK (so_luong_loi >= 0);
-                        END;
-
-                        -- 5.4 Cập nhật ràng buộc lý do nhật ký kho (NhatKyKho)
-                        IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_LyDoNhatKyKho')
-                        BEGIN
-                            ALTER TABLE NhatKyKho DROP CONSTRAINT CK_LyDoNhatKyKho;
-                        END;
-                        ALTER TABLE NhatKyKho ADD CONSTRAINT CK_LyDoNhatKyKho 
-                            CHECK (ly_do IN ('BAN_HANG', 'NHAP_HANG', 'TRA_HANG', 'TRA_HANG_LOI', 'DIEU_CHINH'));
-
-                        -- 5.5 Bổ sung thông tin đổi trả cho PhanHoiKhachHang
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PhanHoiKhachHang') AND name = 'hinh_thuc_hoan')
-                        BEGIN
-                            ALTER TABLE PhanHoiKhachHang ADD hinh_thuc_hoan NVARCHAR(30) DEFAULT N'Thu hồi tại nhà';
-                        END;
-
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PhanHoiKhachHang') AND name = 'dia_chi_thu_hoi')
-                        BEGIN
-                            ALTER TABLE PhanHoiKhachHang ADD dia_chi_thu_hoi NVARCHAR(255) NULL;
-                        END;
-
-                        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('PhanHoiKhachHang') AND name = 'ma_chi_nhanh_hen')
-                        BEGIN
-                            ALTER TABLE PhanHoiKhachHang ADD ma_chi_nhanh_hen INT NULL;
-                        END;
-
-                        -- 5.6 Đảm bảo nhân viên và tài khoản mẫu cho Order Coordinator
-                        IF NOT EXISTS (SELECT 1 FROM NhanVien WHERE vai_tro = N'Order Coordinator')
-                        BEGIN
-                            INSERT INTO NhanVien (ten_nhan_vien, dien_thoai, vai_tro, da_xoa)
-                            VALUES (N'Nguyễn Điều Phối', '0908889999', N'Order Coordinator', 0);
-                            
-                            DECLARE @NewStaffId INT = SCOPE_IDENTITY();
-                            IF NOT EXISTS (SELECT 1 FROM TaiKhoan WHERE ten_dang_nhap = 'coordinator')
+                    // Đảm bảo ghi nhận migration nếu chưa có
+                    try
+                    {
+                        using var cmdRecord = dbConn.CreateCommand();
+                        cmdRecord.CommandText = @"
+                            IF NOT EXISTS (SELECT 1 FROM __SchemaMigrations WHERE MigrationId = 'V2.0_InitialCompleteSchema')
                             BEGIN
-                                INSERT INTO TaiKhoan (ten_dang_nhap, mat_khau_hash, ma_nhan_vien, dang_hoat_dong)
-                                VALUES ('coordinator', 'Password123!', @NewStaffId, 1);
-                            END;
-                        END;
-
-                        -- 5.7 Cập nhật ràng buộc trạng thái cho PhanHoiKhachHang & DonTraHang
-                        IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_TrangThaiPhanHoi')
-                        BEGIN
-                            ALTER TABLE PhanHoiKhachHang DROP CONSTRAINT CK_TrangThaiPhanHoi;
-                        END;
-                        ALTER TABLE PhanHoiKhachHang WITH CHECK ADD CONSTRAINT CK_TrangThaiPhanHoi 
-                            CHECK (trang_thai IN (N'Chưa xử lý', N'Cần duyệt', N'Đang xử lý', N'Đã duyệt', N'Đã nhận hàng hoàn', N'Đã giải quyết', N'Đã đóng', N'Từ chối'));
-                        
-                        ALTER TABLE DonTraHang ALTER COLUMN trang_thai NVARCHAR(50);
-                    ";
-                    cmdUpgrade.ExecuteNonQuery();
-
-                    logger.LogInformation("Nâng cấp Schema (Đang giao hàng, Kho hàng lỗi, Đổi trả, Order Coordinator) thành công!");
-                }
-                catch (Exception exUpgrade)
-                {
-                    logger.LogWarning("Kiểm tra/Nâng cấp Schema Order Coordinator: {Msg}", exUpgrade.Message);
+                                INSERT INTO __SchemaMigrations (MigrationId, AppliedAt) VALUES ('V2.0_InitialCompleteSchema', GETDATE());
+                            END;";
+                        cmdRecord.ExecuteNonQuery();
+                    }
+                    catch { }
                 }
             }
+            swTotal.Stop();
+            logger.LogInformation("Khởi tạo CSDL hoàn tất tổng cộng trong {TotalMs} ms.", swTotal.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Lỗi khi khởi tạo tự động cơ sở dữ liệu: {Message}", ex.Message);
         }
+    }
+
+    public static void ApplyIncrementalMigrations(SqlConnection dbConn, ILogger logger)
+    {
+        try
+        {
+            string sql = GetIncrementalMigrationsSql();
+            using var cmd = dbConn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.CommandTimeout = 60;
+            cmd.ExecuteNonQuery();
+            logger.LogInformation("Kiểm tra và áp dụng các migration gia tăng (Incremental Migrations) an toàn thành công.");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Thông báo kiểm tra migration gia tăng: {Msg}", ex.Message);
+        }
+    }
+
+    public static string GetIncrementalMigrationsSql()
+    {
+        return @"
+-- 1. Bổ sung cột so_luong_loi vào BienTheSanPham nếu thiếu
+IF COL_LENGTH('BienTheSanPham', 'so_luong_loi') IS NULL
+BEGIN
+    ALTER TABLE BienTheSanPham ADD so_luong_loi INT DEFAULT 0 NULL;
+END;
+
+-- 2. Bổ sung các cột thông tin hoàn trả vào PhanHoiKhachHang nếu thiếu
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'PhanHoiKhachHang')
+BEGIN
+    IF COL_LENGTH('PhanHoiKhachHang', 'hinh_thuc_hoan') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD hinh_thuc_hoan NVARCHAR(50) NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'dia_chi_thu_hoi') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD dia_chi_thu_hoi NVARCHAR(500) NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'ma_chi_nhanh_hen') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD ma_chi_nhanh_hen INT NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'ma_bien_the') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD ma_bien_the INT NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'so_luong_tra') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD so_luong_tra INT NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'ma_nhan_vien_tiep_nhan') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD ma_nhan_vien_tiep_nhan INT NULL;
+    IF COL_LENGTH('PhanHoiKhachHang', 'ghi_chu_xu_ly') IS NULL
+        ALTER TABLE PhanHoiKhachHang ADD ghi_chu_xu_ly NVARCHAR(1000) NULL;
+END;
+
+-- 3. Tạo bảng ChinhSach nếu chưa có
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ChinhSach')
+BEGIN
+    CREATE TABLE ChinhSach (
+        ma_chinh_sach INT PRIMARY KEY IDENTITY(1,1),
+        slug VARCHAR(100) NOT NULL UNIQUE,
+        tieu_de NVARCHAR(200) NOT NULL,
+        tom_tat NVARCHAR(500) NULL,
+        noi_dung NVARCHAR(MAX) NOT NULL,
+        thu_tu INT DEFAULT 0,
+        kich_hoat BIT DEFAULT 1,
+        ngay_tao DATETIME DEFAULT GETDATE(),
+        ngay_cap_nhat DATETIME DEFAULT GETDATE(),
+        nguoi_cap_nhat NVARCHAR(100) NULL
+    );
+END;
+
+-- 4. Tạo bảng NhatKyHeThong nếu chưa có
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'NhatKyHeThong')
+BEGIN
+    CREATE TABLE NhatKyHeThong (
+        ma_nhat_ky INT PRIMARY KEY IDENTITY(1,1),
+        loai_thao_tac NVARCHAR(50) NOT NULL,
+        doi_tuong NVARCHAR(100) NOT NULL,
+        noi_dung_chi_tiet NVARCHAR(1000) NULL,
+        ma_nhan_vien INT NULL,
+        ip_dia_chi VARCHAR(50) NULL,
+        thoi_gian DATETIME DEFAULT GETDATE()
+    );
+END;
+
+-- 5. Tạo bảng ThongBaoNoiBo nếu chưa có
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ThongBaoNoiBo')
+BEGIN
+    CREATE TABLE ThongBaoNoiBo (
+        ma_thong_bao INT PRIMARY KEY IDENTITY(1,1),
+        tieu_de NVARCHAR(200) NOT NULL,
+        noi_dung NVARCHAR(MAX) NOT NULL,
+        muc_do_uu_tien NVARCHAR(20) DEFAULT N'Bình thường',
+        vai_tro_nhan NVARCHAR(50) NULL,
+        ma_chi_nhanh INT NULL,
+        ngay_tao DATETIME DEFAULT GETDATE(),
+        ngay_het_han DATETIME NULL,
+        trang_thai NVARCHAR(20) DEFAULT N'Hiệu lực',
+        ma_nhan_vien_tao INT NULL
+    );
+END;
+
+-- 6. Tạo bảng ThongBao_NguoiDoc nếu chưa có
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'ThongBao_NguoiDoc')
+BEGIN
+    CREATE TABLE ThongBao_NguoiDoc (
+        ma_thong_bao INT NOT NULL,
+        ma_nhan_vien INT NOT NULL,
+        da_doc BIT DEFAULT 0,
+        thoi_gian_doc DATETIME NULL,
+        PRIMARY KEY (ma_thong_bao, ma_nhan_vien)
+    );
+END;
+
+-- 7. Bổ sung cột da_xoa vào BienTheSanPham nếu thiếu
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'BienTheSanPham')
+BEGIN
+    IF COL_LENGTH('BienTheSanPham', 'da_xoa') IS NULL
+    BEGIN
+        ALTER TABLE BienTheSanPham ADD da_xoa BIT DEFAULT 0 NOT NULL;
+    END;
+END;
+";
     }
 }

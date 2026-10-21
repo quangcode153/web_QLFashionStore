@@ -2,6 +2,7 @@
 @page "/admin/warehouse"
 @page "/warehouse/portal"
 @page "/kho"
+@layout EmptyLayout
 @namespace Frontend.Pages.Warehouse
 @inject IAdminApiClient AdminApi
 @inject IToastService Toast
@@ -14,9 +15,30 @@
     <!-- TOPBAR ĐIỀU HÀNH KHO CHUYÊN NGHIỆP -->
     <header class="wh-topbar">
         <div class="topbar-left">
+            @if (_isBranchManager)
+            {
+                <a href="/admin/orders" class="btn-topbar-back" title="Quay lại giao diện Quản lý chi nhánh">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    <span>Quay lại</span>
+                </a>
+            }
+            else if (_canAccessAdminChain)
+            {
+                <a href="/admin/dashboard" class="btn-topbar-back" title="Quay lại giao diện Quản trị chuỗi">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    <span>Quay lại</span>
+                </a>
+            }
+
             <div class="wh-brand">
                 <div class="wh-brand-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
@@ -24,51 +46,128 @@
                 </div>
                 <div class="wh-brand-text">
                     <span class="brand-title">QF WAREHOUSE</span>
-                    <span class="brand-sub">Trung Tâm Điều Hành Tồn Kho & Nhập Hàng</span>
+                    <span class="brand-sub">Điều Hành Kho & Nhập Hàng</span>
                 </div>
             </div>
 
-            <div class="role-scope-badge">
-                <span class="role-chip">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="topbar-brand-divider"></div>
+
+            <!-- BỘ ĐIỀU HÀNH PHẠM VI (SCOPE CONTROL CAPSULE - TÍCH HỢP LIỀN MẠCH) -->
+            <div class="wh-scope-capsule" title="@_scopeDescText">
+                <div class="capsule-role-tag">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                         <circle cx="12" cy="7" r="4"></circle>
                     </svg>
                     <span>@_badgeRoleTitle</span>
-                </span>
-                <span class="scope-text">@_scopeDescText</span>
+                </div>
+
+                <div class="capsule-divider"></div>
+
+                <div class="capsule-scope-select">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    <span class="scope-label">Kho:</span>
+                    <select class="wh-branch-scope-select"
+                            data-testid="warehouse-scope-selector"
+                            disabled="@(!_isChainAdmin)"
+                            value="@_currentWarehouseScopeId"
+                            @onchange="OnWarehouseScopeChanged">
+                        @if (_isChainAdmin)
+                        {
+                            <option value="0">🏢 Toàn chuỗi (@(_branches.Any() ? $"{_branches.Count} chi nhánh" : "Tất cả chi nhánh"))</option>
+                            @foreach (var b in _branches)
+                            {
+                                @if (b.IsOnlineWarehouse || b.MaChiNhanh == 9)
+                                {
+                                    <option value="@b.MaChiNhanh">🌐 Kho Tổng Online (@b.TenChiNhanh)</option>
+                                }
+                                else
+                                {
+                                    <option value="@b.MaChiNhanh">🏬 @b.TenChiNhanh</option>
+                                }
+                            }
+                        }
+                        else if (_isOnlineWarehouseKeeper)
+                        {
+                            var onlineBranch = _branches.FirstOrDefault(b => b.IsOnlineWarehouse || b.MaChiNhanh == 9);
+                            <option value="9">🌐 Kho Tổng Online (@(onlineBranch?.TenChiNhanh ?? "Tân Bình"))</option>
+                        }
+                        else if (_isBranchWarehouseKeeper || _staffBranchId > 0)
+                        {
+                            var myBranch = _branches.FirstOrDefault(b => b.MaChiNhanh == _staffBranchId);
+                            <option value="@_staffBranchId">🏬 @(myBranch?.TenChiNhanh ?? _staffBranchName)</option>
+                        }
+                        else
+                        {
+                            <option value="9">🌐 Kho Tổng QF Tân Bình</option>
+                        }
+                    </select>
+                    @if (!_isChainAdmin)
+                    {
+                        <span class="scope-lock-indicator" title="Tài khoản bị giới hạn theo chi nhánh trực thuộc">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            <span>Cố định</span>
+                        </span>
+                    }
+                </div>
             </div>
         </div>
 
         <div class="topbar-right">
-            <RealtimeNotificationBell />
+            <!-- NHÓM PHÍM TẮT & THÔNG BÁO -->
+            <div class="topbar-actions">
+                @if (_canAccessPos)
+                {
+                    <a href="/pos" class="btn-portal-shortcut" title="Mở máy tính tiền POS bán lẻ">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                        <span>Quầy POS</span>
+                    </a>
+                }
+
+                @if (_canAccessAdminChain)
+                {
+                    <a href="/admin/dashboard" class="btn-portal-shortcut" title="Về trang Quản trị chuỗi">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="9"></rect>
+                            <rect x="14" y="3" width="7" height="5"></rect>
+                            <rect x="14" y="12" width="7" height="9"></rect>
+                            <rect x="3" y="16" width="7" height="5"></rect>
+                        </svg>
+                        <span>Admin Hub</span>
+                    </a>
+                }
+                else if (_isBranchManager)
+                {
+                    <a href="/admin/orders" class="btn-portal-shortcut btn-portal-shortcut-highlight" title="Quay lại giao diện Quản lý chi nhánh">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="2" width="18" height="20" rx="2"></rect>
+                            <line x1="9" y1="6" x2="9" y2="6.01"></line>
+                            <line x1="15" y1="6" x2="15" y2="6.01"></line>
+                            <line x1="9" y1="12" x2="9" y2="12.01"></line>
+                            <line x1="15" y1="12" x2="15" y2="12.01"></line>
+                        </svg>
+                        <span>Quản lý chi nhánh</span>
+                    </a>
+                }
+
+                <div class="topbar-bell-wrapper">
+                    <RealtimeNotificationBell />
+                </div>
+            </div>
+
             <div class="topbar-divider"></div>
 
-            @if (_canAccessPos)
-            {
-                <a href="/pos" class="btn-portal-shortcut" title="Mở máy tính tiền POS bán lẻ">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="3" width="20" height="14" rx="2"></rect>
-                        <line x1="8" y1="21" x2="16" y2="21"></line>
-                        <line x1="12" y1="17" x2="12" y2="21"></line>
-                    </svg>
-                    <span>Quầy POS</span>
-                </a>
-            }
-
-            @if (_canAccessAdminChain)
-            {
-                <a href="/admin/dashboard" class="btn-portal-shortcut" title="Về trang Quản trị chuỗi">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="9"></rect>
-                        <rect x="14" y="3" width="7" height="5"></rect>
-                        <rect x="14" y="12" width="7" height="9"></rect>
-                        <rect x="3" y="16" width="7" height="5"></rect>
-                    </svg>
-                    <span>Admin Hub</span>
-                </a>
-            }
-
+            <!-- PROFILE & THOÁT -->
             <div class="wh-user-profile">
                 <div class="avatar-squircle">@_avatarLetters</div>
                 <div class="profile-info">
@@ -78,7 +177,7 @@
             </div>
 
             <button type="button" class="btn-logout" @onclick="HandleLogout" title="Đăng xuất">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                     <polyline points="16 17 21 12 16 7"></polyline>
                     <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -99,40 +198,73 @@
                     </svg>
                 </div>
                 <div class="kpi-body">
-                    <span class="kpi-label">BIẾN THỂ SKU THEO DÕI</span>
+                    <span class="kpi-label">@(_currentWarehouseScopeId == 0 ? "TỔNG SKU TOÀN CHUỖI" : "BIẾN THỂ SKU THEO DÕI")</span>
                     <div class="kpi-value tabular-nums">@_totalSkuTracked</div>
                     <span class="kpi-hint">Đầy đủ màu sắc & size</span>
                 </div>
             </div>
 
-            <div class="kpi-card @(_lowStockAlerts.Count > 0 ? "border-amber" : "")">
-                <div class="kpi-icon icon-warn">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                        <line x1="12" y1="9" x2="12" y2="13"></line>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
+            @if (_currentWarehouseScopeId == 0)
+            {
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-chain-total">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">TỔNG HÀNG TỒN TOÀN HỆ THỐNG</span>
+                        <div class="kpi-value tabular-nums text-blue">@_totalStockInChain.ToString("N0") <small style="font-size: 0.82rem; font-weight: normal; color: #64748b;">cái</small></div>
+                        <span class="kpi-hint">Tổng sản phẩm thực tế cả 9 kho</span>
+                    </div>
                 </div>
-                <div class="kpi-body">
-                    <span class="kpi-label">CẢNH BÁO SẮP HẾT (&le; 10 CÁI)</span>
-                    <div class="kpi-value tabular-nums text-amber">@_lowStockAlerts.Count</div>
-                    <span class="kpi-hint">Cần lập đơn nhập hàng bổ sung</span>
-                </div>
-            </div>
 
-            <div class="kpi-card @(_outOfStockCount > 0 ? "border-red" : "")">
-                <div class="kpi-icon icon-danger">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
-                    </svg>
+                <div class="kpi-card">
+                    <div class="kpi-icon icon-chain-network">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">ĐIỂM BÁN & KHO VẬN HÀNH</span>
+                        <div class="kpi-value tabular-nums text-emerald">@_branches.Count <small style="font-size: 0.82rem; font-weight: normal; color: #64748b;">cơ sở</small></div>
+                        <span class="kpi-hint">1 Kho Online + 8 Chi nhánh</span>
+                    </div>
                 </div>
-                <div class="kpi-body">
-                    <span class="kpi-label">CẠN HÀNG TRONG KHO (0 CÁI)</span>
-                    <div class="kpi-value tabular-nums text-red">@_outOfStockCount</div>
-                    <span class="kpi-hint">Hết sạch biến thể bày bán</span>
+            }
+            else
+            {
+                <div class="kpi-card @(_lowStockAlerts.Count > 0 ? "border-amber" : "")">
+                    <div class="kpi-icon icon-warn">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">CẢNH BÁO SẮP HẾT (&le; 10 CÁI)</span>
+                        <div class="kpi-value tabular-nums text-amber">@_lowStockAlerts.Count</div>
+                        <span class="kpi-hint">Cần lập đơn nhập hàng bổ sung</span>
+                    </div>
                 </div>
-            </div>
+
+                <div class="kpi-card @(_outOfStockCount > 0 ? "border-red" : "")">
+                    <div class="kpi-icon icon-danger">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                        </svg>
+                    </div>
+                    <div class="kpi-body">
+                        <span class="kpi-label">CẠN HÀNG TRONG KHO (0 CÁI)</span>
+                        <div class="kpi-value tabular-nums text-red">@_outOfStockCount</div>
+                        <span class="kpi-hint">Hết sạch biến thể bày bán</span>
+                    </div>
+                </div>
+            }
 
             <div class="kpi-card">
                 <div class="kpi-icon icon-supplier">
@@ -153,35 +285,42 @@
 
         <!-- 2. TABS ĐIỀU HƯỚNG TÁC VỤ THỦ KHO -->
         <div class="wh-tabs-bar">
-            <button type="button" class="wh-tab-btn @(_currentTab == TabType.Import ? "active" : "")" @onclick="() => SetTab(TabType.Import)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="12" y1="18" x2="12" y2="12"></line>
-                    <line x1="9" y1="15" x2="15" y2="15"></line>
-                </svg>
-                <span>1. LẬP PHIẾU NHẬP HÀNG</span>
-            </button>
+            @if (_currentWarehouseScopeId > 0)
+            {
+                <button type="button" class="wh-tab-btn @(_currentTab == TabType.Import ? "active" : "")" @onclick="() => SetTab(TabType.Import)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                    </svg>
+                    <span>1. LẬP PHIẾU NHẬP HÀNG</span>
+                </button>
+            }
 
             <button type="button" class="wh-tab-btn @(_currentTab == TabType.Inventory ? "active" : "")" @onclick="() => SetTab(TabType.Inventory)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                    <line x1="12" y1="9" x2="12" y2="13"></line>
-                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
                 </svg>
-                <span>2. CẢNH BÁO TỒN KHO & KIỂM KÊ</span>
-                @if (_lowStockAlerts.Count > 0)
+                <span>@(_currentWarehouseScopeId == 0 ? "1. TỔNG HỢP SẢN PHẨM & TỒN KHO TOÀN CHUỖI" : (_isBranchManager ? "1. DANH SÁCH SẢN PHẨM & TỒN KHO" : "2. CẢNH BÁO TỒN KHO & KIỂM KÊ"))</span>
+                @if (_currentWarehouseScopeId == 0)
+                {
+                    <span class="tab-badge-count">@_totalSkuTracked SKU</span>
+                }
+                else if (_lowStockAlerts.Count > 0)
                 {
                     <span class="tab-badge-count">@_lowStockAlerts.Count</span>
                 }
             </button>
 
-            <button type="button" class="wh-tab-btn @(_currentTab == TabType.History ? "active" : "")" @onclick="() => SetTab(TabType.History)">
+            <button type="button" data-testid="tab-history-btn" class="wh-tab-btn @(_currentTab == TabType.History ? "active" : "")" @onclick="() => SetTab(TabType.History)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <span>3. LỊCH SỬ NHẬP KHO & AUDIT</span>
+                <span>@(_currentWarehouseScopeId == 0 ? "2. LỊCH SỬ NHẬP KHO & AUDIT" : "3. LỊCH SỬ NHẬP KHO & AUDIT")</span>
             </button>
 
             <button type="button" class="wh-tab-btn @(_currentTab == TabType.Announcements ? "active" : "")" @onclick="() => SetTab(TabType.Announcements)">
@@ -189,7 +328,7 @@
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
-                <span>4. THÔNG BÁO ĐIỀU HÀNH KHO</span>
+                <span>@(_currentWarehouseScopeId == 0 ? "3. THÔNG BÁO ĐIỀU HÀNH KHO" : "4. THÔNG BÁO ĐIỀU HÀNH KHO")</span>
                 @if (_announcements.Count > 0)
                 {
                     <span class="tab-badge-blue">@_announcements.Count</span>
@@ -200,13 +339,60 @@
         <!-- 3. NỘI DUNG TỪNG TAB -->
         @if (_currentTab == TabType.Import)
         {
-            <!-- TAB 1: LẬP PHIẾU NHẬP HÀNG -->
-            <div class="import-tab-layout">
-                <!-- FORM NHẬP KHO CHÍNH -->
-                <div class="card wh-card">
-                    <div class="card-header">
-                        <div class="header-left">
-                            <span class="step-num">01</span>
+            @if (_currentWarehouseScopeId == 0)
+            {
+                <!-- KHI Ở PHẠM VI TOÀN CHUỖI: BẢNG HƯỚNG DẪN & ĐIỀU PHỐI CHỌN KHO -->
+                <div class="card wh-card chain-scope-guide-card">
+                    <div class="chain-guide-header">
+                        <div class="guide-icon-badge">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                        </div>
+                        <div class="guide-texts">
+                            <h3 class="guide-title">CHẾ ĐỘ GIÁM SÁT TOÀN CHUỖI (@(_branches.Any() ? $"{_branches.Count} CHI NHÁNH" : "TOÀN HỆ THỐNG"))</h3>
+                            <p class="guide-desc">
+                                Toàn chuỗi là chỉ số tổng hợp logic toàn hệ thống. Hàng hóa thực tế chỉ được nhập vào <strong>Kho Tổng Online</strong> hoặc <strong>Kho Chi Nhánh vật lý cụ thể</strong>.
+                                Vui lòng chọn một kho bên dưới để bắt đầu lập phiếu nhập hàng:
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="dispatch-grid">
+                        <!-- Kho Tổng Online Card -->
+                        <div class="dispatch-card online-wh-card" @onclick="() => SwitchToSpecificWarehouse(OnlineWarehouseId)">
+                            <div class="card-status-pill online">Fulfillment & Đơn Online</div>
+                            <div class="wh-symbol">🌐</div>
+                            <h4 class="wh-title">@OnlineWarehouseName</h4>
+                            <p class="wh-meta">Kho tiếp nhận từ xưởng may, đối tác NCC, xử lý đơn online & điều phối liên chi nhánh</p>
+                            <button type="button" class="btn-dispatch-action online">Vào Lập Phiếu Nhập Kho Online &rarr;</button>
+                        </div>
+
+                        <!-- Các chi nhánh offline -->
+                        @foreach (var b in _branches.Where(x => !x.IsOnlineWarehouse && x.MaChiNhanh != OnlineWarehouseId))
+                        {
+                            <div class="dispatch-card offline-branch-card" @onclick="() => SwitchToSpecificWarehouse(b.MaChiNhanh)">
+                                <div class="card-status-pill offline">Điểm Bán Lẻ POS</div>
+                                <div class="wh-symbol">🏬</div>
+                                <h4 class="wh-title">@b.TenChiNhanh</h4>
+                                <p class="wh-meta">@(string.IsNullOrEmpty(b.DiaChi) ? "Chi nhánh thời trang QF" : b.DiaChi)</p>
+                                <button type="button" class="btn-dispatch-action offline">Vào Lập Phiếu Nhập Kho CN #@b.MaChiNhanh &rarr;</button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- TAB 1: LẬP PHIẾU NHẬP HÀNG KHO CỤ THỂ -->
+                <div class="import-tab-layout">
+                    <!-- FORM NHẬP KHO CHÍNH -->
+                    <div class="card wh-card">
+                        <div class="card-header">
+                            <div class="header-left">
+                                <span class="step-num">01</span>
                             <div>
                                 <h3 class="card-title">LẬP PHIẾU NHẬP KHO TỨC THÌ</h3>
                                 <p class="card-desc">Cập nhật số lượng tồn vào kho và ghi vết kiểm toán hệ thống</p>
@@ -271,12 +457,23 @@
 
                             <div class="form-group">
                                 <label class="form-label">Cơ sở / Kho tiếp nhận hàng <span class="required">*</span></label>
-                                <select class="form-control" @bind="_selectedBranchId">
-                                    <option value="1">Kho Tổng (Chi nhánh Quận 1)</option>
-                                    <option value="2">Cơ sở QF Quận 10 (Sư Vạn Hạnh)</option>
-                                    <option value="3">Cơ sở QF Tân Bình (Lê Văn Sỹ)</option>
-                                    <option value="4">Cơ sở QF Gò Vấp (Quang Trung)</option>
-                                </select>
+                                <div class="locked-branch-display">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2">
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                                    </svg>
+                                    <span class="locked-branch-text">@CurrentWarehouseDisplayName</span>
+                                    @if (_isChainAdmin)
+                                    {
+                                        <button type="button" class="btn-change-branch-link" @onclick="() => SwitchToSpecificWarehouse(0)" title="Trở về bảng chọn kho khác">
+                                            &larr; Đổi kho khác
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-lock-pill">Khóa theo phân quyền</span>
+                                    }
+                                </div>
                             </div>
                         </div>
 
@@ -300,11 +497,15 @@
                                 <div class="lookup-dropdown">
                                     @foreach (var v in _filteredSuggestions)
                                     {
-                                        <div class="lookup-item" @onclick="() => SelectSuggestion(v)">
+                                        <div class="lookup-item @(v.DaXoa ? "item-disabled" : "")" @onclick="() => SelectSuggestion(v)">
                                             <div class="item-left">
                                                 <code class="sku-tag">@v.MaSku</code>
                                                 <span class="item-name">@v.TenSanPham</span>
                                                 <span class="item-variant">(@v.MauSac - Size @v.KichCo)</span>
+                                                @if (v.DaXoa)
+                                                {
+                                                    <span class="badge-hidden-pill" style="background: #fef2f2; color: #ef4444; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; border: 1px solid #fecaca;">⚠️ TẠM NGỪNG CUNG CẤP</span>
+                                                }
                                             </div>
                                             <div class="item-right">
                                                 <span class="stock-pill">Tồn: @v.SoLuongTon</span>
@@ -446,94 +647,203 @@
                     </div>
                 </div>
             </div>
+            }
         }
         else if (_currentTab == TabType.Inventory)
         {
-            <!-- TAB 2: CẢNH BÁO TỒN KHO & KIỂM KÊ -->
-            <div class="card wh-card">
-                <div class="card-header">
-                    <div class="header-left">
-                        <h3 class="card-title">KIỂM KÊ TỒN KHO & CẢNH BÁO MỨC TỐI THIỂU</h3>
-                    </div>
-                    <div class="header-filter-bar">
-                        <div class="search-box">
-                            <input type="text" class="form-control" placeholder="Lọc theo SKU, tên sản phẩm, màu sắc, size..." @bind="_inventoryFilterQuery" @bind:event="oninput" />
+            @if (_currentWarehouseScopeId == 0)
+            {
+                <!-- TAB TỔNG HỢP TỒN KHO TOÀN CHUỖI (DÀNH CHO ADMIN) -->
+                <div class="card wh-card">
+                    <div class="card-header">
+                        <div class="header-left">
+                            <div>
+                                <h3 class="card-title">TỔNG HỢP TỒN KHO TOÀN HỆ THỐNG (@FilteredInventoryList.Count() SKU)</h3>
+                                <p class="card-desc" style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                                    💡 Hệ thống hiển thị tổng sản lượng hàng hóa của cả chuỗi (@(_branches.Any() ? $"{_branches.Count} kho" : "toàn chuỗi")). Để xem chi tiết kho nào đang thiếu hàng hoặc lập phiếu nhập, vui lòng chọn kho chi nhánh trên thanh điều hành ở trên.
+                                </p>
+                            </div>
                         </div>
-                        <div class="status-filters">
-                            <button type="button" class="filter-chip @(_stockFilterMode == "ALL" ? "active" : "")" @onclick='() => _stockFilterMode = "ALL"'>Tất cả (@_lowStockAlerts.Count)</button>
-                            <button type="button" class="filter-chip @(_stockFilterMode == "LOW" ? "active" : "")" @onclick='() => _stockFilterMode = "LOW"'>Sắp hết (&le; 10)</button>
-                            <button type="button" class="filter-chip @(_stockFilterMode == "OUT" ? "active" : "")" @onclick='() => _stockFilterMode = "OUT"'>Cạn kho (0)</button>
+                        <div class="header-filter-bar">
+                            <div class="search-box">
+                                <input type="text" class="form-control" placeholder="Lọc theo SKU, tên sản phẩm, màu sắc, size..." @bind="_inventoryFilterQuery" @bind:event="oninput" />
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="table-responsive">
-                    <table class="wh-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 80px;">MÃ BT</th>
-                                <th>MÃ SKU</th>
-                                <th>TÊN SẢN PHẨM</th>
-                                <th>PHÂN LOẠI</th>
-                                <th class="text-center">SỐ LƯỢNG TỒN</th>
-                                <th class="text-right">GIÁ NHẬP ĐỀ XUẤT</th>
-                                <th class="text-center">TRẠNG THÁI</th>
-                                <th class="text-center" style="width: 110px;">THAO TÁC</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (!FilteredInventoryList.Any())
-                            {
+                    <div class="table-responsive">
+                        <table class="wh-table">
+                            <thead>
                                 <tr>
-                                    <td colspan="8" class="text-center py-5 text-muted">
-                                        Không tìm thấy sản phẩm nào phù hợp điều kiện lọc.
-                                    </td>
+                                    <th style="width: 80px;">MÃ BT</th>
+                                    <th>MÃ SKU</th>
+                                    <th>TÊN SẢN PHẨM</th>
+                                    <th>PHÂN LOẠI</th>
+                                    <th class="text-center">TỔNG TỒN CẢ CHUỖI</th>
+                                    <th class="text-right">GIÁ NHẬP THAM KHẢO</th>
+                                    <th class="text-center" style="width: 140px;">CHI TIẾT KHO</th>
                                 </tr>
-                            }
-                            else
-                            {
-                                @foreach (var item in FilteredInventoryList)
+                            </thead>
+                            <tbody>
+                                @if (!FilteredInventoryList.Any())
                                 {
-                                    <tr class="@(item.SoLuongTon == 0 ? "row-out-of-stock" : "row-low-stock")">
-                                        <td class="font-mono text-muted">#@item.MaBienThe</td>
-                                        <td><code class="sku-code">@item.MaSku</code></td>
-                                        <td class="font-bold">@item.TenSanPham</td>
-                                        <td>@item.MauSac - Size @item.KichCo</td>
-                                        <td class="text-center tabular-nums">
-                                            <span class="stock-badge @(item.SoLuongTon == 0 ? "stock-zero" : "stock-low")">
-                                                @item.SoLuongTon
-                                            </span>
-                                        </td>
-                                        <td class="text-right tabular-nums">@item.GiaNhap.ToString("N0") đ</td>
-                                        <td class="text-center">
-                                            @if (item.SoLuongTon == 0)
-                                            {
-                                                <span class="badge-status-out">HẾT HÀNG</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge-status-warn">SẮP HẾT HÀNG</span>
-                                            }
-                                        </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-action-import" @onclick="() => PreFillImport(item.MaBienThe, item.GiaNhap, item)">
-                                                + Nhập hàng
-                                            </button>
+                                    <tr>
+                                        <td colspan="7" class="text-center py-5 text-muted">
+                                            Không tìm thấy sản phẩm nào phù hợp điều kiện lọc.
                                         </td>
                                     </tr>
                                 }
-                            }
-                        </tbody>
-                    </table>
+                                else
+                                {
+                                    @foreach (var item in FilteredInventoryList)
+                                    {
+                                        <tr>
+                                            <td class="font-mono text-muted">#@item.MaBienThe</td>
+                                            <td><code class="sku-code">@item.MaSku</code></td>
+                                            <td class="font-bold">@item.TenSanPham</td>
+                                            <td>@item.MauSac - Size @item.KichCo</td>
+                                            <td class="text-center tabular-nums">
+                                                <span class="stock-badge stock-neutral">
+                                                    @item.SoLuongTon cái
+                                                </span>
+                                                @if (item.DaXoa)
+                                                {
+                                                    <span style="display: block; font-size: 0.68rem; color: #64748b; font-weight: 700; margin-top: 2px;">⚪ ĐÃ ẨN</span>
+                                                }
+                                            </td>
+                                            <td class="text-right tabular-nums">@item.GiaNhap.ToString("N0") đ</td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm btn-branch-detail" @onclick="() => OpenDispatchModal(item)" title="Xem danh sách kho để chuyển sang kiểm tra">
+                                                    🏬 Xem từng kho &rarr;
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <!-- TAB CẢNH BÁO TỒN KHO & KIỂM KÊ CHO KHO CỤ THỂ -->
+                <div class="card wh-card">
+                    <div class="card-header">
+                        <div class="header-left">
+                            <div>
+                                <h3 class="card-title">CẢNH BÁO THIẾU HÀNG & KIỂM KÊ - @CurrentWarehouseDisplayName</h3>
+                                <p class="card-desc" style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+                                    Danh sách các mặt hàng tại cơ sở này cần lập kế hoạch bổ sung hàng hóa.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="header-filter-bar">
+                            <div class="search-box">
+                                <input type="text" class="form-control" placeholder="Lọc theo SKU, tên sản phẩm, màu sắc, size..." @bind="_inventoryFilterQuery" @bind:event="oninput" />
+                            </div>
+                            <div class="status-filters">
+                                <button type="button" class="filter-chip @(_stockFilterMode == "ALL" ? "active" : "")" @onclick='() => _stockFilterMode = "ALL"'>Tất cả (@_totalSkuTracked)</button>
+                                <button type="button" class="filter-chip @(_stockFilterMode == "LOW" ? "active" : "")" @onclick='() => _stockFilterMode = "LOW"'>Sắp hết (&le; 10)</button>
+                                <button type="button" class="filter-chip @(_stockFilterMode == "OUT" ? "active" : "")" @onclick='() => _stockFilterMode = "OUT"'>Cạn kho (0)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="wh-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">MÃ BT</th>
+                                    <th>MÃ SKU</th>
+                                    <th>TÊN SẢN PHẨM</th>
+                                    <th>PHÂN LOẠI</th>
+                                    <th class="text-center">SỐ LƯỢNG TỒN</th>
+                                    <th class="text-right">GIÁ NHẬP ĐỀ XUẤT</th>
+                                    <th class="text-center">TRẠNG THÁI</th>
+                                    <th class="text-center" style="width: 110px;">THAO TÁC</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!FilteredInventoryList.Any())
+                                {
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5 text-muted">
+                                            Không tìm thấy sản phẩm nào phù hợp điều kiện lọc.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var item in FilteredInventoryList)
+                                    {
+                                        <tr class="@(item.SoLuongTon == 0 ? "row-out-of-stock" : (item.SoLuongTon <= 10 ? "row-low-stock" : ""))">
+                                            <td class="font-mono text-muted">#@item.MaBienThe</td>
+                                            <td><code class="sku-code">@item.MaSku</code></td>
+                                            <td class="font-bold">@item.TenSanPham</td>
+                                            <td>@item.MauSac - Size @item.KichCo</td>
+                                            <td class="text-center tabular-nums">
+                                                <span class="stock-badge @(item.SoLuongTon == 0 ? "stock-zero" : (item.SoLuongTon <= 10 ? "stock-low" : "stock-ok"))">
+                                                    @item.SoLuongTon
+                                                </span>
+                                            </td>
+                                            <td class="text-right tabular-nums">@item.GiaNhap.ToString("N0") đ</td>
+                                            <td class="text-center">
+                                                @if (item.DaXoa)
+                                                {
+                                                    <span class="badge-status-hidden" style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700;">⚪ ĐÃ ẨN / TẠM NGỪNG</span>
+                                                }
+                                                else if (item.SoLuongTon == 0)
+                                                {
+                                                    <span class="badge-status-out">HẾT HÀNG</span>
+                                                }
+                                                else if (item.SoLuongTon <= 10)
+                                                {
+                                                    <span class="badge-status-warn">SẮP HẾT HÀNG</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge-status-ok">ĐỦ HÀNG</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (item.DaXoa)
+                                                {
+                                                    <button type="button" class="btn btn-sm" @onclick="() => WarnHiddenItem(item)" style="opacity: 0.7; background: #f8fafc; color: #94a3b8; border: 1px dashed #cbd5e1; cursor: not-allowed; font-size: 0.74rem;" title="Hàng đã tạm thời ngừng cung cấp">
+                                                        🚫 Đã ẩn
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-action-import" @onclick="() => PreFillImport(item.MaBienThe, item.GiaNhap, item)" title="Nạp vào form nhập của kho này">
+                                                        + Nhập hàng
+                                                    </button>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
         }
         else if (_currentTab == TabType.History)
         {
             <!-- TAB 3: LỊCH SỬ NHẬP KHO & AUDIT -->
             <div class="card wh-card">
                 <div class="card-header">
-                    <h3 class="card-title">NHẬT KÝ THAO TÁC NHẬP HÀNG & BIẾN ĐỘNG KHO</h3>
+                    <h3 class="card-title">
+                        @if (_isChainAdmin)
+                        {
+                            <span>NHẬT KÝ THAO TÁC NHẬP HÀNG & BIẾN ĐỘNG KHO (@(_currentWarehouseScopeId == 0 ? "TOÀN HỆ THỐNG" : (_branches.FirstOrDefault(b => b.MaChiNhanh == _currentWarehouseScopeId)?.TenChiNhanh ?? $"Chi nhánh #{_currentWarehouseScopeId}")))</span>
+                        }
+                        else
+                        {
+                            <span>NHẬT KÝ NHẬP HÀNG KHO (@(_isOnlineWarehouseKeeper ? OnlineWarehouseName : _staffBranchName))</span>
+                        }
+                    </h3>
                     <button type="button" class="btn-refresh" @onclick="LoadAuditLogs">Làm mới lịch sử</button>
                 </div>
 
@@ -544,15 +854,27 @@
                                 <th style="width: 90px;">MÃ VẾT</th>
                                 <th style="width: 140px;">ĐỐI TƯỢNG</th>
                                 <th>NỘI DUNG CHI TIẾT NHẬP HÀNG</th>
+                                @if (_isChainAdmin && _currentWarehouseScopeId == 0)
+                                {
+                                    <th style="width: 170px;">CHI NHÁNH</th>
+                                }
                                 <th style="width: 180px;">NGƯỜI THỰC HIỆN</th>
                                 <th style="width: 160px;" class="text-right">THỜI GIAN</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @if (!_auditLogs.Any())
+                            @if (_isLoadingLogs)
                             {
                                 <tr>
-                                    <td colspan="5" class="text-center py-5 text-muted">Chưa ghi nhận đợt nhập hàng nào trong nhật ký.</td>
+                                    <td colspan="@(_isChainAdmin && _currentWarehouseScopeId == 0 ? 6 : 5)" class="text-center py-5 text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status"></div> Đang nạp nhật ký kiểm toán và lịch sử nhập kho...
+                                    </td>
+                                </tr>
+                            }
+                            else if (!_auditLogs.Any())
+                            {
+                                <tr>
+                                    <td colspan="@(_isChainAdmin && _currentWarehouseScopeId == 0 ? 6 : 5)" class="text-center py-5 text-muted">Chưa ghi nhận đợt nhập hàng nào trong nhật ký kho này.</td>
                                 </tr>
                             }
                             else
@@ -563,6 +885,10 @@
                                         <td class="font-mono text-muted">#@log.MaNhatKy</td>
                                         <td><span class="pill-badge">@log.DoiTuong</span></td>
                                         <td class="log-content">@log.NoiDungChiTiet</td>
+                                        @if (_isChainAdmin && _currentWarehouseScopeId == 0)
+                                        {
+                                            <td><span class="pill-badge" style="background:#e0e7ff; color:#3730a3;">@(log.TenChiNhanh ?? (log.MaChiNhanh.HasValue ? $"Chi nhánh #{log.MaChiNhanh}" : "Kho hệ thống"))</span></td>
+                                        }
                                         <td><strong>@log.TenNhanVien</strong></td>
                                         <td class="text-right font-mono text-muted">@log.ThoiGian.ToString("dd/MM/yyyy HH:mm")</td>
                                     </tr>
@@ -608,6 +934,66 @@
                 </div>
             </div>
         }
+
+        <!-- MODAL CHUYỂN SANG TRANG KHO CHI NHÁNH KHI ĐANG Ở TOÀN CHUỖI -->
+        @if (_isDispatchModalOpen && _dispatchingItem != null)
+        {
+            <div class="modal-backdrop">
+                <div class="modal-card dispatch-modal-box">
+                    <div class="modal-header">
+                        <div class="modal-header-left">
+                            <span class="icon-modal-dispatch">🏬</span>
+                            <div>
+                                <h3 class="modal-title">CHUYỂN SANG TRANG KHO CHI NHÁNH</h3>
+                                <p class="modal-desc">Chọn một cơ sở để chuyển sang kiểm tra tồn kho & lập phiếu nhập hàng</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-modal-close" @onclick="CloseDispatchModal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="dispatch-target-item">
+                            <div class="target-sku"><code>@_dispatchingItem.MaSku</code></div>
+                            <div class="target-name">@_dispatchingItem.TenSanPham</div>
+                            <div class="target-meta">Phân loại: <strong>@_dispatchingItem.MauSac - Size @_dispatchingItem.KichCo</strong> | Tổng tồn toàn chuỗi: <span class="text-blue font-weight-bold">@_dispatchingItem.SoLuongTon cái</span></div>
+                        </div>
+
+                        <div class="dispatch-prompt">
+                            <strong>Chọn cơ sở / kho để chuyển sang quản lý:</strong>
+                        </div>
+
+                        <div class="dispatch-options-list">
+                            <!-- Kho Tổng Online -->
+                            <button type="button" class="dispatch-option-btn online" @onclick="() => DispatchToWarehouse(OnlineWarehouseId)">
+                                <div class="option-icon">🌐</div>
+                                <div class="option-info">
+                                    <span class="option-title">@OnlineWarehouseName</span>
+                                    <span class="option-sub">Phục vụ đơn online, fulfillment & bưu tá</span>
+                                </div>
+                                <span class="option-arrow">&rarr;</span>
+                            </button>
+
+                            <!-- Các chi nhánh offline -->
+                            @foreach (var b in _branches.Where(x => !x.IsOnlineWarehouse && x.MaChiNhanh != OnlineWarehouseId))
+                            {
+                                <button type="button" class="dispatch-option-btn branch" @onclick="() => DispatchToWarehouse(b.MaChiNhanh)">
+                                    <div class="option-icon">🏬</div>
+                                    <div class="option-info">
+                                        <span class="option-title">@b.TenChiNhanh</span>
+                                        <span class="option-sub">@(string.IsNullOrEmpty(b.DiaChi) ? "Điểm bán lẻ trực tiếp" : b.DiaChi)</span>
+                                    </div>
+                                    <span class="option-arrow">&rarr;</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseDispatchModal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        }
     </main>
 </div>
 
@@ -620,79 +1006,165 @@
         font-family: var(--font-family);
     }
 
-    /* TOPBAR: NOIR THEME */
+    /* TOPBAR: MODERN NOIR CONTROL ROOM (PRECISION AESTHETICS) */
     .wh-topbar {
-        background: #090d16;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 10px 24px;
+        background: #080c14;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        padding: 0 24px;
+        height: 60px;
+        min-height: 60px;
         display: flex;
         justify-content: space-between;
         align-items: center;
         color: #ffffff;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        backdrop-filter: blur(12px);
     }
 
     .topbar-left {
         display: flex;
         align-items: center;
-        gap: 18px;
+        gap: 16px;
     }
 
     .wh-brand {
         display: flex;
         align-items: center;
         gap: 10px;
+        user-select: none;
     }
 
     .wh-brand-icon {
-        width: 38px;
-        height: 38px;
-        background: rgba(234, 179, 8, 0.12);
-        border: 1px solid rgba(234, 179, 8, 0.3);
-        border-radius: 8px;
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, rgba(234, 179, 8, 0.16), rgba(234, 179, 8, 0.04));
+        border: 1px solid rgba(234, 179, 8, 0.28);
+        border-radius: 9px;
         display: flex;
         align-items: center;
         justify-content: center;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
     }
 
     .wh-brand-text {
         display: flex;
         flex-direction: column;
+        line-height: 1.25;
     }
 
     .brand-title {
-        font-size: 0.95rem;
-        font-weight: 900;
-        letter-spacing: 0.04em;
+        font-size: 0.88rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
         color: #f8fafc;
     }
 
     .brand-sub {
-        font-size: 0.7rem;
+        font-size: 0.66rem;
+        font-weight: 500;
         color: #94a3b8;
     }
 
-    .role-scope-badge {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        padding: 4px 10px;
-        border-radius: 6px;
+    .topbar-brand-divider {
+        width: 1px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.08);
     }
 
-    .role-chip {
+    /* SCOPE CAPSULE: TÍCH HỢP LIỀN KHỐI GỌN GÀNG */
+    .wh-scope-capsule {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(15, 23, 42, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 4px 6px 4px 12px;
+        border-radius: 9999px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25);
+        transition: border-color 0.2s ease;
+    }
+
+    .wh-scope-capsule:hover {
+        border-color: rgba(234, 179, 8, 0.35);
+    }
+
+    .capsule-role-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: #facc15;
+        white-space: nowrap;
+    }
+
+    .capsule-divider {
+        width: 1px;
+        height: 16px;
+        background: rgba(255, 255, 255, 0.12);
+    }
+
+    .capsule-scope-select {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: #94a3b8;
+    }
+
+    .scope-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+
+    .wh-branch-scope-select {
+        background: rgba(255, 255, 255, 0.05);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        cursor: pointer;
+        outline: none;
+        transition: all 0.2s ease;
+        max-width: 260px;
+        text-overflow: ellipsis;
+    }
+
+    .wh-branch-scope-select:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(234, 179, 8, 0.35);
+    }
+
+    .wh-branch-scope-select:focus {
+        border-color: #eab308;
+        box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
+    }
+
+    .wh-branch-scope-select:disabled {
+        background: rgba(255, 255, 255, 0.03);
+        color: #94a3b8;
+        cursor: not-allowed;
+        border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .scope-lock-indicator {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        font-size: 0.72rem;
-        font-weight: 800;
-        color: #eab308;
-    }
-
-    .scope-text {
-        font-size: 0.7rem;
-        color: #94a3b8;
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #f59e0b;
+        background: rgba(245, 158, 11, 0.12);
+        padding: 2px 7px;
+        border-radius: 9999px;
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        white-space: nowrap;
     }
 
     .topbar-right {
@@ -701,9 +1173,20 @@
         gap: 12px;
     }
 
+    .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .topbar-bell-wrapper {
+        display: flex;
+        align-items: center;
+    }
+
     .topbar-divider {
         width: 1px;
-        height: 20px;
+        height: 22px;
         background: rgba(255, 255, 255, 0.1);
     }
 
@@ -711,55 +1194,97 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 8px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.09);
         color: #e2e8f0;
         text-decoration: none;
-        transition: all 0.15s ease;
+        transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .btn-portal-shortcut:hover {
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.18);
         color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .btn-topbar-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 11px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        color: #f1f5f9;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .btn-topbar-back:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.3);
+        transform: translateX(-2px);
+    }
+
+    .btn-portal-shortcut-highlight {
+        background: rgba(14, 165, 233, 0.12);
+        border-color: rgba(14, 165, 233, 0.35);
+        color: #38bdf8;
+    }
+
+    .btn-portal-shortcut-highlight:hover {
+        background: rgba(14, 165, 233, 0.22);
+        border-color: rgba(14, 165, 233, 0.55);
+        color: #7dd3fc;
     }
 
     .wh-user-profile {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 9px;
     }
 
     .avatar-squircle {
         width: 32px;
         height: 32px;
-        background: #1e293b;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        color: #eab308;
-        font-weight: 800;
-        font-size: 0.78rem;
+        background: linear-gradient(135deg, #1e293b, #0f172a);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #facc15;
+        font-weight: 700;
+        font-size: 0.74rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 8px;
+        border-radius: 9999px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
 
     .profile-info {
         display: flex;
         flex-direction: column;
+        line-height: 1.25;
     }
 
     .profile-name {
-        font-size: 0.8rem;
+        font-size: 0.76rem;
         font-weight: 700;
         color: #f8fafc;
     }
 
     .profile-role {
-        font-size: 0.68rem;
+        font-size: 0.65rem;
+        font-weight: 500;
         color: #94a3b8;
     }
 
@@ -767,20 +1292,27 @@
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 6px 10px;
-        background: transparent;
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        height: 32px;
+        padding: 0 10px;
+        background: rgba(239, 68, 68, 0.06);
+        border: 1px solid rgba(239, 68, 68, 0.2);
         color: #f87171;
-        border-radius: 6px;
+        border-radius: 8px;
         font-size: 0.72rem;
-        font-weight: 700;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .btn-logout:hover {
-        background: rgba(239, 68, 68, 0.15);
+        background: rgba(239, 68, 68, 0.14);
+        border-color: rgba(239, 68, 68, 0.35);
         color: #fca5a5;
+        transform: translateY(-1px);
+    }
+
+    .btn-logout:active {
+        transform: translateY(0);
     }
 
     /* MAIN CONTAINER */
@@ -1325,6 +1857,411 @@
         cursor: pointer;
     }
 
+    /* LOCKED BRANCH DISPLAY IN IMPORT FORM */
+    .locked-branch-display {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        padding: 8px 12px;
+        border-radius: 6px;
+    }
+
+    .locked-branch-text {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .btn-change-branch-link {
+        background: none;
+        border: none;
+        color: #2563eb;
+        font-size: 0.75rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 2px 6px;
+        text-decoration: underline;
+    }
+
+    .badge-lock-pill {
+        margin-left: auto;
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #d97706;
+        background: #fef3c7;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid #fde68a;
+    }
+
+    /* CHAIN SCOPE DISPATCH GUIDE BOARD */
+    .chain-scope-guide-card {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .chain-guide-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .guide-icon-badge {
+        width: 48px;
+        height: 48px;
+        background: #fefce8;
+        border: 1px solid #fef08a;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .guide-texts {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .guide-title {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        color: #0f172a;
+    }
+
+    .guide-desc {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #64748b;
+        line-height: 1.45;
+    }
+
+    .dispatch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .dispatch-card {
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .dispatch-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .dispatch-card.online-wh-card {
+        border-color: #3b82f6;
+        background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+    }
+
+    .dispatch-card.online-wh-card:hover {
+        border-color: #1d4ed8;
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+    }
+
+    .dispatch-card.offline-branch-card:hover {
+        border-color: #0f172a;
+    }
+
+    .card-status-pill {
+        align-self: flex-start;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 3px 8px;
+        border-radius: 4px;
+    }
+
+    .card-status-pill.online {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .card-status-pill.offline {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .wh-symbol {
+        font-size: 1.8rem;
+        margin-top: 4px;
+    }
+
+    .wh-title {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .wh-meta {
+        margin: 0;
+        font-size: 0.78rem;
+        color: #64748b;
+        flex: 1;
+        line-height: 1.4;
+    }
+
+    .btn-dispatch-action {
+        margin-top: 8px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: center;
+    }
+
+    .btn-dispatch-action.online {
+        background: #2563eb;
+        color: #ffffff;
+    }
+
+    .btn-dispatch-action.online:hover {
+        background: #1d4ed8;
+    }
+
+    .btn-dispatch-action.offline {
+        background: #0f172a;
+        color: #ffffff;
+    }
+
+    .btn-dispatch-action.offline:hover {
+        background: #334155;
+    }
+
+    /* ACTION DISPATCH BUTTON IN TABLE */
+    .btn-action-dispatch {
+        background: #eab308;
+        color: #0f172a;
+        font-weight: 800;
+        font-size: 0.72rem;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .btn-action-dispatch:hover {
+        background: #facc15;
+        box-shadow: 0 2px 6px rgba(234, 179, 8, 0.4);
+    }
+
+    /* DISPATCH MODAL */
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 16px;
+    }
+
+    .modal-card.dispatch-modal-box {
+        background: #ffffff;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 520px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: modalFadeIn 0.2s ease-out;
+    }
+
+    @@keyframes modalFadeIn {
+        from { opacity: 0; transform: scale(0.96); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        background: #fafafa;
+    }
+
+    .modal-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .icon-modal-dispatch {
+        font-size: 1.5rem;
+    }
+
+    .modal-title {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .modal-desc {
+        margin: 0;
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .btn-modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #94a3b8;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    .btn-modal-close:hover {
+        color: #0f172a;
+    }
+
+    .modal-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .dispatch-target-item {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .target-sku code {
+        background: #e2e8f0;
+        color: #0f172a;
+        font-weight: 700;
+        font-size: 0.75rem;
+        padding: 1px 5px;
+        border-radius: 3px;
+    }
+
+    .target-name {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .target-meta {
+        font-size: 0.78rem;
+        color: #475569;
+    }
+
+    .dispatch-prompt {
+        font-size: 0.8rem;
+        color: #334155;
+    }
+
+    .dispatch-options-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+
+    .dispatch-option-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+        cursor: pointer;
+        text-align: left;
+        transition: all 0.15s ease;
+    }
+
+    .dispatch-option-btn:hover {
+        border-color: #eab308;
+        background: #fefce8;
+        transform: translateX(3px);
+    }
+
+    .dispatch-option-btn.online {
+        border-color: #bfdbfe;
+        background: #f8fafc;
+    }
+
+    .dispatch-option-btn.online:hover {
+        border-color: #2563eb;
+        background: #eff6ff;
+    }
+
+    .option-icon {
+        font-size: 1.3rem;
+    }
+
+    .option-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: 1;
+    }
+
+    .option-title {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .option-sub {
+        font-size: 0.72rem;
+        color: #64748b;
+    }
+
+    .option-arrow {
+        font-size: 1.1rem;
+        color: #94a3b8;
+        font-weight: 800;
+    }
+
+    .modal-footer {
+        padding: 12px 20px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+        background: #fafafa;
+    }
+
     /* TABLES */
     .wh-table {
         width: 100%;
@@ -1362,6 +2299,8 @@
 
     .stock-zero { background: #fee2e2; color: #dc2626; }
     .stock-low { background: #fef3c7; color: #b45309; }
+    .stock-neutral { background: #f1f5f9; color: #1e293b; border: 1px solid #cbd5e1; }
+    .stock-ok { background: #f0fdf4; color: #166534; }
 
     .badge-status-out {
         font-size: 0.7rem;
@@ -1379,6 +2318,49 @@
         color: #b45309;
         padding: 2px 6px;
         border-radius: 4px;
+    }
+
+    .badge-status-ok {
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: #f0fdf4;
+        color: #16a34a;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .btn-branch-detail {
+        padding: 4px 10px;
+        background: #f1f5f9;
+        color: #1e293b;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .btn-branch-detail:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+        border-color: #94a3b8;
+        transform: translateY(-1px);
+    }
+
+    .icon-chain-total {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .icon-chain-network {
+        background: #ecfdf5;
+        color: #059669;
+    }
+
+    .text-blue {
+        color: #2563eb !important;
     }
 
     .btn-action-import {
@@ -1512,9 +2494,21 @@
     private bool _canAccessAdminChain = false;
     private bool _canAccessPos = false;
     private string _badgeRoleTitle = "THỦ KHO CHUYÊN TRÁCH";
-    private string _scopeDescText = "Phạm vi: Kho Tổng & 9 Chi Nhánh QF";
+    private string _scopeDescText = "Phạm vi: Toàn chuỗi";
     private string _roleDisplayTitle = "Thủ kho hệ thống QF";
     private string _avatarLetters = "TK";
+
+    // Phân quyền cách ly kho (RBAC Scope Isolation)
+    private List<global::Shared.DTOs.Warehouse.BranchDto> _branches = new();
+    private global::Shared.DTOs.Warehouse.BranchDto? OnlineWarehouseBranch =>
+        _branches.FirstOrDefault(b => b.IsOnlineWarehouse) ?? _branches.FirstOrDefault(b => b.MaChiNhanh == 9);
+    private int OnlineWarehouseId => OnlineWarehouseBranch?.MaChiNhanh ?? 9;
+    private string OnlineWarehouseName => OnlineWarehouseBranch?.TenChiNhanh ?? "Kho Tổng QF Tân Bình";
+    private int _currentWarehouseScopeId = 0;
+    private bool _isChainAdmin = false;
+    private bool _isBranchManager = false;
+    private bool _isOnlineWarehouseKeeper = false;
+    private bool _isBranchWarehouseKeeper = false;
 
     private List<global::Shared.DTOs.Warehouse.LowStockAlertDto> _allVariants = new();
     private List<global::Shared.DTOs.Warehouse.LowStockAlertDto> _lowStockAlerts = new();
@@ -1523,8 +2517,10 @@
     private List<global::Shared.DTOs.Announcement.InternalAnnouncementDto> _announcements = new();
 
     private int _totalSkuTracked = 0;
+    private int _totalStockInChain = 0;
     private int _outOfStockCount = 0;
     private bool _isLoadingData = true;
+    private bool _isLoadingLogs = false;
 
     // Form nhập hàng
     private int _selectedSupplierId = 1;
@@ -1555,7 +2551,45 @@
     protected override async Task OnInitializedAsync()
     {
         await SignalRService.StartAsync();
+        SyncAuthFromAuthStateService();
         await LoadWarehouseData();
+    }
+
+    private void SyncAuthFromAuthStateService()
+    {
+        if (AuthStateService.IsAuthenticated && !string.IsNullOrEmpty(AuthStateService.UserRole))
+        {
+            _userRole = AuthStateService.UserRole;
+            _staffName = AuthStateService.StaffName;
+            var isChainAdmin = _userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
+                               _userRole.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                               _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase);
+
+            var isBranchManager = _userRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                                  _userRole.Contains("Cửa hàng trưởng", StringComparison.OrdinalIgnoreCase);
+
+            if (isChainAdmin)
+            {
+                _isChainAdmin = true;
+                _canAccessAdminChain = true;
+                _canAccessPos = true;
+                _badgeRoleTitle = "QUẢN LÝ CHUỖI TOÀN HỆ THỐNG";
+                _roleDisplayTitle = "Quản trị viên toàn chuỗi";
+                _scopeDescText = "Phạm vi: Toàn chuỗi";
+                var name = _staffName ?? "Admin";
+                _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "AD";
+            }
+            else if (isBranchManager)
+            {
+                _isBranchManager = true;
+                _canAccessPos = true;
+                _badgeRoleTitle = "QUẢN LÝ CHI NHÁNH";
+                _scopeDescText = $"Phạm vi: {_staffBranchName}";
+                _roleDisplayTitle = "Cửa hàng trưởng chi nhánh";
+                var name = _staffName ?? "QL";
+                _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "QL";
+            }
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1601,18 +2635,36 @@
 
                     if (isChainAdmin)
                     {
+                        _isChainAdmin = true;
+                        _isOnlineWarehouseKeeper = false;
+                        _isBranchWarehouseKeeper = false;
                         _canAccessAdminChain = true;
                         _canAccessPos = true;
                         _badgeRoleTitle = "QUẢN LÝ CHUỖI TOÀN HỆ THỐNG";
-                        _scopeDescText = "Phạm vi: Toàn chuỗi (9 chi nhánh)";
+                        _scopeDescText = _currentWarehouseScopeId == 0 
+                            ? $"Phạm vi: Toàn chuỗi ({(_branches.Any() ? _branches.Count.ToString() : "Tất cả")} chi nhánh)" 
+                            : $"Phạm vi: {_branches.FirstOrDefault(b => b.MaChiNhanh == _currentWarehouseScopeId)?.TenChiNhanh ?? $"Chi nhánh #{_currentWarehouseScopeId}"}";
                         _roleDisplayTitle = "Quản trị viên toàn chuỗi";
                         var name = _staffName ?? "Admin";
                         _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "AD";
+
+                        // Khi ở chế độ Toàn chuỗi: Mặc định Tab Giám sát tồn kho toàn chuỗi để quan sát số liệu
+                        if (_currentWarehouseScopeId == 0)
+                        {
+                            _currentTab = TabType.Inventory;
+                        }
                     }
                     else if (isBranchManager)
                     {
+                        _isChainAdmin = false;
+                        _isBranchManager = true;
+                        _isOnlineWarehouseKeeper = false;
+                        _isBranchWarehouseKeeper = true;
+                        _currentWarehouseScopeId = _staffBranchId;
+                        _selectedBranchId = _staffBranchId;
                         _canAccessAdminChain = false;
                         _canAccessPos = true;
+                        _currentTab = TabType.Inventory;
                         _badgeRoleTitle = "QUẢN LÝ CHI NHÁNH";
                         _scopeDescText = $"Phạm vi: {_staffBranchName}";
                         _roleDisplayTitle = "Cửa hàng trưởng chi nhánh";
@@ -1626,12 +2678,22 @@
                         _canAccessPos = false;
                         if (_loaiThuKho.Contains("Online", StringComparison.OrdinalIgnoreCase) || _staffBranchId == 9)
                         {
+                            _isChainAdmin = false;
+                            _isOnlineWarehouseKeeper = true;
+                            _isBranchWarehouseKeeper = false;
+                            _currentWarehouseScopeId = 9;
+                            _selectedBranchId = 9;
                             _badgeRoleTitle = "THỦ KHO ONLINE (KHO TỔNG)";
                             _scopeDescText = "Phạm vi: Kho Tổng QF Tân Bình (Đơn Online & Bán buôn)";
                             _roleDisplayTitle = "Thủ kho Online (Kho Tổng)";
                         }
                         else
                         {
+                            _isChainAdmin = false;
+                            _isOnlineWarehouseKeeper = false;
+                            _isBranchWarehouseKeeper = true;
+                            _currentWarehouseScopeId = _staffBranchId;
+                            _selectedBranchId = _staffBranchId;
                             _badgeRoleTitle = "THỦ KHO CHI NHÁNH";
                             _scopeDescText = $"Phạm vi: {_staffBranchName}";
                             _roleDisplayTitle = $"Thủ kho {_staffBranchName}";
@@ -1640,19 +2702,19 @@
                     }
                     else
                     {
-                        _canAccessAdminChain = false;
-                        _canAccessPos = true;
-                        _badgeRoleTitle = "NHÂN VIÊN BÁN HÀNG";
-                        _scopeDescText = "Phạm vi: Điểm bán POS";
-                        _roleDisplayTitle = "Nhân viên bán lẻ";
-                        _avatarLetters = "NV";
+                        Toast.ShowWarning("Bạn không có quyền truy cập cổng Quản lý kho.");
+                        Navigation.NavigateTo(_userRole == global::Shared.Constants.RoleConstants.KhachHang ? "/" : "/pos");
+                        return;
                     }
                 }
                 else
                 {
-                    // Mặc định là Thủ kho: không có quyền Quản lý chuỗi
-                    _canAccessAdminChain = false;
-                    _canAccessPos = false;
+                    Navigation.NavigateTo("/login?returnUrl=/warehouse");
+                    return;
+                }
+                if (_currentWarehouseScopeId > 0)
+                {
+                    await LoadWarehouseDataForScope(_currentWarehouseScopeId);
                 }
                 StateHasChanged();
             }
@@ -1660,43 +2722,171 @@
         }
     }
 
-    private void SetTab(TabType tab)
+    private async Task SetTab(TabType tab)
     {
         _currentTab = tab;
-        if (tab == TabType.History && !_auditLogs.Any())
+        if (tab == TabType.History)
         {
-            _ = LoadAuditLogs();
+            await LoadAuditLogs();
         }
         else if (tab == TabType.Announcements && !_announcements.Any())
         {
-            _ = LoadAnnouncements();
+            await LoadAnnouncements();
         }
     }
 
-    private async Task LoadWarehouseData()
+    private string CurrentWarehouseDisplayName
+    {
+        get
+        {
+            if (_currentWarehouseScopeId == 0) return $"Toàn chuỗi ({(_branches.Any() ? _branches.Count.ToString() : "Tất cả")} chi nhánh)";
+            var onlineBranch = _branches.FirstOrDefault(x => x.IsOnlineWarehouse);
+            if (onlineBranch != null && _currentWarehouseScopeId == onlineBranch.MaChiNhanh) return $"🌐 Kho Tổng Online ({onlineBranch.TenChiNhanh})";
+            var b = _branches.FirstOrDefault(x => x.MaChiNhanh == _currentWarehouseScopeId);
+            return b != null ? $"🏬 {b.TenChiNhanh}" : $"Chi nhánh #{_currentWarehouseScopeId}";
+        }
+    }
+
+    private async Task SwitchToSpecificWarehouse(int branchId)
+    {
+        var onlineBranchId = _branches.FirstOrDefault(x => x.IsOnlineWarehouse)?.MaChiNhanh ?? 9;
+        if (!_isChainAdmin && branchId != _staffBranchId && !(_isOnlineWarehouseKeeper && branchId == onlineBranchId))
+            return;
+
+        _currentWarehouseScopeId = branchId;
+        if (branchId > 0)
+        {
+            _selectedBranchId = branchId;
+            var b = _branches.FirstOrDefault(x => x.MaChiNhanh == branchId);
+            var name = b?.IsOnlineWarehouse == true ? "Kho Tổng Online" : (b?.TenChiNhanh ?? $"Chi nhánh #{branchId}");
+            _scopeDescText = $"Phạm vi: {name}";
+            _currentTab = TabType.Import;
+        }
+        else
+        {
+            _scopeDescText = $"Phạm vi: Toàn chuỗi ({(_branches.Any() ? _branches.Count.ToString() : "Tất cả")} chi nhánh)";
+            _currentTab = TabType.Inventory;
+        }
+        await LoadWarehouseDataForScope(branchId);
+        if (_currentTab == TabType.History)
+        {
+            await LoadAuditLogs();
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnWarehouseScopeChanged(ChangeEventArgs e)
+    {
+        if (!_isChainAdmin) return;
+
+        if (int.TryParse(e.Value?.ToString(), out var newScopeId))
+        {
+            await SwitchToSpecificWarehouse(newScopeId);
+        }
+    }
+
+    // Modal Điều Phối Nhập Hàng Từ Bảng Toàn Chuỗi
+    private bool _isDispatchModalOpen = false;
+    private global::Shared.DTOs.Warehouse.LowStockAlertDto? _dispatchingItem;
+
+    private void OpenDispatchModal(global::Shared.DTOs.Warehouse.LowStockAlertDto item)
+    {
+        _dispatchingItem = item;
+        _isDispatchModalOpen = true;
+    }
+
+    private void CloseDispatchModal()
+    {
+        _isDispatchModalOpen = false;
+        _dispatchingItem = null;
+    }
+
+    private async Task DispatchToWarehouse(int branchId)
+    {
+        var itemToImport = _dispatchingItem;
+        await SwitchToSpecificWarehouse(branchId);
+        if (itemToImport != null)
+        {
+            PreFillImport(itemToImport.MaBienThe, itemToImport.GiaNhap, itemToImport);
+        }
+        CloseDispatchModal();
+    }
+
+    private Task LoadWarehouseData() => LoadWarehouseDataForScope(_currentWarehouseScopeId);
+
+    private async Task LoadWarehouseDataForScope(int scopeId)
     {
         _isLoadingData = true;
         try
         {
-            var variantsTask = AdminApi.GetAllWarehouseVariantsAsync();
-            var alertsTask = AdminApi.GetLowStockAlertsAsync(threshold: 15);
             var suppliersTask = AdminApi.GetSuppliersAsync();
             var announcementsTask = AdminApi.GetAnnouncementsAsync(phamVi: "Thủ kho");
+            var branchesTask = AdminApi.GetBranchesAsync();
 
-            await Task.WhenAll(variantsTask, alertsTask, suppliersTask, announcementsTask);
+            if (scopeId == 0)
+            {
+                // TOÀN CHUỖI: Lấy tổng hợp toàn chuỗi (Toàn bộ 351 SKU)
+                var variantsTask = AdminApi.GetAllWarehouseVariantsAsync();
 
-            _allVariants = (await variantsTask) ?? new();
-            _lowStockAlerts = (await alertsTask) ?? new();
-            _suppliers = (await suppliersTask) ?? new();
-            _announcements = (await announcementsTask) ?? new();
+                await Task.WhenAll(variantsTask, suppliersTask, announcementsTask, branchesTask);
+
+                _allVariants = (await variantsTask) ?? new();
+                _suppliers = (await suppliersTask) ?? new();
+                _announcements = (await announcementsTask) ?? new();
+                _branches = (await branchesTask) ?? new();
+
+                _totalStockInChain = _allVariants.Sum(x => x.SoLuongTon);
+                _totalSkuTracked = _allVariants.Any() ? _allVariants.Count : 351;
+                _lowStockAlerts = new();
+                _outOfStockCount = 0;
+            }
+            else
+            {
+                // KHO CỤ THỂ: Lấy đúng tồn kho của chi nhánh/kho online này từ TonKhoChiNhanh
+                var inventoryTask = AdminApi.GetBranchInventoryAsync(scopeId);
+
+                await Task.WhenAll(inventoryTask, suppliersTask, announcementsTask, branchesTask);
+
+                var branchItems = (await inventoryTask) ?? new();
+                _suppliers = (await suppliersTask) ?? new();
+                _announcements = (await announcementsTask) ?? new();
+                _branches = (await branchesTask) ?? new();
+
+                _allVariants = branchItems.Select(x => new LowStockAlertDto
+                {
+                    MaBienThe = x.MaBienThe,
+                    TenSanPham = x.TenSanPham,
+                    MaSku = x.MaSku ?? $"QF-SP-{x.MaBienThe}",
+                    MauSac = x.MauSac,
+                    KichCo = x.KichCo,
+                    SoLuongTon = x.SoLuongTon,
+                    GiaNhap = x.GiaBan * 0.6m,
+                    DaXoa = x.DaXoa
+                }).ToList();
+
+                _lowStockAlerts = branchItems
+                    .Where(x => x.SoLuongTon <= x.MucCanhBaoTon)
+                    .OrderBy(x => x.SoLuongTon)
+                    .Select(x => new LowStockAlertDto
+                    {
+                        MaBienThe = x.MaBienThe,
+                        TenSanPham = x.TenSanPham,
+                        MaSku = x.MaSku ?? $"QF-SP-{x.MaBienThe}",
+                        MauSac = x.MauSac,
+                        KichCo = x.KichCo,
+                        SoLuongTon = x.SoLuongTon,
+                        GiaNhap = x.GiaBan * 0.6m,
+                        DaXoa = x.DaXoa
+                    }).ToList();
+
+                _outOfStockCount = branchItems.Count(x => x.SoLuongTon == 0);
+                _totalSkuTracked = branchItems.Count;
+            }
 
             if (_suppliers.Any() && (_selectedSupplierId == 0 || !_suppliers.Any(s => s.MaNhaCungCap == _selectedSupplierId)))
             {
                 _selectedSupplierId = _suppliers.First().MaNhaCungCap;
             }
-
-            _outOfStockCount = _lowStockAlerts.Count(x => x.SoLuongTon == 0);
-            _totalSkuTracked = _allVariants.Any() ? _allVariants.Count : Math.Max(_lowStockAlerts.Count + 42, 60);
         }
         catch (Exception ex)
         {
@@ -1705,19 +2895,39 @@
         finally
         {
             _isLoadingData = false;
+            StateHasChanged();
         }
     }
 
     private async Task LoadAuditLogs()
     {
+        _isLoadingLogs = true;
+        StateHasChanged();
         try
         {
-            var data = await AdminApi.GetAuditLogsAsync("NHAP_HANG", 50);
+            int? targetBranchId = null;
+            if (!_isChainAdmin)
+            {
+                // Kho chi nhánh chỉ được xem nhật ký của kho mình đang quản lý
+                targetBranchId = _isOnlineWarehouseKeeper ? OnlineWarehouseId : (_staffBranchId > 0 ? _staffBranchId : _currentWarehouseScopeId);
+            }
+            else
+            {
+                // Admin: Toàn chuỗi (_currentWarehouseScopeId == 0) xem toàn bộ; nếu chọn kho cụ thể thì xem riêng kho đó
+                targetBranchId = _currentWarehouseScopeId > 0 ? _currentWarehouseScopeId : null;
+            }
+
+            var data = await AdminApi.GetAuditLogsAsync("NHAP_HANG", targetBranchId, 50);
             _auditLogs = data ?? new();
         }
         catch (Exception ex)
         {
             Toast.ShowError($"Lỗi tải lịch sử: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingLogs = false;
+            StateHasChanged();
         }
     }
 
@@ -1755,16 +2965,19 @@
                 q = q.Where(x => 
                     x.MaSku.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
                     x.TenSanPham.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
-                    x.MauSac.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
-                    x.KichCo.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase));
+                    (x.MauSac != null && x.MauSac.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase)) ||
+                    (x.KichCo != null && x.KichCo.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase)));
             }
-            if (_stockFilterMode == "LOW")
+            if (_currentWarehouseScopeId > 0)
             {
-                q = q.Where(x => x.SoLuongTon > 0 && x.SoLuongTon <= 10);
-            }
-            else if (_stockFilterMode == "OUT")
-            {
-                q = q.Where(x => x.SoLuongTon == 0);
+                if (_stockFilterMode == "LOW")
+                {
+                    q = q.Where(x => x.SoLuongTon > 0 && x.SoLuongTon <= 10);
+                }
+                else if (_stockFilterMode == "OUT")
+                {
+                    q = q.Where(x => x.SoLuongTon == 0);
+                }
             }
             return q;
         }
@@ -1772,10 +2985,20 @@
 
     private void SelectSuggestion(global::Shared.DTOs.Warehouse.LowStockAlertDto item)
     {
+        if (item.DaXoa)
+        {
+            Toast.ShowWarning("Hàng đã tạm thời ngừng cung cấp. Không thể lập phiếu nhập cho sản phẩm này!");
+            return;
+        }
         _selectedVariant = item;
         _importVariantId = item.MaBienThe;
         if (item.GiaNhap > 0) _importPrice = item.GiaNhap;
         _skuSearchQuery = string.Empty;
+    }
+
+    private void WarnHiddenItem(global::Shared.DTOs.Warehouse.LowStockAlertDto item)
+    {
+        Toast.ShowWarning($"Sản phẩm '{item.TenSanPham}' ({item.MaSku}) đã bị ẩn. Hàng đã tạm thời ngừng cung cấp!");
     }
 
     private void ClearSelectedVariant()
@@ -1788,6 +3011,11 @@
 
     private void PreFillImport(int variantId, decimal price, global::Shared.DTOs.Warehouse.LowStockAlertDto? item = null)
     {
+        if (item != null && item.DaXoa)
+        {
+            Toast.ShowWarning($"Hàng đã tạm thời ngừng cung cấp. Không thể lập phiếu nhập cho '{item.TenSanPham}'!");
+            return;
+        }
         _currentTab = TabType.Import;
         _importVariantId = variantId;
         if (price > 0) _importPrice = price;
@@ -1861,6 +3089,12 @@
 
     private async Task HandleImportStock()
     {
+        if (_selectedVariant != null && _selectedVariant.DaXoa)
+        {
+            Toast.ShowError("Hàng đã tạm thời ngừng cung cấp. Không thể lập phiếu nhập cho sản phẩm này!");
+            return;
+        }
+
         if (_importVariantId <= 0 && _selectedVariant != null)
         {
             _importVariantId = _selectedVariant.MaBienThe;
@@ -1889,7 +3123,9 @@
         {
             var req = new global::Shared.DTOs.Warehouse.ImportStockRequestDto
             {
-                MaChiNhanh = _staffBranchId > 0 ? _staffBranchId : (_selectedBranchId > 0 ? _selectedBranchId : 9),
+                MaChiNhanh = !_isChainAdmin
+                    ? (_isOnlineWarehouseKeeper ? OnlineWarehouseId : (_staffBranchId > 0 ? _staffBranchId : OnlineWarehouseId))
+                    : (_selectedBranchId > 0 ? _selectedBranchId : OnlineWarehouseId),
                 MaBienThe = _importVariantId,
                 MaNhaCungCap = _selectedSupplierId,
                 MaNhanVien = _staffId,

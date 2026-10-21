@@ -22,11 +22,16 @@ public class CustomerService : ICustomerService
 {
     private readonly ICustomerRepository _customerRepository;
     private readonly IPasswordHasher? _passwordHasher;
+    private readonly IAuditLogRepository? _auditLogRepository;
 
-    public CustomerService(ICustomerRepository customerRepository, IPasswordHasher? passwordHasher = null)
+    public CustomerService(
+        ICustomerRepository customerRepository, 
+        IPasswordHasher? passwordHasher = null,
+        IAuditLogRepository? auditLogRepository = null)
     {
         _customerRepository = customerRepository;
         _passwordHasher = passwordHasher;
+        _auditLogRepository = auditLogRepository;
     }
 
     public async Task<ApiResponse<CustomerProfileDto>> GetProfileByPhoneAsync(string phone)
@@ -91,10 +96,30 @@ public class CustomerService : ICustomerService
             return ApiResponse<bool>.Fail("Mã định danh khách hàng không hợp lệ.");
         }
 
+        var customer = await _customerRepository.GetProfileByIdAsync(customerId);
+
         var success = await _customerRepository.ToggleCustomerStatusAsync(customerId);
         if (!success)
         {
             return ApiResponse<bool>.Fail("Không tìm thấy khách hàng hoặc không thể cập nhật trạng thái.");
+        }
+
+        if (_auditLogRepository != null)
+        {
+            try
+            {
+                var cusName = customer?.TenKhachHang ?? $"Khách hàng #{customerId}";
+                var phone = customer?.DienThoai ?? "N/A";
+                await _auditLogRepository.CreateAuditLogAsync(new Shared.DTOs.Audit.CreateAuditLogRequestDto
+                {
+                    LoaiThaoTac = "KHOA_TAI_KHOAN",
+                    DoiTuong = $"Khách hàng: {cusName} (#{customerId})",
+                    NoiDungChiTiet = $"Thay đổi trạng thái khóa/hoạt động tài khoản khách hàng '{cusName}' (SĐT: {phone}).",
+                    MaNhanVien = 1,
+                    IpDiaChi = "127.0.0.1"
+                });
+            }
+            catch { }
         }
 
         return ApiResponse<bool>.Ok(true, "Cập nhật trạng thái tài khoản khách hàng thành công.");
@@ -116,6 +141,22 @@ public class CustomerService : ICustomerService
         if (!success)
         {
             return ApiResponse<bool>.Fail("Không thể cập nhật thông tin khách hàng.");
+        }
+
+        if (_auditLogRepository != null)
+        {
+            try
+            {
+                await _auditLogRepository.CreateAuditLogAsync(new Shared.DTOs.Audit.CreateAuditLogRequestDto
+                {
+                    LoaiThaoTac = "CAP_NHAT_TAI_KHOAN",
+                    DoiTuong = $"Khách hàng: {dto.TenKhachHang} (#{dto.MaKhachHang})",
+                    NoiDungChiTiet = $"Cập nhật hồ sơ khách hàng '{dto.TenKhachHang}' (SĐT: {dto.DienThoai}, Cấp độ: #{dto.MaCapDo}, Điểm: {dto.DiemThuong}).",
+                    MaNhanVien = 1,
+                    IpDiaChi = "127.0.0.1"
+                });
+            }
+            catch { }
         }
 
         return ApiResponse<bool>.Ok(true, "Cập nhật thông tin khách hàng thành công.");
@@ -147,6 +188,23 @@ public class CustomerService : ICustomerService
         try
         {
             var newId = await _customerRepository.CreateCustomerAsync(dto, pwdHash);
+
+            if (_auditLogRepository != null)
+            {
+                try
+                {
+                    await _auditLogRepository.CreateAuditLogAsync(new Shared.DTOs.Audit.CreateAuditLogRequestDto
+                    {
+                        LoaiThaoTac = "TAO_TAI_KHOAN",
+                        DoiTuong = $"Khách hàng: {dto.TenKhachHang} (#{newId})",
+                        NoiDungChiTiet = $"Tạo tài khoản khách hàng mới '{dto.TenKhachHang}' (SĐT: {dto.DienThoai}, Cấp độ: #{dto.MaCapDo}).",
+                        MaNhanVien = 1,
+                        IpDiaChi = "127.0.0.1"
+                    });
+                }
+                catch { }
+            }
+
             return ApiResponse<int>.Ok(newId, "Tạo tài khoản khách hàng mới thành công.");
         }
         catch (Exception ex)

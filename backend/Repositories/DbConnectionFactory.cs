@@ -14,7 +14,8 @@ public class DbConnectionFactory : IDbConnectionFactory
 
     public DbConnectionFactory(IConfiguration configuration)
     {
-        _connectionString = configuration["CONNECTION_STRING"] 
+        _connectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING")
+            ?? configuration["CONNECTION_STRING"] 
             ?? configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối. Vui lòng định nghĩa biến môi trường CONNECTION_STRING trong file .env hoặc appsettings.json.");
     }

@@ -150,4 +150,18 @@ public class PosApiClient : IPosApiClient
             return ApiResponse<int>.Fail($"Lỗi kết nối khi gửi yêu cầu trả hàng: {ex.Message}");
         }
     }
+
+    public async Task<List<ProductVariantDto>?> GetProductVariantsAsync(int productId)
+    {
+        if (productId <= 0) return new List<ProductVariantDto>();
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<IEnumerable<ProductVariantDto>>>($"api/products/{productId}/variants");
+            return res?.Data?.ToList() ?? new List<ProductVariantDto>();
+        }
+        catch
+        {
+            return new List<ProductVariantDto>();
+        }
+    }
 }

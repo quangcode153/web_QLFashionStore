@@ -23,25 +23,25 @@
 
     <!-- KPI Summary Pills -->
     <div class="kpi-grid">
-        <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>
+        <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => SetFilter("ALL")'>
             <div class="kpi-label">Tổng số thao tác</div>
             <div class="kpi-value">@_logs.Count</div>
             <div class="kpi-sub">Lịch sử toàn hệ thống</div>
         </div>
-        <div class="kpi-card text-success @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => _currentFilter = "NHAP_HANG"'>
+        <div class="kpi-card text-success @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => SetFilter("NHAP_HANG")'>
             <div class="kpi-label">Nhập kho hàng</div>
             <div class="kpi-value text-success">@_logs.Count(l => l.LoaiThaoTac == "NHAP_HANG")</div>
             <div class="kpi-sub">Lượng hàng bổ sung</div>
         </div>
-        <div class="kpi-card text-primary @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "TAO_TAI_KHOAN"'>
+        <div class="kpi-card text-primary @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("TAO_TAI_KHOAN")'>
             <div class="kpi-label">Tạo tài khoản</div>
             <div class="kpi-value text-primary">@_logs.Count(l => l.LoaiThaoTac == "TAO_TAI_KHOAN")</div>
             <div class="kpi-sub">Cấp quyền nhân viên</div>
         </div>
-        <div class="kpi-card text-warning @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "CAP_NHAT_TAI_KHOAN"'>
+        <div class="kpi-card text-warning @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("CAP_NHAT_TAI_KHOAN")'>
             <div class="kpi-label">Đổi quyền / Khóa</div>
-            <div class="kpi-value text-warning">@_logs.Count(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN")</div>
-            <div class="kpi-sub">Biến động nhân sự</div>
+            <div class="kpi-value text-warning">@_logs.Count(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN" || l.LoaiThaoTac == "MO_KHOA_TAI_KHOAN")</div>
+            <div class="kpi-sub">Biến động nhân sự & tài khoản</div>
         </div>
     </div>
 
@@ -52,22 +52,40 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <input type="text" class="search-input" placeholder="Tìm theo tên nhân viên, đối tượng, nội dung hoặc IP..." @bind="_searchText" @bind:event="oninput" />
+            <input type="text" class="search-input" placeholder="Tìm theo tên nhân viên, đối tượng, nội dung hoặc IP..." @bind="_searchText" @bind:event="oninput" @bind:after="() => _page = 1" />
             @if (!string.IsNullOrEmpty(_searchText))
             {
-                <button type="button" class="btn-clear" @onclick='() => _searchText = string.Empty'>×</button>
+                <button type="button" class="btn-clear" @onclick="ClearSearch">×</button>
             }
         </div>
         <div class="filter-tags">
-            <button type="button" class="tag-btn @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>Tất cả</button>
-            <button type="button" class="tag-btn @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => _currentFilter = "NHAP_HANG"'>Nhập kho</button>
-            <button type="button" class="tag-btn @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "TAO_TAI_KHOAN"'>Tạo tài khoản</button>
-            <button type="button" class="tag-btn @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => _currentFilter = "CAP_NHAT_TAI_KHOAN"'>Cập nhật tài khoản</button>
+            <button type="button" class="tag-btn @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => SetFilter("ALL")'>Tất cả</button>
+            <button type="button" class="tag-btn @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => SetFilter("NHAP_HANG")'>Nhập kho</button>
+            <button type="button" class="tag-btn @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("TAO_TAI_KHOAN")'>Tạo tài khoản</button>
+            <button type="button" class="tag-btn @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("CAP_NHAT_TAI_KHOAN")'>Cập nhật tài khoản</button>
         </div>
     </div>
 
-    <!-- Data Table -->
+    <!-- Data Table Card with Compact Scroll & Pagination -->
     <div class="table-card">
+        <div class="table-card-toolbar">
+            <div class="toolbar-left">
+                <span class="toolbar-title">Danh sách biến động</span>
+                <span class="count-pill">@FilteredLogsList.Count bản ghi</span>
+            </div>
+            <div class="toolbar-right">
+                <label class="page-size-label">
+                    <span>Hiển thị:</span>
+                    <select class="page-size-select" value="@_pageSize" @onchange="OnPageSizeChanged">
+                        <option value="15">15 dòng</option>
+                        <option value="25">25 dòng</option>
+                        <option value="50">50 dòng</option>
+                        <option value="100">100 dòng</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+
         @if (_isLoading)
         {
             <div class="loading-state">
@@ -75,7 +93,7 @@
                 <p>Đang tải nhật ký kiểm toán hệ thống...</p>
             </div>
         }
-        else if (!FilteredLogs.Any())
+        else if (!FilteredLogsList.Any())
         {
             <div class="empty-state">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
@@ -90,29 +108,35 @@
         }
         else
         {
-            <div class="table-responsive">
-                <table class="admin-table">
+            <div class="table-scroll-container">
+                <table class="admin-table admin-table-compact">
                     <thead>
                         <tr>
-                            <th style="width: 150px;">Thời gian</th>
-                            <th style="width: 170px;">Người thực hiện</th>
-                            <th style="width: 140px;">Loại thao tác</th>
-                            <th style="width: 160px;">Đối tượng</th>
+                            <th style="width: 135px;">Thời gian</th>
+                            <th style="width: 175px;">Người thực hiện</th>
+                            <th style="width: 135px;">Loại thao tác</th>
+                            <th style="width: 155px;">Đối tượng</th>
                             <th>Nội dung chi tiết</th>
-                            <th style="width: 100px;">Địa chỉ IP</th>
+                            <th style="width: 95px; text-align: right;">Địa chỉ IP</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var log in FilteredLogs)
+                        @foreach (var log in PagedLogs)
                         {
                             <tr>
-                                <td class="font-mono text-muted text-sm">
-                                    @log.ThoiGian.ToString("dd/MM/yyyy HH:mm:ss")
+                                <td class="cell-time">
+                                    <span class="time-date">@log.ThoiGian.ToString("dd/MM/yyyy")</span>
+                                    <span class="time-hour">@log.ThoiGian.ToString("HH:mm:ss")</span>
                                 </td>
                                 <td>
-                                    <div class="staff-cell">
-                                        <div class="staff-name">@log.TenNhanVien</div>
-                                        <div class="staff-role">@(log.ChucVu ?? "Nhân viên")</div>
+                                    <div class="staff-cell-compact">
+                                        <div class="staff-avatar">
+                                            @GetInitials(log.TenNhanVien)
+                                        </div>
+                                        <div class="staff-info">
+                                            <div class="staff-name">@log.TenNhanVien</div>
+                                            <div class="staff-role">@(log.ChucVu ?? "Nhân viên")</div>
+                                        </div>
                                     </div>
                                 </td>
                                 <td>
@@ -120,19 +144,56 @@
                                         @GetActionLabel(log.LoaiThaoTac)
                                     </span>
                                 </td>
-                                <td class="font-weight-bold">
-                                    @log.DoiTuong
+                                <td class="cell-target">
+                                    <code>@log.DoiTuong</code>
                                 </td>
-                                <td class="text-detail">
+                                <td class="cell-detail">
                                     @log.NoiDungChiTiet
                                 </td>
-                                <td class="font-mono text-muted text-sm">
+                                <td class="cell-ip">
                                     @(log.IpDiaChi ?? "127.0.0.1")
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="table-pagination-bar">
+                <div class="pagination-info">
+                    Hiển thị <strong>@((_page - 1) * @_pageSize + 1)</strong> - <strong>@Math.Min(_page * _pageSize, FilteredLogsList.Count)</strong> trên <strong>@FilteredLogsList.Count</strong> nhật ký
+                </div>
+                <div class="pagination-controls">
+                    <button type="button" class="btn-page-nav" disabled="@(_page <= 1)" @onclick="() => ChangePage(_page - 1)" title="Trang trước">
+                        ‹ Trước
+                    </button>
+
+                    <div class="page-numbers">
+                        @for (int i = 1; i <= TotalPages; i++)
+                        {
+                            var p = i;
+                            @if (p == 1 || p == TotalPages || Math.Abs(p - _page) <= 1)
+                            {
+                                <button type="button" class="btn-page-num @(p == _page ? "active" : "")" @onclick="() => ChangePage(p)">
+                                    @p
+                                </button>
+                            }
+                            else if (p == 2 && _page > 3)
+                            {
+                                <span class="page-ellipsis">…</span>
+                            }
+                            else if (p == TotalPages - 1 && _page < TotalPages - 2)
+                            {
+                                <span class="page-ellipsis">…</span>
+                            }
+                        }
+                    </div>
+
+                    <button type="button" class="btn-page-nav" disabled="@(_page >= TotalPages)" @onclick="() => ChangePage(_page + 1)" title="Trang sau">
+                        Sau ›
+                    </button>
+                </div>
             </div>
         }
     </div>
@@ -311,54 +372,195 @@
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
 
+    .table-card-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.65rem 1rem;
+        background: #ffffff;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .toolbar-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toolbar-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.01em;
+    }
+
+    .count-pill {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #f1f5f9;
+        color: #475569;
+        border-radius: 12px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .page-size-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .page-size-select {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 3px 6px;
+        font-size: 0.75rem;
+        background: #ffffff;
+        color: #0f172a;
+        outline: none;
+        cursor: pointer;
+    }
+
+    /* Khung cuộn giới hạn chiều cao tối đa với thanh cuộn đẹp */
+    .table-scroll-container {
+        max-height: 520px;
+        overflow-y: auto;
+        overflow-x: auto;
+        position: relative;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    /* Bảng compact & Sticky Header */
     .admin-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         text-align: left;
     }
 
-    .admin-table th {
+    .admin-table-compact th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
         background: #f8fafc;
         color: #475569;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        padding: 12px 14px;
+        padding: 8px 12px;
         border-bottom: 1px solid #e2e8f0;
+        box-shadow: 0 1px 0 #e2e8f0;
     }
 
-    .admin-table td {
-        padding: 12px 14px;
+    .admin-table-compact td {
+        padding: 8px 12px;
         border-bottom: 1px solid #f1f5f9;
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         color: #1e293b;
         vertical-align: middle;
     }
 
-    .admin-table tr:hover {
+    .admin-table-compact tr:hover td {
         background-color: #f8fafc;
     }
 
-    .staff-cell .staff-name {
-        font-weight: 700;
-        color: #0f172a;
+    /* Cột Thời Gian */
+    .cell-time {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
     }
 
-    .staff-cell .staff-role {
+    .cell-time .time-date {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .cell-time .time-hour {
+        font-family: var(--font-mono, monospace);
         font-size: 0.7rem;
         color: #64748b;
     }
 
+    /* Cột Nhân Viên Gọn Gàng */
+    .staff-cell-compact {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .staff-avatar {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #e2e8f0;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.68rem;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
+
+    .staff-info .staff-name {
+        font-weight: 700;
+        font-size: 0.78rem;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .staff-info .staff-role {
+        font-size: 0.68rem;
+        color: #64748b;
+        line-height: 1.2;
+    }
+
+    /* Badges */
     .action-badge {
         display: inline-block;
-        padding: 3px 8px;
+        padding: 2px 7px;
         border-radius: 4px;
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 700;
         letter-spacing: 0.02em;
+        white-space: nowrap;
     }
 
     .badge-nhaphang {
@@ -385,9 +587,107 @@
         border: 1px solid #e2e8f0;
     }
 
-    .text-detail {
-        line-height: 1.4;
+    .cell-target code {
+        background: #f1f5f9;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        color: #0f172a;
+        font-weight: 600;
+    }
+
+    .cell-detail {
+        font-size: 0.78rem;
+        line-height: 1.35;
         color: #334155;
+        max-width: 380px;
+        word-break: break-word;
+    }
+
+    .cell-ip {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.72rem;
+        color: #64748b;
+        text-align: right;
+    }
+
+    /* Thanh Phân Trang */
+    .table-pagination-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.65rem 1rem;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .pagination-info {
+        font-size: 0.75rem;
+        color: #64748b;
+    }
+
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .btn-page-nav {
+        padding: 3px 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .btn-page-nav:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .btn-page-nav:hover:not(:disabled) {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+    }
+
+    .page-numbers {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+    }
+
+    .btn-page-num {
+        min-width: 26px;
+        height: 26px;
+        padding: 0 4px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .btn-page-num:hover:not(.active) {
+        background: #f1f5f9;
+    }
+
+    .btn-page-num.active {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+    }
+
+    .page-ellipsis {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        padding: 0 3px;
     }
 
     .text-sm { font-size: 0.75rem; }
@@ -424,6 +724,10 @@
     private string _currentFilter = "ALL";
     private string _searchText = string.Empty;
 
+    // Phân trang & Compact View
+    private int _page = 1;
+    private int _pageSize = 25;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadLogs();
@@ -434,8 +738,9 @@
         _isLoading = true;
         try
         {
-            var data = await AdminApi.GetAuditLogsAsync(null, 150);
+            var data = await AdminApi.GetAuditLogsAsync(loaiThaoTac: null, maChiNhanh: null, limit: 200);
             _logs = data ?? new List<global::Shared.DTOs.Audit.AuditLogDto>();
+            _page = 1;
         }
         catch (Exception ex)
         {
@@ -447,7 +752,42 @@
         }
     }
 
-    private IEnumerable<global::Shared.DTOs.Audit.AuditLogDto> FilteredLogs
+    private void SetFilter(string filter)
+    {
+        _currentFilter = filter;
+        _page = 1;
+    }
+
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        _searchText = e.Value?.ToString() ?? string.Empty;
+        _page = 1;
+    }
+
+    private void ClearSearch()
+    {
+        _searchText = string.Empty;
+        _page = 1;
+    }
+
+    private void OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size) && size > 0)
+        {
+            _pageSize = size;
+            _page = 1;
+        }
+    }
+
+    private void ChangePage(int newPage)
+    {
+        if (newPage >= 1 && newPage <= TotalPages)
+        {
+            _page = newPage;
+        }
+    }
+
+    private List<global::Shared.DTOs.Audit.AuditLogDto> FilteredLogsList
     {
         get
         {
@@ -456,7 +796,7 @@
             {
                 if (_currentFilter == "CAP_NHAT_TAI_KHOAN")
                 {
-                    list = list.Where(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN");
+                    list = list.Where(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN" || l.LoaiThaoTac == "MO_KHOA_TAI_KHOAN");
                 }
                 else
                 {
@@ -468,31 +808,47 @@
             {
                 var q = _searchText.Trim().ToLower();
                 list = list.Where(l =>
-                    l.TenNhanVien.ToLower().Contains(q) ||
-                    l.DoiTuong.ToLower().Contains(q) ||
-                    l.NoiDungChiTiet.ToLower().Contains(q) ||
+                    (l.TenNhanVien ?? "").ToLower().Contains(q) ||
+                    (l.DoiTuong ?? "").ToLower().Contains(q) ||
+                    (l.NoiDungChiTiet ?? "").ToLower().Contains(q) ||
                     (l.IpDiaChi != null && l.IpDiaChi.ToLower().Contains(q)));
             }
 
-            return list;
+            return list.ToList();
         }
+    }
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)FilteredLogsList.Count / _pageSize));
+
+    private List<global::Shared.DTOs.Audit.AuditLogDto> PagedLogs => FilteredLogsList
+        .Skip((_page - 1) * _pageSize)
+        .Take(_pageSize)
+        .ToList();
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "QF";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0].Substring(0, Math.Min(2, parts[0].Length)).ToUpperInvariant();
+        return $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant();
     }
 
     private string GetActionBadgeClass(string action) => action switch
     {
         "NHAP_HANG" => "badge-nhaphang",
         "TAO_TAI_KHOAN" => "badge-taotaikhoan",
-        "CAP_NHAT_TAI_KHOAN" or "KHOA_TAI_KHOAN" => "badge-capnhat",
+        "CAP_NHAT_TAI_KHOAN" or "KHOA_TAI_KHOAN" or "MO_KHOA_TAI_KHOAN" => "badge-capnhat",
         _ => "badge-other"
     };
 
     private string GetActionLabel(string action) => action switch
     {
-        "NHAP_HANG" => "Nhập hàng vào kho",
-        "TAO_TAI_KHOAN" => "Tạo tài khoản mới",
-        "CAP_NHAT_TAI_KHOAN" => "Cập nhật tài khoản",
+        "NHAP_HANG" => "Nhập kho",
+        "TAO_TAI_KHOAN" => "Tạo tài khoản",
+        "CAP_NHAT_TAI_KHOAN" => "Cập nhật",
         "KHOA_TAI_KHOAN" => "Khóa tài khoản",
-        "BAN_HANG_POS" => "Bán lẻ tại quầy",
+        "MO_KHOA_TAI_KHOAN" => "Mở khóa",
+        "BAN_HANG_POS" => "Bán lẻ POS",
         _ => action
     };
 }

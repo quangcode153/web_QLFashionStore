@@ -27,6 +27,10 @@ public class AuthHeaderHandler : DelegatingHandler
             {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
+            else
+            {
+                request.Headers.Authorization = null;
+            }
         }
         catch
         {

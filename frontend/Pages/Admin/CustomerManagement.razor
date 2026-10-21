@@ -52,10 +52,10 @@
         <div class="kpi-card">
             <div class="kpi-label">HẠNG THÀNH VIÊN VIP</div>
             <div class="kpi-val text-amber">
-                @(_customersList?.Count(c => c.TenCapDo == "Vàng" || c.TenCapDo == "Bạc") ?? 0)
+                @(_customersList?.Count(c => c.TenCapDo == "Vàng" || c.TenCapDo == "Bạc" || c.TenCapDo == "Kim Cương") ?? 0)
             </div>
             <div class="kpi-sub">
-                Hạng Vàng: @(_customersList?.Count(c => c.TenCapDo == "Vàng") ?? 0) &bull; Hạng Bạc: @(_customersList?.Count(c => c.TenCapDo == "Bạc") ?? 0)
+                KC: @(_customersList?.Count(c => c.TenCapDo == "Kim Cương") ?? 0) &bull; Vàng: @(_customersList?.Count(c => c.TenCapDo == "Vàng") ?? 0) &bull; Bạc: @(_customersList?.Count(c => c.TenCapDo == "Bạc") ?? 0)
             </div>
         </div>
         <div class="kpi-card">
@@ -99,6 +99,9 @@
                 </button>
                 <button class="tab-btn @(_selectedRankFilter == 3 ? "active" : "")" @onclick="() => _selectedRankFilter = 3">
                     Vàng (Giảm 10%)
+                </button>
+                <button class="tab-btn @(_selectedRankFilter == 4 ? "active" : "")" @onclick="() => _selectedRankFilter = 4">
+                    Kim Cương (Giảm 15%)
                 </button>
             </div>
 
@@ -321,6 +324,7 @@
                             <option value="1">Hạng Thường (0% chiết khấu)</option>
                             <option value="2">Hạng Bạc (Giảm 5%)</option>
                             <option value="3">Hạng Vàng (Giảm 10%)</option>
+                            <option value="4">Hạng Kim Cương (Giảm 15%)</option>
                         </select>
                     </div>
 
@@ -404,6 +408,7 @@
                             <option value="1">Hạng Thường (0% giảm giá)</option>
                             <option value="2">Hạng Bạc (Giảm giá 5%)</option>
                             <option value="3">Hạng Vàng (Giảm giá 10%)</option>
+                            <option value="4">Hạng Kim Cương (Giảm giá 15%)</option>
                         </select>
                     </div>
 
@@ -810,6 +815,12 @@
         font-weight: 700;
         padding: 3px 8px;
         border-radius: 12px;
+    }
+
+    .rank-diamond {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
     }
 
     .rank-gold {
@@ -1507,6 +1518,7 @@
     {
         if (string.IsNullOrWhiteSpace(rank)) return "standard";
         var r = rank.ToLowerInvariant();
+        if (r.Contains("kim cương") || r.Contains("diamond")) return "diamond";
         if (r.Contains("vàng") || r.Contains("gold")) return "gold";
         if (r.Contains("bạc") || r.Contains("silver")) return "silver";
         return "standard";

@@ -14,6 +14,14 @@ public interface ICatalogService
     Task<ProductVariantDto?> GetVariantBySkuAsync(string sku);
     Task<int> CreateProductAsync(CreateProductRequest request);
     Task<int> CreateProductVariantAsync(CreateProductVariantRequest request);
+    Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId);
+    Task<int> CreateCategoryAsync(CreateCategoryRequest request);
+    Task<int> CreateBrandAsync(CreateBrandRequest request);
+    Task<bool> ToggleProductStatusAsync(int productId);
+    Task<bool> ToggleVariantStatusAsync(int variantId);
+    Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
+    Task<bool> UpdateProductAsync(UpdateProductRequest request);
+    Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds);
 }
 
 public class CatalogService : ICatalogService
@@ -126,7 +134,9 @@ public class CatalogService : ICatalogService
             BrandId = query.BrandId,
             MinPrice = query.MinPrice,
             MaxPrice = query.MaxPrice,
-            SortBy = query.SortBy
+            SortBy = query.SortBy,
+            DaXoa = query.DaXoa,
+            IncludeAll = query.IncludeAll
         };
 
         return await _catalogRepository.GetProductsPagedAsync(normalizedQuery);
@@ -160,5 +170,78 @@ public class CatalogService : ICatalogService
     public async Task<IEnumerable<BrandDto>> GetBrandsAsync()
     {
         return await _catalogRepository.GetBrandsAsync();
+    }
+
+    public async Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId)
+    {
+        if (productId <= 0)
+        {
+            return Enumerable.Empty<ProductBranchStockDto>();
+        }
+
+        return await _catalogRepository.GetProductBranchStockAsync(productId);
+    }
+
+    public async Task<int> CreateCategoryAsync(CreateCategoryRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.TenDanhMuc))
+            throw new ArgumentException("Tên danh mục không được để trống.");
+
+        return await _catalogRepository.CreateCategoryAsync(request);
+    }
+
+    public async Task<int> CreateBrandAsync(CreateBrandRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.TenThuongHieu))
+            throw new ArgumentException("Tên thương hiệu không được để trống.");
+
+        return await _catalogRepository.CreateBrandAsync(request);
+    }
+
+    public async Task<bool> ToggleProductStatusAsync(int productId)
+    {
+        if (productId <= 0)
+            throw new ArgumentException("ID sản phẩm không hợp lệ.");
+
+        return await _catalogRepository.ToggleProductStatusAsync(productId);
+    }
+
+    public async Task<bool> ToggleVariantStatusAsync(int variantId)
+    {
+        if (variantId <= 0)
+            throw new ArgumentException("ID biến thể không hợp lệ.");
+
+        return await _catalogRepository.ToggleVariantStatusAsync(variantId);
+    }
+
+    public async Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId)
+    {
+        if (productId <= 0)
+            return Enumerable.Empty<ProductVariantDto>();
+
+        return await _catalogRepository.GetProductVariantsForAdminAsync(productId);
+    }
+
+    public async Task<bool> UpdateProductAsync(UpdateProductRequest request)
+    {
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (request.MaSanPham <= 0) throw new ArgumentException("Mã sản phẩm không hợp lệ.");
+        if (string.IsNullOrWhiteSpace(request.TenSanPham)) throw new ArgumentException("Tên sản phẩm không được để trống.");
+        if (request.MaDanhMuc <= 0) throw new ArgumentException("Danh mục sản phẩm không hợp lệ.");
+        if (request.MaThuongHieu <= 0) throw new ArgumentException("Thương hiệu không hợp lệ.");
+
+        request.TenSanPham = request.TenSanPham.Trim();
+        request.ChatLieu = request.ChatLieu?.Trim();
+        request.AnhDaiDien = request.AnhDaiDien?.Trim();
+
+        return await _catalogRepository.UpdateProductAsync(request);
+    }
+
+    public async Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds)
+    {
+        if (variantIds == null || !variantIds.Any())
+            return Enumerable.Empty<VariantAvailabilityDto>();
+
+        return await _catalogRepository.CheckVariantsAvailabilityAsync(variantIds);
     }
 }

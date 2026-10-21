@@ -11,6 +11,7 @@ public class ProductListItemDto
     public decimal GiaCaoNhat { get; set; }
     public int TongTonKho { get; set; }
     public string? AnhDaiDien { get; set; }
+    public bool DaXoa { get; set; }
 }
 
 public class ProductVariantDto
@@ -25,6 +26,7 @@ public class ProductVariantDto
     public int SoLuongTon { get; set; }
     public string TinhTrangHang { get; set; } = string.Empty;
     public string? HinhAnh { get; set; }
+    public bool DaXoa { get; set; }
 }
 
 public class ProductImageDto
@@ -84,4 +86,52 @@ public class CreateProductVariantRequest
     public int SoLuongTon { get; set; }
 }
 
+public class ProductBranchStockDto
+{
+    public int MaChiNhanh { get; set; }
+    public string TenChiNhanh { get; set; } = string.Empty;
+    public string? DiaChi { get; set; }
+    public bool IsOnlineWarehouse { get; set; }
+    public int MaBienThe { get; set; }
+    public string MauSac { get; set; } = string.Empty;
+    public string KichCo { get; set; } = string.Empty;
+    public string MaSku { get; set; } = string.Empty;
+    public int SoLuongTon { get; set; }
+}
 
+public class CreateCategoryRequest
+{
+    public string TenDanhMuc { get; set; } = string.Empty;
+    public int? MaDanhMucCha { get; set; }
+}
+
+public class CreateBrandRequest
+{
+    public string TenThuongHieu { get; set; } = string.Empty;
+    public string? XuatXu { get; set; }
+}
+
+public class UpdateProductRequest
+{
+    public int MaSanPham { get; set; }
+    public string TenSanPham { get; set; } = string.Empty;
+    public int MaDanhMuc { get; set; }
+    public int MaThuongHieu { get; set; }
+    public string? ChatLieu { get; set; }
+    public string? AnhDaiDien { get; set; }
+}
+
+public class CheckVariantAvailabilityRequest
+{
+    public List<int> VariantIds { get; set; } = new();
+}
+
+public class VariantAvailabilityDto
+{
+    public int MaBienThe { get; set; }
+    public string TenSanPham { get; set; } = string.Empty;
+    public string? MauSac { get; set; }
+    public string? KichCo { get; set; }
+    public bool DaAn { get; set; }
+    public string? ThongBao { get; set; }
+}

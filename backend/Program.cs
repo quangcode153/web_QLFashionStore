@@ -59,12 +59,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 5. Cấu hình CORS chặt chẽ giữa Backend (Port 5000) và Frontend (Port 3000)
+// 5. Cấu hình CORS chặt chẽ giữa Backend và Frontend, hỗ trợ biến môi trường CORS_ALLOWED_ORIGINS
+var defaultCorsOrigins = new[] { "http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5092", "https://localhost:7071" };
+var envCors = (Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") ?? builder.Configuration["CORS_ALLOWED_ORIGINS"])
+    ?.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+var allowedCorsOrigins = envCors != null && envCors.Length > 0 ? envCors : defaultCorsOrigins;
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5092", "https://localhost:7071")
+        policy.WithOrigins(allowedCorsOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -136,6 +141,7 @@ builder.Services.AddScoped<IFeedbackRepository, FeedbackRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 builder.Services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
 builder.Services.AddScoped<IBranchRepository, BranchRepository>();
+builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 
 // Services
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -151,6 +157,8 @@ builder.Services.AddScoped<IFeedbackService, FeedbackService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
+builder.Services.AddScoped<IPolicyService, PolicyService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 // 9. Cấu hình Rate Limiting (Chống Brute-Force & DoS)
 builder.Services.AddRateLimiter(options =>
@@ -184,7 +192,8 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 // 10. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
-var connStr = app.Configuration["CONNECTION_STRING"] 
+var connStr = Environment.GetEnvironmentVariable("CONNECTION_STRING")
+    ?? app.Configuration["CONNECTION_STRING"] 
     ?? app.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối cơ sở dữ liệu. Vui lòng thiết lập CONNECTION_STRING trong file .env hoặc biến môi trường.");
 

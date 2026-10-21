@@ -3,6 +3,8 @@
 @namespace Frontend.Pages.Admin
 @inject IAdminApiClient AdminApi
 @inject IToastService Toast
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <div class="products-container">
     <div class="page-header">
@@ -45,8 +47,22 @@
                 <button type="button" class="clear-btn" @onclick="() => _searchTerm = string.Empty">×</button>
             }
         </div>
+
+        <!-- Bộ lọc trạng thái mở bán / ẩn sản phẩm -->
+        <div class="status-filter-group">
+            <button type="button" class="status-filter-btn @(_statusFilter == "all" ? "active" : "")" @onclick="@(() => SetStatusFilter("all"))">
+                Tất cả @(_totalAll > 0 ? $"({_totalAll})" : (_pagedResult?.TotalCount > 0 ? $"({_pagedResult.TotalCount})" : ""))
+            </button>
+            <button type="button" class="status-filter-btn @(_statusFilter == "active" ? "active" : "")" @onclick="@(() => SetStatusFilter("active"))">
+                🟢 Đang bán @(_totalActive > 0 ? $"({_totalActive})" : "")
+            </button>
+            <button type="button" class="status-filter-btn @(_statusFilter == "hidden" ? "active" : "")" @onclick="@(() => SetStatusFilter("hidden"))">
+                ⚪ Đã ẩn @(_totalHidden > 0 ? $"({_totalHidden})" : "")
+            </button>
+        </div>
+
         <div class="catalog-stats-pill">
-            <span>Tổng: <strong>@(_pagedResult?.TotalCount ?? 0)</strong> sản phẩm</span>
+            <span>Hiển thị: <strong>@(_pagedResult?.Items?.Count() ?? 0)</strong> bản ghi</span>
         </div>
     </div>
 
@@ -63,15 +79,16 @@
                         <th>Thương hiệu</th>
                         <th class="text-right">Khoảng giá</th>
                         <th class="text-center">Tổng tồn</th>
-                        <th class="text-center">Trạng thái</th>
-                        <th class="text-center" style="width: 140px;">Thao tác</th>
+                        <th class="text-center">Tình trạng</th>
+                        <th class="text-center">Hiển thị</th>
+                        <th class="text-center" style="width: 170px;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (FilteredProducts == null || !FilteredProducts.Any())
                     {
                         <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="10" class="text-center py-5 text-muted">
                                 Không tìm thấy sản phẩm nào trong hệ thống.
                             </td>
                         </tr>
@@ -80,7 +97,7 @@
                     {
                         @foreach (var prod in FilteredProducts)
                         {
-                            <tr>
+                            <tr class="@(prod.DaXoa ? "row-hidden-product" : "")">
                                 <td class="font-mono text-muted">#@prod.MaSanPham</td>
                                 <td>
                                     <div class="product-squircle-thumb">
@@ -137,6 +154,16 @@
                                     }
                                 </td>
                                 <td class="text-center">
+                                    @if (prod.DaXoa)
+                                    {
+                                        <span class="badge-status-hidden" title="Sản phẩm đang bị ẩn khỏi khách hàng">⚪ Đã ẩn</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-status-visible" title="Sản phẩm đang mở bán trên Storefront">🟢 Đang bán</span>
+                                    }
+                                </td>
+                                <td class="text-center">
                                     <div class="row-actions">
                                         <!-- Xem biến thể -->
                                         <button class="btn-action-ghost" @onclick="() => OpenViewVariantsModal(prod)" title="Xem danh sách biến thể của sản phẩm">
@@ -162,6 +189,28 @@
                                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                             </svg>
                                         </button>
+                                        <!-- Bật/Tắt Ẩn Sản Phẩm (Quyền Admin Toàn Quyền) -->
+                                        @if (_isChainAdmin)
+                                        {
+                                            @if (prod.DaXoa)
+                                            {
+                                                <button class="btn-action-ghost text-success" @onclick="() => ToggleProductVisibility(prod)" title="Mở bán lại sản phẩm này cho khách">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                        <circle cx="12" cy="12" r="3"></circle>
+                                                    </svg>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn-action-ghost text-danger" @onclick="() => ToggleProductVisibility(prod)" title="Ẩn sản phẩm này khỏi khách hàng">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                                                    </svg>
+                                                </button>
+                                            }
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -207,7 +256,7 @@
                 <div>
                     <div class="modal-badge">QF NOIR CATALOG</div>
                     <h3 class="modal-title">THÊM BIẾN THỂ SẢN PHẨM</h3>
-                    <p class="modal-subtitle">Tạo biến thể màu sắc, kích cỡ, mã SKU và định mức tồn kho ban đầu</p>
+                    <p class="modal-subtitle">Bổ sung 1 biến thể (Cặp Màu sắc & Kích cỡ) mới cho sản phẩm</p>
                 </div>
                 <button type="button" class="btn-close-modal" @onclick="CloseCreateVariantModal">✕</button>
             </div>
@@ -266,13 +315,44 @@
                     }
                 </div>
 
+                <!-- Danh sách các biến thể hiện có của sản phẩm này -->
+                <div class="form-group existing-variants-box">
+                    <div class="existing-variants-header">
+                        <label class="form-label" style="margin-bottom: 0;">Các biến thể đã có của sản phẩm (@_existingVariantsForSelectedProduct.Count):</label>
+                        @if (_isLoadingExistingVariants)
+                        {
+                            <span class="text-sm text-muted">Đang tải danh sách...</span>
+                        }
+                    </div>
+                    <div class="existing-chips-list">
+                        @if (!_existingVariantsForSelectedProduct.Any())
+                        {
+                            <span class="text-sm text-muted">Chưa có biến thể nào. Bạn đang tạo biến thể đầu tiên cho sản phẩm này.</span>
+                        }
+                        else
+                        {
+                            @foreach (var v in _existingVariantsForSelectedProduct)
+                            {
+                                <span class="existing-variant-chip" title="SKU: @v.MaSku - Tồn: @v.SoLuongTon cái">
+                                    <span class="chip-dot"></span>
+                                    <strong>@v.MauSac</strong> - Size <strong>@v.KichCo</strong>
+                                    <span class="chip-sku">@v.MaSku</span>
+                                </span>
+                            }
+                        }
+                    </div>
+                </div>
+
                 <div class="form-row-2">
                     <!-- Màu sắc -->
                     <div class="form-group">
-                        <label class="form-label">Màu sắc <span class="required">*</span></label>
+                        <label class="form-label">
+                            Màu sắc biến thể 
+                            <span class="text-muted" style="font-size: 0.72rem; font-weight: normal;">(Để trống mặc định "Mặc định")</span>
+                        </label>
                         <div class="input-with-suggestions">
-                            <input type="text" class="form-control" placeholder="VD: Đen, Trắng, Xanh Navy..." 
-                                   @bind="_variantForm.MauSac" @bind:after="OnVariantAttributesChanged" />
+                            <input type="text" class="form-control" placeholder="VD: Đen, Trắng, Nâu Bò, Be..." 
+                                   @bind="_variantForm.MauSac" @bind:event="oninput" @bind:after="OnVariantAttributesChanged" />
                         </div>
                         <div class="quick-chips">
                             @foreach (var c in _popularColors)
@@ -285,10 +365,13 @@
 
                     <!-- Kích cỡ -->
                     <div class="form-group">
-                        <label class="form-label">Kích cỡ (Size) <span class="required">*</span></label>
+                        <label class="form-label">
+                            Kích cỡ (Size)
+                            <span class="text-muted" style="font-size: 0.72rem; font-weight: normal;">(Ví / phụ kiện để trống = "Free")</span>
+                        </label>
                         <div class="input-with-suggestions">
-                            <input type="text" class="form-control font-mono" placeholder="VD: S, M, L, XL, 30..." 
-                                   @bind="_variantForm.KichCo" @bind:after="OnVariantAttributesChanged" />
+                            <input type="text" class="form-control font-mono" placeholder="VD: Free, S, M, L, XL, 30..." 
+                                   @bind="_variantForm.KichCo" @bind:event="oninput" @bind:after="OnVariantAttributesChanged" />
                         </div>
                         <div class="quick-chips">
                             @foreach (var s in _popularSizes)
@@ -300,6 +383,21 @@
                     </div>
                 </div>
 
+                <!-- Cảnh báo nếu trùng lặp biến thể Màu + Size -->
+                @if (IsDuplicateVariant)
+                {
+                    <div class="alert-box alert-error" style="background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; margin-bottom: 1rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>
+                            <strong>Đã tồn tại biến thể này!</strong> Sản phẩm này đã có biến thể <strong>[Màu: @(string.IsNullOrWhiteSpace(_variantForm.MauSac) ? "Mặc định" : _variantForm.MauSac) - Size: @(string.IsNullOrWhiteSpace(_variantForm.KichCo) ? "Free" : _variantForm.KichCo)]</strong>. Hệ thống chặn trùng để bảo vệ dữ liệu tồn kho hiện có!
+                        </span>
+                    </div>
+                }
+
                 <!-- Mã SKU -->
                 <div class="form-group">
                     <div class="label-with-action">
@@ -310,7 +408,8 @@
                     <span class="form-hint">Mã định danh duy nhất của từng biến thể trên toàn hệ thống kho QF.</span>
                 </div>
 
-                <div class="form-row-3">
+                <!-- Giá bán & Giá nhập (Đã loại bỏ hoàn toàn ô Tồn kho ban đầu) -->
+                <div class="form-row-2">
                     <!-- Giá nhập -->
                     <div class="form-group">
                         <label class="form-label">Giá nhập đề xuất (đ) <span class="required">*</span></label>
@@ -322,11 +421,14 @@
                         <label class="form-label">Giá niêm yết bán (đ) <span class="required">*</span></label>
                         <input type="number" class="form-control tabular-nums text-right font-weight-bold" min="0" step="1000" @bind="_variantForm.GiaBan" />
                     </div>
+                </div>
 
-                    <!-- Tồn kho ban đầu -->
-                    <div class="form-group">
-                        <label class="form-label">Tồn kho ban đầu</label>
-                        <input type="number" class="form-control tabular-nums text-center" min="0" @bind="_variantForm.SoLuongTon" />
+                <!-- Thông báo bảo toàn nguyên tắc kho: Tồn kho khởi tạo = 0 -->
+                <div class="stock-zero-notice">
+                    <div class="notice-icon">🔒</div>
+                    <div class="notice-content">
+                        <strong>Tồn kho khởi tạo: 0 cái</strong>
+                        <p>Theo nguyên tắc bảo toàn kho, biến thể mới tạo chưa có số lượng tồn. Để phân bổ hàng về kho chi nhánh cụ thể có chứng từ nhà cung cấp, vui lòng tạo <strong>Phiếu nhập kho</strong> tại Quản lý kho.</p>
                     </div>
                 </div>
 
@@ -347,7 +449,7 @@
                 <button type="button" class="btn-modal-cancel" @onclick="CloseCreateVariantModal" disabled="@_isSubmittingVariant">
                     Hủy bỏ
                 </button>
-                <button type="button" class="btn-modal-submit" @onclick="SubmitCreateVariant" disabled="@_isSubmittingVariant">
+                <button type="button" class="btn-modal-submit" @onclick="SubmitCreateVariant" disabled="@(_isSubmittingVariant || IsDuplicateVariant || (string.IsNullOrWhiteSpace(_variantForm.MauSac) && string.IsNullOrWhiteSpace(_variantForm.KichCo)))">
                     @if (_isSubmittingVariant)
                     {
                         <span class="spinner-small"></span>
@@ -412,12 +514,17 @@
                                     <th class="text-right">Giá bán niêm yết</th>
                                     <th class="text-center">Số lượng tồn</th>
                                     <th class="text-center">Tình trạng</th>
+                                    <th class="text-center">Hiển thị</th>
+                                    @if (_isChainAdmin)
+                                    {
+                                        <th class="text-center" style="width: 100px;">Thao tác</th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var v in _productVariantsList)
                                 {
-                                    <tr>
+                                    <tr class="@(v.DaXoa ? "row-hidden-variant" : "")">
                                         <td class="font-mono text-muted">#@v.MaBienThe</td>
                                         <td><code class="sku-badge">@v.MaSku</code></td>
                                         <td>
@@ -443,6 +550,33 @@
                                                 <span class="badge-status-red">Hết hàng</span>
                                             }
                                         </td>
+                                        <td class="text-center">
+                                            @if (v.DaXoa)
+                                            {
+                                                <span class="badge-status-gray" title="Biến thể đang ẩn khỏi khách hàng">⚪ Đã ẩn</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-status-green" title="Biến thể đang mở bán bình thường">🟢 Đang bán</span>
+                                            }
+                                        </td>
+                                        @if (_isChainAdmin)
+                                        {
+                                            <td class="text-center">
+                                                @if (v.DaXoa)
+                                                {
+                                                    <button type="button" class="btn-toggle-variant btn-show" @onclick="() => ToggleVariantVisibility(v)" title="Mở bán lại biến thể này cho khách">
+                                                        Mở bán
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn-toggle-variant btn-hide" @onclick="() => ToggleVariantVisibility(v)" title="Ẩn biến thể này khỏi khách hàng">
+                                                        Ẩn
+                                                    </button>
+                                                }
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>
@@ -496,7 +630,15 @@
 
                 <div class="form-row-2">
                     <div class="form-group">
-                        <label class="form-label">Danh mục sản phẩm <span class="required">*</span></label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" style="margin: 0;">Danh mục sản phẩm <span class="required">*</span></label>
+                            @if (_isChainAdmin)
+                            {
+                                <button type="button" class="btn-quick-add" @onclick="ToggleQuickAddCategory" title="Thêm nhanh danh mục mới">
+                                    @(_showQuickCategory ? "✕ Đóng" : "+ Tạo mới")
+                                </button>
+                            }
+                        </div>
                         <select class="form-control" @bind="_productForm.MaDanhMuc">
                             <option value="0">-- Chọn danh mục --</option>
                             @if (_categoriesList != null)
@@ -507,10 +649,40 @@
                                 }
                             }
                         </select>
+
+                        @if (_isChainAdmin && _showQuickCategory)
+                        {
+                            <div class="quick-add-panel">
+                                <input type="text" class="form-control form-control-sm mb-2" placeholder="Tên danh mục mới (VD: Áo Khoác Gió)..." @bind="_newCategoryName" />
+                                <div class="mb-2">
+                                    <span style="font-size: 0.74rem; color: #64748b; font-weight: 700;">Thuộc nhóm chính trên Menu:</span>
+                                    <select class="form-control form-control-sm mt-1" @bind="_newCategoryParentId">
+                                        <option value="4">👔 Áo Nam (Gom vào tab ÁO)</option>
+                                        <option value="5">👖 Quần Nam (Gom vào tab QUẦN)</option>
+                                        <option value="13">👖 Quần Jean Nam (Gom vào tab JEAN)</option>
+                                        <option value="3">🎒 Phụ kiện (Gom vào tab PHỤ KIỆN)</option>
+                                        <option value="1">Thời trang Nam (Chung)</option>
+                                    </select>
+                                </div>
+                                <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                    <button type="button" class="btn-quick-save" @onclick="SaveQuickCategory" disabled="@_isSavingQuickCategory">
+                                        @(_isSavingQuickCategory ? "Đang lưu..." : "✓ Lưu danh mục")
+                                    </button>
+                                </div>
+                            </div>
+                        }
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Thương hiệu <span class="required">*</span></label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label class="form-label" style="margin: 0;">Thương hiệu <span class="required">*</span></label>
+                            @if (_isChainAdmin)
+                            {
+                                <button type="button" class="btn-quick-add" @onclick="ToggleQuickAddBrand" title="Thêm nhanh thương hiệu mới">
+                                    @(_showQuickBrand ? "✕ Đóng" : "+ Tạo mới")
+                                </button>
+                            }
+                        </div>
                         <select class="form-control" @bind="_productForm.MaThuongHieu">
                             <option value="0">-- Chọn thương hiệu --</option>
                             @if (_brandsList != null)
@@ -521,6 +693,19 @@
                                 }
                             }
                         </select>
+
+                        @if (_isChainAdmin && _showQuickBrand)
+                        {
+                            <div class="quick-add-panel">
+                                <input type="text" class="form-control form-control-sm mb-2" placeholder="Tên thương hiệu (VD: Zara, Uniqlo)..." @bind="_newBrandName" />
+                                <input type="text" class="form-control form-control-sm mb-2" placeholder="Xuất xứ (VD: Việt Nam, Tây Ban Nha)..." @bind="_newBrandOrigin" />
+                                <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                    <button type="button" class="btn-quick-save" @onclick="SaveQuickBrand" disabled="@_isSavingQuickBrand">
+                                        @(_isSavingQuickBrand ? "Đang lưu..." : "✓ Lưu thương hiệu")
+                                    </button>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -549,6 +734,108 @@
                     else
                     {
                         <span>Lưu sản phẩm mới</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL 4: CHỈNH SỬA THÔNG TIN SẢN PHẨM                                     -->
+<!-- ========================================================================= -->
+@if (_isEditProductModalOpen && _editingProduct != null)
+{
+    <div class="modal-backdrop" @onclick="CloseEditProductModal">
+        <div class="modal-panel modal-panel-md" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge">CẬP NHẬT THÔNG TIN</div>
+                    <h3 class="modal-title">CHỈNH SỬA SẢN PHẨM #@_editingProduct.MaSanPham</h3>
+                    <p class="modal-subtitle">Thay đổi tên, danh mục, thương hiệu, chất liệu và ảnh sản phẩm</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseEditProductModal">✕</button>
+            </div>
+
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(_editProductErrorMessage))
+                {
+                    <div class="alert-box alert-error">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span>@_editProductErrorMessage</span>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label class="form-label">Tên sản phẩm thời trang <span class="required">*</span></label>
+                    <input type="text" class="form-control" placeholder="VD: Áo Blazer Nam Slimfit..." @bind="_editProductForm.TenSanPham" />
+                </div>
+
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Danh mục sản phẩm <span class="required">*</span></label>
+                        <select class="form-control" @bind="_editProductForm.MaDanhMuc">
+                            <option value="0">-- Chọn danh mục --</option>
+                            @if (_categoriesList != null)
+                            {
+                                @foreach (var cat in _categoriesList)
+                                {
+                                    <option value="@cat.MaDanhMuc">@cat.TenDanhMuc</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Thương hiệu <span class="required">*</span></label>
+                        <select class="form-control" @bind="_editProductForm.MaThuongHieu">
+                            <option value="0">-- Chọn thương hiệu --</option>
+                            @if (_brandsList != null)
+                            {
+                                @foreach (var b in _brandsList)
+                                {
+                                    <option value="@b.MaThuongHieu">@b.TenThuongHieu</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Chất liệu vải / mô tả vật liệu</label>
+                    <input type="text" class="form-control" placeholder="VD: 100% Cotton Compact..." @bind="_editProductForm.ChatLieu" />
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Đường dẫn hình ảnh chính (URL) <span class="required">*</span></label>
+                    <input type="text" class="form-control" placeholder="https://images.unsplash.com/..." @bind="_editProductForm.AnhDaiDien" />
+                    @if (!string.IsNullOrWhiteSpace(_editProductForm.AnhDaiDien))
+                    {
+                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                            <img src="@_editProductForm.AnhDaiDien" alt="Preview" style="width: 50px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0;" />
+                            <span class="text-sm text-muted">Xem trước ảnh đại diện</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" @onclick="CloseEditProductModal" disabled="@_isSubmittingEditProduct">
+                    Hủy bỏ
+                </button>
+                <button type="button" class="btn-modal-submit" @onclick="SubmitEditProduct" disabled="@_isSubmittingEditProduct">
+                    @if (_isSubmittingEditProduct)
+                    {
+                        <span class="spinner-small"></span>
+                        <span>Đang lưu thay đổi...</span>
+                    }
+                    else
+                    {
+                        <span>Cập nhật sản phẩm</span>
                     }
                 </button>
             </div>
@@ -1344,6 +1631,44 @@
         background: #334155;
     }
 
+    .btn-quick-add {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        color: #2563eb;
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .btn-quick-add:hover {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+    }
+    .quick-add-panel {
+        background: #f8fafc;
+        border: 1px dashed #93c5fd;
+        border-radius: 6px;
+        padding: 10px;
+        margin-top: 8px;
+    }
+    .btn-quick-save {
+        background: #10b981;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 5px 12px;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-quick-save:hover:not(:disabled) {
+        background: #059669;
+    }
+
     .size-pill {
         background: #e2e8f0;
         color: #0f172a;
@@ -1380,6 +1705,82 @@
         border-radius: 10px;
     }
 
+    .existing-variants-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+    }
+
+    .existing-variants-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .existing-chips-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .existing-variant-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        color: #1e293b;
+    }
+
+    .chip-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #3b82f6;
+    }
+
+    .chip-sku {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
+    .stock-zero-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-top: 10px;
+    }
+
+    .notice-icon {
+        font-size: 1rem;
+        line-height: 1;
+    }
+
+    .notice-content {
+        font-size: 0.78rem;
+        color: #166534;
+        line-height: 1.4;
+    }
+
+    .notice-content strong {
+        color: #14532d;
+    }
+
+    .notice-content p {
+        margin: 2px 0 0 0;
+        color: #166534;
+    }
+
     .spinner-small {
         display: inline-block;
         width: 12px;
@@ -1407,6 +1808,102 @@
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .text-muted { color: #94a3b8; }
+
+    /* STATUS FILTER TABS */
+    .status-filter-group {
+        display: inline-flex;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 8px;
+        gap: 2px;
+    }
+
+    .status-filter-btn {
+        background: transparent;
+        border: none;
+        padding: 5px 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #64748b;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .status-filter-btn:hover {
+        color: #0f172a;
+    }
+
+    .status-filter-btn.active {
+        background: #ffffff;
+        color: #0f172a;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .badge-status-visible {
+        display: inline-flex;
+        align-items: center;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+
+    .badge-status-hidden, .badge-status-gray {
+        display: inline-flex;
+        align-items: center;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 10px;
+        border: 1px dashed #cbd5e1;
+    }
+
+    .row-hidden-product, .row-hidden-variant {
+        background-color: #f8fafc;
+        opacity: 0.75;
+    }
+
+    .btn-toggle-variant {
+        padding: 3px 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        border-radius: 4px;
+        border: 1px solid;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-toggle-variant.btn-show {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        color: #047857;
+    }
+
+    .btn-toggle-variant.btn-show:hover {
+        background: #d1fae5;
+    }
+
+    .btn-toggle-variant.btn-hide {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #b91c1c;
+    }
+
+    .btn-toggle-variant.btn-hide:hover {
+        background: #fee2e2;
+    }
+
+    .btn-action-ghost.text-success {
+        color: #16a34a;
+    }
+    .btn-action-ghost.text-danger {
+        color: #ef4444;
+    }
 </style>
 
 @code {
@@ -1415,12 +1912,37 @@
     private int _pageSize = 10;
     private string _searchTerm = string.Empty;
 
+    // Phân quyền Quản trị chuỗi (cầm quyền tuyệt đối ẩn/hiện và tạo danh mục/thương hiệu)
+    private bool _isChainAdmin = false;
+    private string _statusFilter = "all"; // "all", "active", "hidden"
+    private int _totalAll = 0;
+    private int _totalActive = 0;
+    private int _totalHidden = 0;
+
+    // State Modal Chỉnh Sửa Sản Phẩm
+    private bool _isEditProductModalOpen = false;
+    private bool _isSubmittingEditProduct = false;
+    private string _editProductErrorMessage = string.Empty;
+    private ProductListItemDto? _editingProduct;
+    private UpdateProductRequest _editProductForm = new();
+
     // Danh sách toàn bộ sản phẩm (để chọn khi thêm biến thể)
     private List<ProductListItemDto>? _allProductsList;
 
     // Danh mục & Thương hiệu cho form thêm sản phẩm
     private List<CategoryDto>? _categoriesList;
     private List<BrandDto>? _brandsList;
+
+    // State Thêm nhanh Danh mục & Thương hiệu (Quick Add)
+    private bool _showQuickCategory = false;
+    private string _newCategoryName = string.Empty;
+    private int _newCategoryParentId = 4; // Mặc định Áo Nam (4)
+    private bool _isSavingQuickCategory = false;
+
+    private bool _showQuickBrand = false;
+    private string _newBrandName = string.Empty;
+    private string _newBrandOrigin = "Việt Nam";
+    private bool _isSavingQuickBrand = false;
 
     // State Modal Thêm Biến Thể
     private bool _isVariantModalOpen = false;
@@ -1429,6 +1951,27 @@
     private ProductListItemDto? _selectedProductForVariant;
     private bool _canChangeProductInVariantModal = true;
     private CreateProductVariantRequest _variantForm = new();
+    private List<ProductVariantDto> _existingVariantsForSelectedProduct = new();
+    private bool _isLoadingExistingVariants = false;
+
+    private bool IsDuplicateVariant
+    {
+        get
+        {
+            if (_existingVariantsForSelectedProduct == null || !_existingVariantsForSelectedProduct.Any())
+                return false;
+
+            if (string.IsNullOrWhiteSpace(_variantForm.MauSac) && string.IsNullOrWhiteSpace(_variantForm.KichCo))
+                return false;
+
+            var checkColor = string.IsNullOrWhiteSpace(_variantForm.MauSac) ? "Mặc định" : _variantForm.MauSac.Trim();
+            var checkSize = string.IsNullOrWhiteSpace(_variantForm.KichCo) ? "Free" : _variantForm.KichCo.Trim();
+
+            return _existingVariantsForSelectedProduct.Any(v => 
+                v.MauSac.Trim().Equals(checkColor, StringComparison.OrdinalIgnoreCase) && 
+                v.KichCo.Trim().Equals(checkSize, StringComparison.OrdinalIgnoreCase));
+        }
+    }
 
     // State Modal Xem Biến Thể
     private bool _isViewVariantsModalOpen = false;
@@ -1443,9 +1986,9 @@
     private CreateProductRequest _productForm = new();
     private string _productMainImageUrl = string.Empty;
 
-    // Gợi ý nhanh màu & size nam chuẩn
+    // Gợi ý nhanh màu & size nam chuẩn (có Free size cho Ví, Clutch, Thắt lưng, Phụ kiện)
     private readonly string[] _popularColors = new[] { "Đen", "Trắng", "Xám Ghi", "Be Sáng", "Xanh Navy", "Xanh Rêu", "Nâu Cafe" };
-    private readonly string[] _popularSizes = new[] { "S", "M", "L", "XL", "XXL", "29", "30", "31", "32" };
+    private readonly string[] _popularSizes = new[] { "Free", "S", "M", "L", "XL", "XXL", "29", "30", "31", "32" };
 
     private IEnumerable<ProductListItemDto>? FilteredProducts
     {
@@ -1464,24 +2007,144 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadUserRole();
+        if (!_isChainAdmin)
+        {
+            Toast.ShowWarning("Chỉ Quản trị viên chuỗi mới có quyền quản lý Sản phẩm & Biến thể. Đang chuyển hướng về trang Kho & Tồn kho...");
+            Navigation.NavigateTo("/warehouse");
+            return;
+        }
         await LoadProducts();
+    }
+
+    private async Task LoadUserRole()
+    {
+        try
+        {
+            var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            if (string.IsNullOrEmpty(role))
+            {
+                _isChainAdmin = true;
+            }
+            else if (role.Equals("AdminChuoi", StringComparison.OrdinalIgnoreCase) || 
+                     role.Equals("QuanLyHeThong", StringComparison.OrdinalIgnoreCase) ||
+                     role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                     (role.Contains("Admin", StringComparison.OrdinalIgnoreCase) && !role.Contains("ChiNhanh", StringComparison.OrdinalIgnoreCase)) ||
+                     role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
+                     role.Contains("chuỗi", StringComparison.OrdinalIgnoreCase))
+            {
+                _isChainAdmin = true;
+            }
+            else
+            {
+                _isChainAdmin = false;
+            }
+        }
+        catch
+        {
+            _isChainAdmin = true;
+        }
+    }
+
+    private async Task SetStatusFilter(string filter)
+    {
+        _statusFilter = filter;
+        _currentPage = 1;
+        await LoadProducts();
+    }
+
+    private async Task LoadStatsCounts()
+    {
+        try
+        {
+            var resActive = await AdminApi.GetProductsAsync(1, 1, daXoa: false, includeAll: false);
+            var resHidden = await AdminApi.GetProductsAsync(1, 1, daXoa: true, includeAll: false);
+            if (resActive != null) _totalActive = resActive.TotalCount;
+            if (resHidden != null) _totalHidden = resHidden.TotalCount;
+            _totalAll = _totalActive + _totalHidden;
+        }
+        catch
+        {
+            // Ignore stats error
+        }
     }
 
     private async Task LoadProducts()
     {
         try
         {
-            _pagedResult = await AdminApi.GetProductsAsync(_currentPage, _pageSize);
+            if (_statusFilter == "all")
+            {
+                _pagedResult = await AdminApi.GetProductsAsync(_currentPage, _pageSize);
+            }
+            else if (_statusFilter == "active")
+            {
+                _pagedResult = await AdminApi.GetProductsAsync(_currentPage, _pageSize, daXoa: false, includeAll: false);
+            }
+            else if (_statusFilter == "hidden")
+            {
+                _pagedResult = await AdminApi.GetProductsAsync(_currentPage, _pageSize, daXoa: true, includeAll: false);
+            }
+
             // Tải thêm danh sách trang lớn để phục vụ chọn SP nhanh khi thêm biến thể
             if (_allProductsList == null || !_allProductsList.Any())
             {
                 var bigPage = await AdminApi.GetProductsAsync(1, 100);
                 _allProductsList = bigPage?.Items?.ToList() ?? new List<ProductListItemDto>();
             }
+
+            await LoadStatsCounts();
         }
         catch (Exception ex)
         {
             Toast.ShowError($"Lỗi tải danh sách sản phẩm: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleProductVisibility(ProductListItemDto prod)
+    {
+        try
+        {
+            var res = await AdminApi.ToggleProductStatusAsync(prod.MaSanPham);
+            if (res.Success)
+            {
+                prod.DaXoa = res.Data;
+                Toast.ShowSuccess(res.Data ? $"Đã ẩn sản phẩm #{prod.MaSanPham} khỏi khách hàng." : $"Đã mở bán lại sản phẩm #{prod.MaSanPham}.");
+                await LoadProducts();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể cập nhật trạng thái sản phẩm.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+    }
+
+    private async Task ToggleVariantVisibility(ProductVariantDto variant)
+    {
+        try
+        {
+            var res = await AdminApi.ToggleVariantStatusAsync(variant.MaBienThe);
+            if (res.Success)
+            {
+                variant.DaXoa = res.Data;
+                Toast.ShowSuccess(res.Data ? $"Đã ẩn biến thể {variant.MaSku} khỏi khách hàng." : $"Đã mở bán lại biến thể {variant.MaSku}.");
+                if (_viewingProduct != null)
+                {
+                    await LoadProductVariants(_viewingProduct.MaSanPham);
+                }
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể cập nhật trạng thái biến thể.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
         }
     }
 
@@ -1495,16 +2158,16 @@
     // =========================================================================
     // XỬ LÝ MODAL THÊM BIẾN THỂ
     // =========================================================================
-    private void OpenCreateVariantModal(ProductListItemDto? prod = null)
+    private async Task OpenCreateVariantModal(ProductListItemDto? prod = null)
     {
         _variantErrorMessage = string.Empty;
         _variantForm = new CreateProductVariantRequest
         {
             MauSac = "Đen",
-            KichCo = "L",
+            KichCo = "Free",
             GiaNhap = 150000,
             GiaBan = 250000,
-            SoLuongTon = 20
+            SoLuongTon = 0 // Khóa cứng tồn kho ban đầu = 0
         };
 
         if (prod != null)
@@ -1527,21 +2190,48 @@
 
         GenerateSuggestedSku();
         _isVariantModalOpen = true;
+
+        if (_variantForm.MaSanPham > 0)
+        {
+            await LoadExistingVariantsForSelectedProduct(_variantForm.MaSanPham);
+        }
+    }
+
+    private async Task LoadExistingVariantsForSelectedProduct(int productId)
+    {
+        _isLoadingExistingVariants = true;
+        try
+        {
+            _existingVariantsForSelectedProduct = await AdminApi.GetProductVariantsAsync(productId) ?? new();
+        }
+        catch
+        {
+            _existingVariantsForSelectedProduct = new();
+        }
+        finally
+        {
+            _isLoadingExistingVariants = false;
+        }
     }
 
     private void CloseCreateVariantModal()
     {
         _isVariantModalOpen = false;
         _variantErrorMessage = string.Empty;
+        _existingVariantsForSelectedProduct = new();
     }
 
-    private void OnProductSelectChanged(ChangeEventArgs e)
+    private async Task OnProductSelectChanged(ChangeEventArgs e)
     {
         if (int.TryParse(e.Value?.ToString(), out int pid))
         {
             _selectedProductForVariant = _allProductsList?.FirstOrDefault(x => x.MaSanPham == pid);
             _variantForm.MaSanPham = pid;
             GenerateSuggestedSku();
+            if (pid > 0)
+            {
+                await LoadExistingVariantsForSelectedProduct(pid);
+            }
         }
     }
 
@@ -1565,14 +2255,15 @@
     private void GenerateSuggestedSku()
     {
         var pid = _variantForm.MaSanPham > 0 ? _variantForm.MaSanPham : (_selectedProductForVariant?.MaSanPham ?? 1);
-        var rawColor = string.IsNullOrWhiteSpace(_variantForm.MauSac) ? "DEN" : ConvertToUnaccentedUpper(_variantForm.MauSac).Replace(" ", "");
-        var rawSize = string.IsNullOrWhiteSpace(_variantForm.KichCo) ? "L" : _variantForm.KichCo.Trim().ToUpperInvariant();
+        var rawColor = string.IsNullOrWhiteSpace(_variantForm.MauSac) ? "MAU" : ConvertToUnaccentedUpper(_variantForm.MauSac).Replace(" ", "");
+        var rawSize = string.IsNullOrWhiteSpace(_variantForm.KichCo) ? "SIZE" : _variantForm.KichCo.Trim().ToUpperInvariant();
         _variantForm.MaSku = $"QF-SP{pid:D2}-{rawColor}-{rawSize}";
     }
 
     private async Task SubmitCreateVariant()
     {
         _variantErrorMessage = string.Empty;
+        _variantForm.SoLuongTon = 0; // Luôn luôn khởi tạo tồn kho = 0
 
         if (_variantForm.MaSanPham <= 0)
         {
@@ -1580,22 +2271,31 @@
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(_variantForm.MauSac) && string.IsNullOrWhiteSpace(_variantForm.KichCo))
+        {
+            _variantErrorMessage = "Vui lòng nhập ít nhất Màu sắc hoặc Kích cỡ biến thể.";
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_variantForm.MauSac))
         {
-            _variantErrorMessage = "Vui lòng nhập hoặc chọn màu sắc biến thể.";
-            return;
+            _variantForm.MauSac = "Mặc định";
         }
 
         if (string.IsNullOrWhiteSpace(_variantForm.KichCo))
         {
-            _variantErrorMessage = "Vui lòng nhập hoặc chọn kích cỡ biến thể.";
+            _variantForm.KichCo = "Free";
+        }
+
+        if (IsDuplicateVariant)
+        {
+            _variantErrorMessage = $"Sản phẩm này đã có biến thể [Màu: {_variantForm.MauSac} - Size: {_variantForm.KichCo}]. Hệ thống chặn trùng để bảo vệ dữ liệu tồn kho hiện có!";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_variantForm.MaSku))
         {
-            _variantErrorMessage = "Vui lòng nhập mã SKU cho biến thể.";
-            return;
+            GenerateSuggestedSku();
         }
 
         if (_variantForm.GiaBan < 0 || _variantForm.GiaNhap < 0)
@@ -1652,7 +2352,14 @@
         _isLoadingVariants = true;
         try
         {
-            _productVariantsList = await AdminApi.GetProductVariantsAsync(productId);
+            if (_isChainAdmin)
+            {
+                _productVariantsList = await AdminApi.GetProductVariantsForAdminAsync(productId);
+            }
+            else
+            {
+                _productVariantsList = await AdminApi.GetProductVariantsAsync(productId);
+            }
         }
         catch (Exception ex)
         {
@@ -1671,10 +2378,10 @@
         _productVariantsList = null;
     }
 
-    private void SwitchToCreateVariantFromView(ProductListItemDto prod)
+    private async Task SwitchToCreateVariantFromView(ProductListItemDto prod)
     {
         CloseViewVariantsModal();
-        OpenCreateVariantModal(prod);
+        await OpenCreateVariantModal(prod);
     }
 
     // =========================================================================
@@ -1755,7 +2462,7 @@
                 // Gợi ý ngay mở form tạo biến thể đầu tiên cho sản phẩm vừa tạo
                 var newProd = _pagedResult?.Items?.FirstOrDefault(x => x.MaSanPham == newPid) 
                               ?? new ProductListItemDto { MaSanPham = newPid, TenSanPham = _productForm.TenSanPham };
-                OpenCreateVariantModal(newProd);
+                await OpenCreateVariantModal(newProd);
             }
             else
             {
@@ -1772,9 +2479,187 @@
         }
     }
 
-    private void EditProduct(ProductListItemDto prod)
+    private async Task EditProduct(ProductListItemDto prod)
     {
-        Toast.ShowInfo($"Chỉnh sửa sản phẩm #{prod.MaSanPham}: {prod.TenSanPham}");
+        _editingProduct = prod;
+        _editProductErrorMessage = string.Empty;
+
+        try
+        {
+            if (_categoriesList == null || !_categoriesList.Any())
+                _categoriesList = await AdminApi.GetCategoriesAsync();
+
+            if (_brandsList == null || !_brandsList.Any())
+                _brandsList = await AdminApi.GetBrandsAsync();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải danh mục/thương hiệu: {ex.Message}");
+        }
+
+        var matchedCat = _categoriesList?.FirstOrDefault(c => c.TenDanhMuc.Equals(prod.TenDanhMuc, StringComparison.OrdinalIgnoreCase));
+        var matchedBrand = _brandsList?.FirstOrDefault(b => b.TenThuongHieu.Equals(prod.TenThuongHieu, StringComparison.OrdinalIgnoreCase));
+
+        _editProductForm = new UpdateProductRequest
+        {
+            MaSanPham = prod.MaSanPham,
+            TenSanPham = prod.TenSanPham,
+            MaDanhMuc = matchedCat?.MaDanhMuc ?? (_categoriesList?.FirstOrDefault()?.MaDanhMuc ?? 1),
+            MaThuongHieu = matchedBrand?.MaThuongHieu ?? (_brandsList?.FirstOrDefault()?.MaThuongHieu ?? 1),
+            ChatLieu = prod.ChatLieu,
+            AnhDaiDien = prod.AnhDaiDien
+        };
+
+        _isEditProductModalOpen = true;
+    }
+
+    private void CloseEditProductModal()
+    {
+        _isEditProductModalOpen = false;
+        _editingProduct = null;
+        _editProductErrorMessage = string.Empty;
+    }
+
+    private async Task SubmitEditProduct()
+    {
+        _editProductErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_editProductForm.TenSanPham))
+        {
+            _editProductErrorMessage = "Vui lòng nhập tên sản phẩm.";
+            return;
+        }
+
+        if (_editProductForm.MaDanhMuc <= 0)
+        {
+            _editProductErrorMessage = "Vui lòng chọn danh mục hợp lệ.";
+            return;
+        }
+
+        if (_editProductForm.MaThuongHieu <= 0)
+        {
+            _editProductErrorMessage = "Vui lòng chọn thương hiệu hợp lệ.";
+            return;
+        }
+
+        _isSubmittingEditProduct = true;
+        try
+        {
+            var res = await AdminApi.UpdateProductAsync(_editProductForm.MaSanPham, _editProductForm);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã cập nhật sản phẩm #{_editProductForm.MaSanPham} thành công!");
+                CloseEditProductModal();
+                await LoadProducts();
+            }
+            else
+            {
+                _editProductErrorMessage = res.Message ?? "Cập nhật sản phẩm thất bại.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _editProductErrorMessage = $"Lỗi xử lý: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingEditProduct = false;
+        }
+    }
+
+    private void ToggleQuickAddCategory()
+    {
+        _showQuickCategory = !_showQuickCategory;
+        _newCategoryName = string.Empty;
+    }
+
+    private async Task SaveQuickCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_newCategoryName))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên danh mục mới.");
+            return;
+        }
+
+        _isSavingQuickCategory = true;
+        try
+        {
+            var res = await AdminApi.CreateCategoryAsync(new CreateCategoryRequest
+            {
+                TenDanhMuc = _newCategoryName.Trim(),
+                MaDanhMucCha = _newCategoryParentId
+            });
+
+            if (res.Success && res.Data > 0)
+            {
+                var newCatId = res.Data;
+                Toast.ShowSuccess($"Đã tạo danh mục '{_newCategoryName.Trim()}' thành công!");
+                _categoriesList = await AdminApi.GetCategoriesAsync();
+                _productForm.MaDanhMuc = newCatId;
+                _showQuickCategory = false;
+                _newCategoryName = string.Empty;
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể tạo danh mục mới.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingQuickCategory = false;
+        }
+    }
+
+    private void ToggleQuickAddBrand()
+    {
+        _showQuickBrand = !_showQuickBrand;
+        _newBrandName = string.Empty;
+        _newBrandOrigin = "Việt Nam";
+    }
+
+    private async Task SaveQuickBrand()
+    {
+        if (string.IsNullOrWhiteSpace(_newBrandName))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên thương hiệu mới.");
+            return;
+        }
+
+        _isSavingQuickBrand = true;
+        try
+        {
+            var res = await AdminApi.CreateBrandAsync(new CreateBrandRequest
+            {
+                TenThuongHieu = _newBrandName.Trim(),
+                XuatXu = string.IsNullOrWhiteSpace(_newBrandOrigin) ? "Việt Nam" : _newBrandOrigin.Trim()
+            });
+
+            if (res.Success && res.Data > 0)
+            {
+                var newBrandId = res.Data;
+                Toast.ShowSuccess($"Đã tạo thương hiệu '{_newBrandName.Trim()}' thành công!");
+                _brandsList = await AdminApi.GetBrandsAsync();
+                _productForm.MaThuongHieu = newBrandId;
+                _showQuickBrand = false;
+                _newBrandName = string.Empty;
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể tạo thương hiệu mới.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingQuickBrand = false;
+        }
     }
 
     private static string ConvertToUnaccentedUpper(string text)

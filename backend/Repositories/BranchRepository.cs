@@ -9,17 +9,16 @@ namespace Backend.Repositories;
 
 public class BranchRepository : IBranchRepository
 {
-    private readonly string _connectionString;
+    private readonly IDbConnectionFactory _connectionFactory;
 
-    public BranchRepository(IConfiguration configuration)
+    public BranchRepository(IDbConnectionFactory connectionFactory)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection") 
-            ?? throw new System.InvalidOperationException("DefaultConnection not found in configuration.");
+        _connectionFactory = connectionFactory;
     }
 
     public async Task<IEnumerable<BranchDto>> GetAllBranchesAsync()
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
                 ma_chi_nhanh AS MaChiNhanh,
@@ -27,7 +26,7 @@ public class BranchRepository : IBranchRepository
                 dia_chi AS DiaChi,
                 dien_thoai AS DienThoai,
                 loai_chi_nhanh AS LoaiChiNhanh,
-                CASE WHEN loai_chi_nhanh = N'Kho tổng online' OR ma_chi_nhanh = 9 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsOnlineWarehouse,
+                is_online_warehouse AS IsOnlineWarehouse,
                 dang_hoat_dong AS DangHoatDong,
                 ngay_tao AS NgayTao
             FROM ChiNhanh
@@ -38,7 +37,7 @@ public class BranchRepository : IBranchRepository
 
     public async Task<BranchDto?> GetBranchByIdAsync(int branchId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
                 ma_chi_nhanh AS MaChiNhanh,
@@ -46,7 +45,7 @@ public class BranchRepository : IBranchRepository
                 dia_chi AS DiaChi,
                 dien_thoai AS DienThoai,
                 loai_chi_nhanh AS LoaiChiNhanh,
-                CASE WHEN loai_chi_nhanh = N'Kho tổng online' OR ma_chi_nhanh = 9 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END AS IsOnlineWarehouse,
+                is_online_warehouse AS IsOnlineWarehouse,
                 dang_hoat_dong AS DangHoatDong,
                 ngay_tao AS NgayTao
             FROM ChiNhanh
@@ -57,7 +56,7 @@ public class BranchRepository : IBranchRepository
 
     public async Task<int> CreateBranchAsync(CreateBranchDto dto)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             INSERT INTO ChiNhanh (ten_chi_nhanh, dia_chi, dien_thoai, loai_chi_nhanh, dang_hoat_dong, ngay_tao)
             VALUES (@TenChiNhanh, @DiaChi, @DienThoai, @LoaiChiNhanh, 1, GETDATE());
@@ -68,7 +67,7 @@ public class BranchRepository : IBranchRepository
 
     public async Task<IEnumerable<BranchInventoryDto>> GetBranchInventoryAsync(int branchId, string? search = null)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         var sql = @"
             SELECT 
                 tk.ma_chi_nhanh AS MaChiNhanh,
@@ -81,7 +80,8 @@ public class BranchRepository : IBranchRepository
                 NULL AS Barcode,
                 tk.so_luong_ton AS SoLuongTon,
                 tk.muc_canh_bao_ton AS MucCanhBaoTon,
-                bt.gia_ban AS GiaBan
+                bt.gia_ban AS GiaBan,
+                ISNULL(sp.da_xoa, 0) AS DaXoa
             FROM TonKhoChiNhanh tk
             JOIN ChiNhanh cn ON tk.ma_chi_nhanh = cn.ma_chi_nhanh
             JOIN BienTheSanPham bt ON tk.ma_bien_the = bt.ma_bien_the
@@ -110,7 +110,7 @@ public class BranchRepository : IBranchRepository
 
     public async Task<BranchInventoryDto?> GetVariantInventoryAtBranchAsync(int branchId, int variantId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
                 tk.ma_chi_nhanh AS MaChiNhanh,
@@ -135,8 +135,11 @@ public class BranchRepository : IBranchRepository
 
     public async Task<bool> AdjustBranchInventoryAsync(int branchId, int variantId, int deltaQuantity, string reason, int staffId)
     {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync();
+        using var connection = _connectionFactory.CreateConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            connection.Open();
+        }
         using var tx = connection.BeginTransaction();
 
         try
@@ -204,7 +207,7 @@ public class BranchRepository : IBranchRepository
 
     public async Task<int> GetStockQuantityAsync(int branchId, int variantId)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT ISNULL(so_luong_ton, 0)
             FROM TonKhoChiNhanh

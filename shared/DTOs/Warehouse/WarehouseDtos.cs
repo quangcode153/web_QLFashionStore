@@ -20,6 +20,7 @@ public class LowStockAlertDto
     public string KichCo { get; set; } = string.Empty;
     public int SoLuongTon { get; set; }
     public decimal GiaNhap { get; set; }
+    public bool DaXoa { get; set; }
 }
 
 public class SupplierDto

@@ -528,9 +528,11 @@
                     if (loginData.MaChiNhanh.HasValue)
                     {
                         await JSRuntime.InvokeVoidAsync("localStorage.setItem", "staffBranchId", loginData.MaChiNhanh.Value.ToString());
+                        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "branchId", loginData.MaChiNhanh.Value.ToString());
                         if (!string.IsNullOrEmpty(loginData.TenChiNhanh))
                         {
                             await JSRuntime.InvokeVoidAsync("localStorage.setItem", "staffBranchName", loginData.TenChiNhanh);
+                            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "branchName", loginData.TenChiNhanh);
                         }
                     }
                     if (!string.IsNullOrEmpty(loginData.LoaiThuKho))

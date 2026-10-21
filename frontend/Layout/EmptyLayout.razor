@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+@using Frontend.Components
+
+<div class="empty-layout-container">
+    @Body
+    <ToastNotification />
+</div>
+
+<style>
+    .empty-layout-container {
+        min-height: 100vh;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #f8fafc;
+    }
+</style>

@@ -35,6 +35,7 @@ public class BranchInventoryDto
     public int SoLuongTon { get; set; }
     public int MucCanhBaoTon { get; set; } = 10;
     public decimal GiaBan { get; set; }
+    public bool DaXoa { get; set; }
 }
 
 public class AdjustBranchInventoryDto

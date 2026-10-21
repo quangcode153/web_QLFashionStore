@@ -14,7 +14,8 @@ public enum OrderStatus
     ChoXuLy,
     DangGiaoHang,
     DaHoanThanh,
-    DaHuy
+    DaHuy,
+    DaHoanTra
 }
 
 public static class OrderStatusHelper
@@ -38,7 +39,11 @@ public static class OrderStatusHelper
         { "DaHuy", "Đã hủy" },
         { "Đã hủy", "Đã hủy" },
         { "Da_Huy", "Đã hủy" },
-        { "Cancelled", "Đã hủy" }
+        { "Cancelled", "Đã hủy" },
+        { "DaHoanTra", "Đã hoàn trả" },
+        { "Đã hoàn trả", "Đã hoàn trả" },
+        { "Da_Hoan_Tra", "Đã hoàn trả" },
+        { "Returned", "Đã hoàn trả" }
     };
 
     public static bool TryNormalizeStatus(string? input, out string normalizedDbStatus)
@@ -57,7 +62,7 @@ public static class OrderStatusHelper
         return false;
     }
 
-    public static string GetAllowedStatusString() => "Chờ xử lý (ChoXuLy), Đang giao hàng (DangGiaoHang), Đã hoàn thành (DaHoanThanh), Đã hủy (DaHuy)";
+    public static string GetAllowedStatusString() => "Chờ xử lý (ChoXuLy), Đang giao hàng (DangGiaoHang), Đã hoàn thành (DaHoanThanh), Đã hoàn trả (DaHoanTra), Đã hủy (DaHuy)";
 }
 
 public enum InventoryChangeReason

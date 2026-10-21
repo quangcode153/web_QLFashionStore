@@ -11,6 +11,7 @@ public class DailyRevenueReportDto
     public int TongSoDon { get; set; }
     public decimal TongTienHang { get; set; }
     public decimal TongTienGiam { get; set; }
+    public decimal TongTienHoan { get; set; }
     public decimal DoanhThuThucTe { get; set; }
 }
 
@@ -35,6 +36,7 @@ public class FinancialRangeReportDto
     public int TongSoKhachHang { get; set; }
     public decimal TongTienHang { get; set; }
     public decimal TongTienKhuyenMai { get; set; }
+    public decimal TongTienHoanTra { get; set; }
     public decimal TongDoanhThuThuc { get; set; }
 }
 

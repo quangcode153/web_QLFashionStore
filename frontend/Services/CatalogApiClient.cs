@@ -93,4 +93,36 @@ public class CatalogApiClient : ICatalogApiClient
         var resp = await _http.DeleteAsync($"api/banners/{id}");
         return resp.IsSuccessStatusCode;
     }
+
+    public async Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId)
+    {
+        try
+        {
+            var resp = await _http.GetFromJsonAsync<ApiResponse<IEnumerable<ProductBranchStockDto>>>($"api/products/{productId}/branch-stock");
+            return resp?.Data ?? Enumerable.Empty<ProductBranchStockDto>();
+        }
+        catch
+        {
+            return Enumerable.Empty<ProductBranchStockDto>();
+        }
+    }
+
+    public async Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds)
+    {
+        try
+        {
+            var request = new CheckVariantAvailabilityRequest { VariantIds = variantIds.ToList() };
+            var resp = await _http.PostAsJsonAsync("api/products/check-availability", request);
+            if (resp.IsSuccessStatusCode)
+            {
+                var apiRes = await resp.Content.ReadFromJsonAsync<ApiResponse<IEnumerable<VariantAvailabilityDto>>>();
+                return apiRes?.Data ?? Enumerable.Empty<VariantAvailabilityDto>();
+            }
+            return Enumerable.Empty<VariantAvailabilityDto>();
+        }
+        catch
+        {
+            return Enumerable.Empty<VariantAvailabilityDto>();
+        }
+    }
 }

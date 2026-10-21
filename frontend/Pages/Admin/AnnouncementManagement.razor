@@ -5,6 +5,7 @@
 @inject IAdminApiClient AdminApi
 @inject IToastService Toast
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <div class="announcement-container">
     <div class="page-header">
@@ -25,7 +26,7 @@
     <!-- Form Phát Thông Báo Mới -->
     <div class="card form-card">
         <div class="card-header">
-            <div class="header-left">
+            <div class="ann-header-left">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                     <line x1="9" y1="10" x2="15" y2="10"></line>
@@ -64,14 +65,17 @@
                         @if (_isBranchManager)
                         {
                             <select class="form-control select-locked" @bind="_model.PhamViGui" disabled title="Quản lý chi nhánh chỉ được phát thông báo cho chi nhánh của mình">
-                                <option value="Nội bộ chi nhánh (QF Quận 10)">Nội bộ chi nhánh (@_branchName)</option>
+                                <option value="@($"Nội bộ chi nhánh ({_branchName})")">Nội bộ chi nhánh (@_branchName)</option>
                             </select>
                         }
                         else
                         {
                             <select class="form-control" @bind="_model.PhamViGui">
-                                <option value="Toàn hệ thống">Toàn hệ thống (Tất cả 9 chi nhánh)</option>
-                                <option value="Nội bộ chi nhánh (QF Quận 10)">Nội bộ chi nhánh (QF Quận 10)</option>
+                                <option value="Toàn hệ thống">Toàn hệ thống (@(_branches.Any() ? $"Tất cả {_branches.Count} chi nhánh" : "Tất cả chi nhánh"))</option>
+                                @foreach (var b in _branches)
+                                {
+                                    <option value="@($"Nội bộ chi nhánh ({b.TenChiNhanh})")">Nội bộ chi nhánh (@b.TenChiNhanh)</option>
+                                }
                                 <option value="Quản lý chi nhánh">Các Quản lý chi nhánh</option>
                                 <option value="Nhân viên bán hàng">Nhân viên bán hàng (POS)</option>
                                 <option value="Thủ kho">Thủ kho & Nhân viên kho</option>
@@ -237,7 +241,7 @@
         align-items: center;
     }
 
-    .header-left {
+    .ann-header-left {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -512,15 +516,26 @@
 
 @code {
     private List<global::Shared.DTOs.Announcement.InternalAnnouncementDto> _announcements = new();
+    private List<global::Shared.DTOs.Warehouse.BranchDto> _branches = new();
     private global::Shared.DTOs.Announcement.CreateAnnouncementRequestDto _model = new();
     private bool _isLoading = false;
     private bool _isSubmitting = false;
     private bool _isBranchManager = false;
-    private string _branchName = "QF Quận 10";
+    private string _branchName = "Cơ sở";
     private int _branchId = 1;
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            var branches = await AdminApi.GetBranchesAsync();
+            if (branches != null && branches.Any())
+            {
+                _branches = branches;
+            }
+        }
+        catch { }
+
         await LoadAnnouncements();
     }
 
@@ -531,15 +546,49 @@
             try
             {
                 var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
-                if (!string.IsNullOrEmpty(role) && role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(role))
                 {
-                    _isBranchManager = true;
-                    _branchName = "QF Quận 10";
-                    _branchId = 1;
-                    _model.PhamViGui = "Nội bộ chi nhánh (QF Quận 10)";
-                    _model.MaChiNhanh = 1;
-                    await LoadAnnouncements();
-                    StateHasChanged();
+                    if (role.Contains("Order Coordinator", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("Điều phối", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("Nhân viên", StringComparison.OrdinalIgnoreCase) ||
+                        role.Contains("Thu ngân", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Toast.ShowWarning("Bạn không có quyền truy cập trang soạn thông báo nội bộ.");
+                        Navigation.NavigateTo(role.Contains("Order Coordinator", StringComparison.OrdinalIgnoreCase) || role.Contains("Điều phối", StringComparison.OrdinalIgnoreCase) ? "/admin/orders" : 
+                                              role.Contains("kho", StringComparison.OrdinalIgnoreCase) ? "/warehouse" : "/pos");
+                        return;
+                    }
+
+                    if (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _isBranchManager = true;
+                        var storedBranchName = await JS.InvokeAsync<string?>("localStorage.getItem", "branchName");
+                        var storedBranchIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+                        if (!string.IsNullOrWhiteSpace(storedBranchName))
+                        {
+                            _branchName = storedBranchName;
+                        }
+                        else if (_branches.Any())
+                        {
+                            _branchName = _branches.First().TenChiNhanh;
+                        }
+
+                        if (int.TryParse(storedBranchIdStr, out var bid) && bid > 0)
+                        {
+                            _branchId = bid;
+                        }
+                        else if (_branches.Any())
+                        {
+                            _branchId = _branches.First().MaChiNhanh;
+                        }
+
+                        _model.PhamViGui = $"Nội bộ chi nhánh ({_branchName})";
+                        _model.MaChiNhanh = _branchId;
+                        await LoadAnnouncements();
+                        StateHasChanged();
+                    }
                 }
             }
             catch { }
@@ -593,14 +642,15 @@
 
             if (_isBranchManager)
             {
-                _model.PhamViGui = "Nội bộ chi nhánh (QF Quận 10)";
+                _model.PhamViGui = $"Nội bộ chi nhánh ({_branchName})";
                 _model.MaChiNhanh = _branchId;
             }
             else
             {
                 if (_model.PhamViGui.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase))
                 {
-                    _model.MaChiNhanh = 1;
+                    var matched = _branches.FirstOrDefault(b => _model.PhamViGui.Contains(b.TenChiNhanh, StringComparison.OrdinalIgnoreCase));
+                    _model.MaChiNhanh = matched?.MaChiNhanh ?? (_branches.FirstOrDefault()?.MaChiNhanh ?? 1);
                 }
                 else
                 {
@@ -618,7 +668,7 @@
                 _model = new();
                 if (_isBranchManager)
                 {
-                    _model.PhamViGui = "Nội bộ chi nhánh (QF Quận 10)";
+                    _model.PhamViGui = $"Nội bộ chi nhánh ({_branchName})";
                     _model.MaChiNhanh = _branchId;
                 }
                 await LoadAnnouncements();

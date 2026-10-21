@@ -1,3 +1,9 @@
+@namespace Frontend.Shared
+@inject IServiceProvider ServiceProvider
+@using Microsoft.Extensions.DependencyInjection
+@using global::Shared.DTOs.Catalog
+@using Frontend.Services
+
 <footer class="yame-footer">
     <div class="yame-container">
         <!-- 4 Trụ Cột Cam Kết Nổi Bật -->
@@ -85,13 +91,23 @@
             <div class="footer-col">
                 <h3 class="col-title">CHÍNH SÁCH BÁN HÀNG</h3>
                 <ul class="footer-links">
-                    <li><a href="/policies/chinh-sach-giao-hang">Chính sách giao hàng toàn quốc</a></li>
-                    <li><a href="/policies/chinh-sach-doi-tra">Chính sách đổi trả hàng</a></li>
-                    <li><a href="/policies/chinh-sach-bao-hanh">Chính sách bảo hành 365 ngày</a></li>
-                    <li><a href="/policies/chinh-sach-thanh-vien-vip">Chính sách Thành viên VIP</a></li>
-                    <li><a href="/policies/chinh-sach-bao-mat">Chính sách bảo mật thông tin</a></li>
-                    <li><a href="/policies/dieu-khoan-dich-vu">Điều khoản dịch vụ</a></li>
-                    <li><a href="/policies/khieu-nai-gop-y">Khiếu nại & Góp ý</a></li>
+                    @if (_policies != null && _policies.Any())
+                    {
+                        @foreach (var p in _policies)
+                        {
+                            <li><a href="/policies/@p.Slug">@((MarkupString)p.TieuDe)</a></li>
+                        }
+                    }
+                    else
+                    {
+                        <li><a href="/policies/chinh-sach-giao-hang">Chính sách giao hàng toàn quốc</a></li>
+                        <li><a href="/policies/chinh-sach-doi-tra">Chính sách đổi trả hàng</a></li>
+                        <li><a href="/policies/chinh-sach-bao-hanh">Chính sách bảo hành 365 ngày</a></li>
+                        <li><a href="/policies/chinh-sach-thanh-vien-vip">Chính sách Thành viên VIP</a></li>
+                        <li><a href="/policies/chinh-sach-bao-mat">Chính sách bảo mật thông tin</a></li>
+                        <li><a href="/policies/dieu-khoan-dich-vu">Điều khoản dịch vụ</a></li>
+                        <li><a href="/policies/khieu-nai-gop-y">Khiếu nại & Góp ý</a></li>
+                    }
                 </ul>
             </div>
 
@@ -136,3 +152,27 @@
         </div>
     </div>
 </footer>
+
+@code {
+    private List<PolicyDto> _policies = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var policyApi = ServiceProvider.GetService<IPolicyApiClient>();
+            if (policyApi != null)
+            {
+                var list = await policyApi.GetActivePoliciesAsync();
+                if (list != null && list.Any())
+                {
+                    _policies = list.OrderBy(p => p.ThuTu).ToList();
+                }
+            }
+        }
+        catch
+        {
+            // fallback gracefully to default hardcoded policies
+        }
+    }
+}

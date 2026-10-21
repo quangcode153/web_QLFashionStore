@@ -62,6 +62,11 @@ public class WarehouseService : IWarehouseService
             return ApiResponse<bool>.Fail("Đơn giá nhập không được nhỏ hơn 0.");
         }
 
+        if (await _warehouseRepository.IsVariantHiddenAsync(request.MaBienThe))
+        {
+            return ApiResponse<bool>.Fail("Hàng đã tạm thời ngừng cung cấp.");
+        }
+
         try
         {
             await _warehouseRepository.ImportStockAsync(request);
@@ -76,6 +81,7 @@ public class WarehouseService : IWarehouseService
                         DoiTuong = $"Biến thể #{request.MaBienThe}",
                         NoiDungChiTiet = $"Nhập {request.SoLuong} sản phẩm vào kho chi nhánh #{request.MaChiNhanh}. Đơn giá: {request.DonGiaNhap:N0}đ. NCC #{request.MaNhaCungCap}.",
                         MaNhanVien = request.MaNhanVien > 0 ? request.MaNhanVien : 1,
+                        MaChiNhanh = request.MaChiNhanh > 0 ? request.MaChiNhanh : (int?)null,
                         IpDiaChi = "127.0.0.1"
                     });
                 }

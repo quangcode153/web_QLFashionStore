@@ -164,7 +164,7 @@ public class SignalRNotificationService : ISignalRNotificationService, IAsyncDis
             var res = await client.GetFromJsonAsync<global::Shared.DTOs.Common.ApiResponse<List<global::Shared.DTOs.Announcement.InternalAnnouncementDto>>>("api/announcements");
             if (res?.Data != null)
             {
-                foreach (var a in res.Data.OrderByDescending(x => x.NgayTao).Take(20))
+                foreach (var a in res.Data.Where(x => !x.TieuDe.StartsWith("[Đổi trả hàng]", StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.NgayTao).Take(20))
                 {
                     var existing = _notifications.FirstOrDefault(n => n.Id == a.MaThongBao.ToString());
                     if (existing == null)

@@ -13,6 +13,7 @@ public class CreateOrderRequestDto
     public int? MaChiNhanh { get; set; }
     public string? MaGiamGia { get; set; }
     public string? TrangThai { get; set; }
+    public string? DiaChiGiaoHang { get; set; }
     public List<CreateOrderItemDto> Items { get; set; } = new();
 }
 
@@ -25,6 +26,9 @@ public class OrderDetailItemDto
     public int SoLuong { get; set; }
     public decimal DonGia { get; set; }
     public decimal ThanhTien { get; set; }
+    public int SoLuongDaTra { get; set; }
+    public int SoLuongConLai => Math.Max(0, SoLuong - SoLuongDaTra);
+    public bool DaTraHet => SoLuongConLai == 0;
 }
 
 public class OrderSummaryDto
@@ -44,6 +48,8 @@ public class OrderSummaryDto
     public string TenChiNhanh { get; set; } = "Chi nhánh 1 (Hội sở)";
     public string? LoaiDonHang { get; set; } = "ONLINE";
     public string? DiaChiGiaoHang { get; set; }
+    public decimal SoTienDaHoan { get; set; } = 0;
+    public bool CoHoanTra => SoTienDaHoan > 0;
 }
 
 public class ReceiptItemDto

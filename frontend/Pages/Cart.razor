@@ -1,6 +1,8 @@
 @page "/cart"
 @namespace Frontend.Pages
+@using global::Shared.DTOs.Catalog
 @inject ICartService CartService
+@inject ICatalogApiClient CatalogApi
 @inject IJSRuntime JSRuntime
 @inject IToastService Toast
 @inject NavigationManager Navigation
@@ -60,6 +62,18 @@
                 </div>
             </div>
 
+            @if (_hasUnavailableItems)
+            {
+                <div class="cart-unavailable-warning-banner">
+                    <div class="warning-banner-text">
+                        <strong>⚠️ Lưu ý quan trọng:</strong> Giỏ hàng của bạn đang có <strong>@UnavailableCount sản phẩm tạm thời không cung cấp</strong>. Vui lòng xóa các sản phẩm này để có thể tiếp tục tiến hành đặt hàng.
+                    </div>
+                    <button type="button" class="btn-remove-unavailable" @onclick="RemoveAllUnavailableItems">
+                        Xóa sản phẩm tạm ngừng (@UnavailableCount)
+                    </button>
+                </div>
+            }
+
             <!-- Main Cart Content Grid -->
             <div class="cart-content-grid">
                 <!-- Left: Items Table / List -->
@@ -75,7 +89,8 @@
                     <div class="cart-table-body">
                         @foreach (var item in CartService.Items)
                         {
-                            <div class="cart-item-row">
+                            var isUnavailable = _availabilityMap.TryGetValue(item.MaBienThe, out var avail) && avail.DaAn;
+                            <div class="cart-item-row @(isUnavailable ? "unavailable" : "")">
                                 <div class="col-product item-meta">
                                     <img src="@(string.IsNullOrEmpty(item.HinhAnh) ? "/images/no-image.svg" : item.HinhAnh)" 
                                          alt="@item.TenSanPham" 
@@ -87,6 +102,12 @@
                                         <a href="/products/@item.MaSanPham" class="item-title">@item.TenSanPham</a>
                                         <div class="item-variant-label">Phân loại: <strong>@item.MauSac / @item.KichCo</strong></div>
                                         <div class="item-sku-label">SKU: @item.MaSKU</div>
+                                        @if (isUnavailable)
+                                        {
+                                            <div class="item-unavailable-tag">
+                                                <span class="unavail-icon">⚠️</span> Sản phẩm tạm thời không cung cấp
+                                            </div>
+                                        }
                                     </div>
                                 </div>
 
@@ -154,9 +175,19 @@
 
                         <p class="summary-note">*(Giá đã bao gồm thuế VAT và áp dụng ưu đãi)*</p>
 
-                        <button type="button" class="btn-proceed-checkout" @onclick="ProceedToCheckout">
-                            TIẾN HÀNH ĐẶT HÀNG
-                        </button>
+                        @if (_hasUnavailableItems)
+                        {
+                            <button type="button" class="btn-proceed-checkout disabled" disabled title="Vui lòng xóa sản phẩm tạm ngừng cung cấp trước khi thanh toán">
+                                TIẾN HÀNH ĐẶT HÀNG
+                            </button>
+                            <p class="unavailable-checkout-hint">⚠️ Vui lòng xóa các sản phẩm tạm thời ngừng cung cấp để tiếp tục thanh toán.</p>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn-proceed-checkout" @onclick="ProceedToCheckout">
+                                TIẾN HÀNH ĐẶT HÀNG
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
@@ -491,17 +522,114 @@
     .btn-proceed-checkout:hover {
         background: #BE123C;
     }
+    .btn-proceed-checkout.disabled {
+        background: #94A3B8 !important;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+    .unavailable-checkout-hint {
+        font-size: 0.82rem;
+        color: #DC2626;
+        font-weight: 600;
+        text-align: center;
+        margin-top: 10px;
+        line-height: 1.4;
+    }
+    .cart-unavailable-warning-banner {
+        background: #FFF1F2;
+        border: 1px solid #FECDD3;
+        border-radius: 8px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .warning-banner-text {
+        color: #9F1239;
+        font-size: 0.92rem;
+        line-height: 1.5;
+    }
+    .btn-remove-unavailable {
+        background: #E11D48;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+    }
+    .btn-remove-unavailable:hover {
+        background: #BE123C;
+    }
+    .cart-item-row.unavailable {
+        background: #FFF8F8;
+        border-left: 3px solid #FCA5A5;
+    }
+    .item-unavailable-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #FEF2F2;
+        color: #DC2626;
+        font-size: 0.8rem;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid #FCA5A5;
+        margin-top: 6px;
+    }
 </style>
 
 @code {
-    protected override void OnInitialized()
+    private Dictionary<int, VariantAvailabilityDto> _availabilityMap = new();
+    private bool _hasUnavailableItems => CartService.Items.Any(i => _availabilityMap.TryGetValue(i.MaBienThe, out var a) && a.DaAn);
+    private int UnavailableCount => CartService.Items.Count(i => _availabilityMap.TryGetValue(i.MaBienThe, out var a) && a.DaAn);
+
+    protected override async Task OnInitializedAsync()
     {
         CartService.OnChange += OnCartChanged;
+        await CheckAvailabilityAsync();
     }
 
-    private void OnCartChanged()
+    private async void OnCartChanged()
     {
-        InvokeAsync(StateHasChanged);
+        await CheckAvailabilityAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CheckAvailabilityAsync()
+    {
+        if (CartService.Items.Any())
+        {
+            var ids = CartService.Items.Select(x => x.MaBienThe).Distinct().ToList();
+            var results = await CatalogApi.CheckVariantsAvailabilityAsync(ids);
+            _availabilityMap = results.ToDictionary(x => x.MaBienThe, x => x);
+        }
+        else
+        {
+            _availabilityMap.Clear();
+        }
+    }
+
+    private async Task RemoveAllUnavailableItems()
+    {
+        var unavailableIds = CartService.Items
+            .Where(i => _availabilityMap.TryGetValue(i.MaBienThe, out var a) && a.DaAn)
+            .Select(i => i.MaBienThe)
+            .ToList();
+
+        foreach (var id in unavailableIds)
+        {
+            await CartService.RemoveItemAsync(id);
+        }
+        await CheckAvailabilityAsync();
+        Toast.ShowSuccess($"Đã xóa {unavailableIds.Count} sản phẩm tạm ngừng cung cấp khỏi giỏ hàng.");
     }
 
     private async Task IncrementQty(CartItemDto item)
@@ -526,6 +654,12 @@
 
     private async Task ProceedToCheckout()
     {
+        if (_hasUnavailableItems)
+        {
+            Toast.ShowWarning("Trong giỏ hàng có sản phẩm tạm thời ngừng cung cấp. Vui lòng xóa trước khi thanh toán.");
+            return;
+        }
+
         string? token = null;
         try
         {
