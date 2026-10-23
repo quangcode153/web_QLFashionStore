@@ -7,10 +7,12 @@ namespace Backend.Tests.IntegrationTests.Infrastructure;
 
 public static class TestTokenHelper
 {
+    public const string FallbackJwtSecret = "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!";
+
     public static string GenerateToken(int userId, string username, string role, string fullName = "Test User")
     {
         var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
-            ?? "ThisIsASecretKeyForTestingPurposesThatIsLongerThan32Chars!";
+            ?? FallbackJwtSecret;
         var issuer = "FashionStoreBackend";
         var audience = "FashionStoreClients";
 

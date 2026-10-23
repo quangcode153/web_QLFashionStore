@@ -23,7 +23,7 @@ namespace Backend.Tests.IntegrationTests.Infrastructure;
 public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     private const string TestPepper = "FashionStore_Secret_Pepper_Password_Hasher_2026_Secure_Key_X9#mK@vL!";
-    private const string TestJwtSecret = "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!";
+    private const string TestJwtSecret = TestTokenHelper.FallbackJwtSecret;
 
     static TestWebApplicationFactory()
     {

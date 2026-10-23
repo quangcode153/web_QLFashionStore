@@ -17,8 +17,8 @@ jobs:
       - run: dotnet restore FashionStore.sln
       - name: Test Execution
         env:
-          JWT_SECRET_KEY: "SuperSecretKeyForFashionStoreBTL2026VeryStrong!"
-          PASSWORD_PEPPER: "PepperSecretKeyFashionStore2026"
+          JWT_SECRET_KEY: "FashionStore_Secret_Key_Super_Secure_2026_JWT_Token_AtLeast_32Characters!"
+          PASSWORD_PEPPER: "FashionStore_Secret_Pepper_Password_Hasher_2026_Secure_Key_X9#mK@vL!"
           CONNECTION_STRING: "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;"
         run: dotnet test FashionStore.sln --no-restore --verbosity normal
 
