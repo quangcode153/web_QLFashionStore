@@ -32,9 +32,6 @@ appsettings.Development.local.json
 secrets.json
 *.secrets
 *.credential
-*.credentials
-tests/
-Tests/
 docker-compose.yml
 docker-compose*.yml
 doc/

@@ -6,20 +6,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-check:
-    name: Build Verification
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet restore backend/Backend.csproj
-      - run: dotnet build backend/Backend.csproj -c Release
+      - run: dotnet restore FashionStore.sln
+      - name: Test Execution
+        env:
+          JWT_SECRET_KEY: "SuperSecretKeyForFashionStoreBTL2026VeryStrong!"
+          PASSWORD_PEPPER: "PepperSecretKeyFashionStore2026"
+          CONNECTION_STRING: "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;"
+        run: dotnet test FashionStore.sln --no-restore --verbosity normal
 
   docker-publish:
     name: Docker Hub Publish
-    needs: build-check
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +59,7 @@ jobs:
 
   vercel-deploy:
     name: Publish Frontend
-    needs: build-check
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
