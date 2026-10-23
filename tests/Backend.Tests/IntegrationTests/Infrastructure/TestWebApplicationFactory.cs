@@ -12,6 +12,7 @@ using Shared.DTOs.Catalog;
 using Shared.DTOs.Common;
 using Shared.DTOs.Order;
 using Shared.DTOs.Report;
+using Shared.DTOs.Warehouse;
 
 namespace Backend.Tests.IntegrationTests.Infrastructure;
 
@@ -509,6 +510,131 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                     TongDoanhThuThuc = 22500000
                 });
 
+            // 9. Mock IBranchRepository theo Specification TS-BRANCH-01..04
+            var branchesList = new List<BranchDto>
+            {
+                new() { MaChiNhanh = 1, TenChiNhanh = "Chi nhánh Quận 10", DiaChi = "123 Đường 3/2, Quận 10", DienThoai = "0281111111", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 2, TenChiNhanh = "Chi nhánh Quận 1", DiaChi = "45 Lê Lợi, Quận 1", DienThoai = "0282222222", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 3, TenChiNhanh = "Chi nhánh Quận 3", DiaChi = "78 CMT8, Quận 3", DienThoai = "0283333333", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 4, TenChiNhanh = "Chi nhánh Quận 5", DiaChi = "90 Trần Hưng Đạo, Quận 5", DienThoai = "0284444444", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 5, TenChiNhanh = "Chi nhánh Quận 7", DiaChi = "12 Nguyễn Thị Thập, Quận 7", DienThoai = "0285555555", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 6, TenChiNhanh = "Chi nhánh Bình Thạnh", DiaChi = "34 Bạch Đằng, Bình Thạnh", DienThoai = "0286666666", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 7, TenChiNhanh = "Chi nhánh Gò Vấp", DiaChi = "56 Quang Trung, Gò Vấp", DienThoai = "0287777777", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 8, TenChiNhanh = "Chi nhánh Tân Bình", DiaChi = "89 Cộng Hòa, Tân Bình", DienThoai = "0288888888", LoaiChiNhanh = "Cửa hàng bán lẻ", IsOnlineWarehouse = false, DangHoatDong = true },
+                new() { MaChiNhanh = 9, TenChiNhanh = "Kho Tổng Online", DiaChi = "100 Hoàng Văn Thụ, Phú Nhuận", DienThoai = "0289999999", LoaiChiNhanh = "Kho tổng online", IsOnlineWarehouse = true, DangHoatDong = true }
+            };
+
+            var branchInventories = new Dictionary<int, List<BranchInventoryDto>>
+            {
+                [1] = new List<BranchInventoryDto>
+                {
+                    new()
+                    {
+                        MaChiNhanh = 1,
+                        TenChiNhanh = "Chi nhánh Quận 10",
+                        MaBienThe = 1,
+                        TenSanPham = "Áo Polo Nam Classic",
+                        KichCo = "M",
+                        MauSac = "Đen",
+                        MaSku = "AP-NAM-BLK-M",
+                        SoLuongTon = 50,
+                        MucCanhBaoTon = 10,
+                        GiaBan = 250000
+                    }
+                }
+            };
+
+            var mockBranchRepo = new Mock<IBranchRepository>();
+            mockBranchRepo.Setup(r => r.GetAllBranchesAsync())
+                .ReturnsAsync(() => branchesList);
+
+            mockBranchRepo.Setup(r => r.GetBranchByIdAsync(It.IsAny<int>()))
+                .ReturnsAsync((int id) => branchesList.FirstOrDefault(b => b.MaChiNhanh == id));
+
+            mockBranchRepo.Setup(r => r.CreateBranchAsync(It.IsAny<CreateBranchDto>()))
+                .ReturnsAsync((CreateBranchDto dto) =>
+                {
+                    var newId = branchesList.Max(b => b.MaChiNhanh) + 1;
+                    var branch = new BranchDto
+                    {
+                        MaChiNhanh = newId,
+                        TenChiNhanh = dto.TenChiNhanh,
+                        DiaChi = dto.DiaChi,
+                        DienThoai = dto.DienThoai,
+                        LoaiChiNhanh = dto.LoaiChiNhanh ?? "Cửa hàng bán lẻ",
+                        IsOnlineWarehouse = false,
+                        DangHoatDong = true
+                    };
+                    branchesList.Add(branch);
+
+                    branchInventories[newId] = new List<BranchInventoryDto>
+                    {
+                        new()
+                        {
+                            MaChiNhanh = newId,
+                            TenChiNhanh = dto.TenChiNhanh,
+                            MaBienThe = 1,
+                            TenSanPham = "Áo Polo Nam Classic",
+                            KichCo = "M",
+                            MauSac = "Đen",
+                            MaSku = "AP-NAM-BLK-M",
+                            SoLuongTon = 0,
+                            MucCanhBaoTon = 10,
+                            GiaBan = 250000
+                        }
+                    };
+                    return newId;
+                });
+
+            mockBranchRepo.Setup(r => r.GetBranchInventoryAsync(It.IsAny<int>(), It.IsAny<string?>()))
+                .ReturnsAsync((int bId, string? search) =>
+                {
+                    if (branchInventories.TryGetValue(bId, out var items))
+                    {
+                        if (string.IsNullOrWhiteSpace(search)) return items;
+                        return items.Where(x => x.TenSanPham.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                                                (x.MaSku != null && x.MaSku.Contains(search, StringComparison.OrdinalIgnoreCase))).ToList();
+                    }
+                    return new List<BranchInventoryDto>();
+                });
+
+            mockBranchRepo.Setup(r => r.GetVariantInventoryAtBranchAsync(It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync((int bId, int vId) =>
+                {
+                    if (branchInventories.TryGetValue(bId, out var items))
+                    {
+                        return items.FirstOrDefault(x => x.MaBienThe == vId);
+                    }
+                    return null;
+                });
+
+            mockBranchRepo.Setup(r => r.GetStockQuantityAsync(It.IsAny<int>(), It.IsAny<int>()))
+                .ReturnsAsync((int bId, int vId) =>
+                {
+                    if (branchInventories.TryGetValue(bId, out var items))
+                    {
+                        var found = items.FirstOrDefault(x => x.MaBienThe == vId);
+                        return found?.SoLuongTon ?? 0;
+                    }
+                    return 0;
+                });
+
+            mockBranchRepo.Setup(r => r.AdjustBranchInventoryAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int>()))
+                .ReturnsAsync((int bId, int vId, int delta, string reason, int staffId) =>
+                {
+                    if (branchInventories.TryGetValue(bId, out var items))
+                    {
+                        var found = items.FirstOrDefault(x => x.MaBienThe == vId);
+                        if (found != null)
+                        {
+                            if (found.SoLuongTon + delta < 0) return false;
+                            found.SoLuongTon += delta;
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+
             // Thay thế các Service Descriptor thật bằng Mock Repositories
             var descriptorsToRemove = services.Where(d =>
                 d.ServiceType == typeof(IAuthRepository) ||
@@ -518,7 +644,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 d.ServiceType == typeof(IWarehouseRepository) ||
                 d.ServiceType == typeof(IPromotionRepository) ||
                 d.ServiceType == typeof(ICustomerRepository) ||
-                d.ServiceType == typeof(IReportRepository)).ToList();
+                d.ServiceType == typeof(IReportRepository) ||
+                d.ServiceType == typeof(IBranchRepository)).ToList();
 
             foreach (var d in descriptorsToRemove)
             {
@@ -533,6 +660,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             services.AddSingleton(mockPromoRepo.Object);
             services.AddSingleton(mockCustomerRepo.Object);
             services.AddSingleton(mockReportRepo.Object);
+            services.AddSingleton(mockBranchRepo.Object);
         });
     }
 }
