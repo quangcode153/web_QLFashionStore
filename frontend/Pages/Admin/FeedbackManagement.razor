@@ -13,7 +13,6 @@
     <div class="page-header">
         <div>
             <h2 class="page-title">QUẢN LÝ KHIẾU NẠI & GÓP Ý</h2>
-            <p class="page-subtitle">Theo dõi, tiếp nhận và giải quyết phản hồi, khiếu nại dịch vụ từ khách hàng</p>
         </div>
         <div class="header-actions">
             <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadFeedbacks" disabled="@_isLoading" title="Tải lại danh sách phản hồi">
@@ -25,49 +24,23 @@
         </div>
     </div>
 
-    <!-- Banner điều hướng yêu cầu hoàn trả sang Cổng Đổi trả & Hoàn kho lỗi -->
-    <div class="return-dispatch-alert">
-        <div class="alert-content">
-            <div class="alert-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                </svg>
-            </div>
-            <div class="alert-text">
-                <strong>Phân luồng nghiệp vụ:</strong> Toàn bộ yêu cầu <strong>Đổi trả hàng & Hoàn kho lỗi</strong> được điều hành tập trung tại Cổng Đổi trả chuyên biệt.
-                @if (_returnTicketsCount > 0)
-                {
-                    <span class="return-count-badge">Có @_returnTicketsCount yêu cầu đổi trả</span>
-                }
-            </div>
-        </div>
-        <a href="/staff/order-support" class="btn-dispatch-link">
-            Đến Cổng Đổi trả & Hoàn kho lỗi »
-        </a>
-    </div>
 
-    <!-- KPI Summary Pills (Chỉ đếm các khiếu nại & góp ý dịch vụ) -->
     <div class="kpi-grid">
         <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => _currentFilter = "ALL"'>
             <div class="kpi-label">Khiếu nại & Góp ý</div>
             <div class="kpi-value">@ServiceFeedbacks.Count</div>
-            <div class="kpi-sub">Phản ánh dịch vụ & CSKH</div>
         </div>
         <div class="kpi-card text-danger @(_currentFilter == "Chưa xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Chưa xử lý"'>
             <div class="kpi-label">Chưa xử lý</div>
             <div class="kpi-value text-danger">@ServiceFeedbacks.Count(f => f.TrangThai == "Chưa xử lý")</div>
-            <div class="kpi-sub">Cần giải quyết ngay</div>
         </div>
         <div class="kpi-card text-primary @(_currentFilter == "Đang xử lý" ? "active" : "")" @onclick='() => _currentFilter = "Đang xử lý"'>
             <div class="kpi-label">Đang xử lý</div>
             <div class="kpi-value text-primary">@ServiceFeedbacks.Count(f => f.TrangThai == "Đang xử lý")</div>
-            <div class="kpi-sub">Đang liên hệ khách</div>
         </div>
         <div class="kpi-card text-success @(_currentFilter == "Đã giải quyết" ? "active" : "")" @onclick='() => _currentFilter = "Đã giải quyết"'>
             <div class="kpi-label">Đã giải quyết</div>
             <div class="kpi-value text-success">@ServiceFeedbacks.Count(f => f.TrangThai == "Đã giải quyết")</div>
-            <div class="kpi-sub">Hoàn tất hỗ trợ</div>
         </div>
     </div>
 
@@ -606,6 +579,82 @@
     .empty-sub {
         font-size: 0.8rem;
         color: #64748b;
+    }
+
+    @@media (max-width: 768px) {
+        .feedback-admin-container {
+            gap: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.25rem;
+        }
+
+        .btn-refresh {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .filter-card {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .filter-tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            padding-bottom: 4px;
+            width: 100%;
+        }
+
+        .filter-tab {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .ticket-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .ticket-actions {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .ticket-actions select, .ticket-actions button {
+            width: 100%;
+        }
+
+        .modal-feedback-content {
+            width: 95vw;
+            max-width: 95vw;
+            margin: 10px;
+        }
+
+        .modal-feedback-footer {
+            flex-direction: column-reverse;
+            gap: 8px;
+        }
+
+        .modal-feedback-footer button {
+            width: 100%;
+        }
     }
 </style>
 

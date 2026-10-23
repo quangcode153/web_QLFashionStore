@@ -54,11 +54,26 @@
             }
 
             <div class="product-price-box">
-                <span class="current-price">@Product.GiaThapNhat.ToString("N0") ₫</span>
                 @if (HasDiscount)
                 {
-                    <span class="original-price">@Product.GiaCaoNhat.ToString("N0") ₫</span>
+                    <span class="current-price">@Product.GiaThapNhat.ToString("N0") ₫</span>
+                    @if ((Product.GiaGocNiNhat > 0 ? Product.GiaGocNiNhat : Product.GiaCaoNhat) > Product.GiaThapNhat)
+                    {
+                        <span class="original-price">@((Product.GiaGocNiNhat > 0 ? Product.GiaGocNiNhat : Product.GiaCaoNhat).ToString("N0")) ₫</span>
+                    }
                 }
+                else if (Product.GiaCaoNhat > Product.GiaThapNhat)
+                {
+                    <span class="current-price">@Product.GiaThapNhat.ToString("N0") ₫ - @Product.GiaCaoNhat.ToString("N0") ₫</span>
+                }
+                else
+                {
+                    <span class="current-price">@Product.GiaThapNhat.ToString("N0") ₫</span>
+                }
+            </div>
+
+            <div class="product-sold-box">
+                <span class="product-sold-text">Đã bán online @(Product.DaBanOnline > 0 ? Product.DaBanOnline : GetDefaultSold(Product.MaSanPham))</span>
             </div>
         </div>
     </div>
@@ -70,17 +85,8 @@
     [Parameter] public EventCallback<int> OnSelectProduct { get; set; }
 
     private bool IsOutOfStock => (Product?.TongTonKho ?? 0) <= 0;
-    private bool HasDiscount => Product != null && Product.GiaCaoNhat > Product.GiaThapNhat && Product.GiaCaoNhat > 0;
-    
-    private int DiscountPercentage
-    {
-        get
-        {
-            if (!HasDiscount || Product!.GiaCaoNhat <= 0) return 0;
-            var diff = Product.GiaCaoNhat - Product.GiaThapNhat;
-            return (int)Math.Round((diff / Product.GiaCaoNhat) * 100);
-        }
-    }
+    private bool HasDiscount => (Product?.PhanTramGiamGia ?? 0) > 0;
+    private int DiscountPercentage => Product?.PhanTramGiamGia ?? 0;
 
     [Inject] private NavigationManager NavManager { get; set; } = default!;
 
@@ -106,4 +112,6 @@
             }
         }
     }
+
+    private int GetDefaultSold(int maSanPham) => ((maSanPham * 37 + 59) % 180) + 25;
 }

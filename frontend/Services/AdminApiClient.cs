@@ -392,6 +392,60 @@ public class AdminApiClient : IAdminApiClient
         }
     }
 
+    public async Task<ApiResponse<bool>> UpdateVariantDiscountAsync(int variantId, int discountPercent)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/products/variants/{variantId}/discount", new UpdateVariantDiscountRequest { PhanTramGiamGia = discountPercent });
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorText = await res.Content.ReadAsStringAsync();
+                try
+                {
+                    var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<bool>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                        return errObj;
+                }
+                catch { }
+                return ApiResponse<bool>.Fail($"Lỗi cập nhật giảm giá (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Fail("Không nhận được phản hồi.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> UpdateProductDiscountAsync(int productId, int discountPercent)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/products/{productId}/discount", new UpdateProductDiscountRequest { PhanTramGiamGia = discountPercent });
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorText = await res.Content.ReadAsStringAsync();
+                try
+                {
+                    var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<bool>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                        return errObj;
+                }
+                catch { }
+                return ApiResponse<bool>.Fail($"Lỗi cập nhật giảm giá (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Fail("Không nhận được phản hồi.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối: {ex.Message}");
+        }
+    }
+
     public async Task<ApiResponse<int>> CreateProductAsync(CreateProductRequest request)
     {
         await AttachAuthHeaderAsync();
@@ -840,6 +894,65 @@ public class AdminApiClient : IAdminApiClient
         catch (Exception ex)
         {
             return ApiResponse<int>.Fail($"Lỗi phát thông báo: {ex.Message}");
+        }
+    }
+
+    public async Task<List<global::Shared.DTOs.Promotion.PromotionDto>?> GetAllPromotionsAsync()
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.GetFromJsonAsync<ApiResponse<IEnumerable<global::Shared.DTOs.Promotion.PromotionDto>>>("api/promotions/all");
+            return res?.Data?.ToList() ?? new List<global::Shared.DTOs.Promotion.PromotionDto>();
+        }
+        catch
+        {
+            return new List<global::Shared.DTOs.Promotion.PromotionDto>();
+        }
+    }
+
+    public async Task<ApiResponse<int>> CreatePromotionAsync(global::Shared.DTOs.Promotion.CreatePromotionRequestDto request)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PostAsJsonAsync("api/promotions", request);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<int>>();
+            return result ?? ApiResponse<int>.Fail("Không nhận được phản hồi từ máy chủ.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<int>.Fail($"Lỗi tạo mã giảm giá: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> UpdatePromotionAsync(int id, global::Shared.DTOs.Promotion.UpdatePromotionRequestDto request)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"api/promotions/{id}", request);
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return result ?? ApiResponse<bool>.Fail("Không nhận được phản hồi từ máy chủ.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi cập nhật mã giảm giá: {ex.Message}");
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeletePromotionAsync(int id)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.DeleteAsync($"api/promotions/{id}");
+            var result = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return result ?? ApiResponse<bool>.Fail("Không nhận được phản hồi từ máy chủ.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi xóa mã giảm giá: {ex.Message}");
         }
     }
 }

@@ -11,7 +11,6 @@
     <div class="page-header">
         <div>
             <h2 class="page-title">QUẢN LÝ HERO BANNER & CHIẾN DỊCH</h2>
-            <p class="page-subtitle">Tùy biến nội dung, tiêu đề, giá nổi bật, nhãn badge và hình ảnh banner ngoài trang chủ (không khóa cứng dữ liệu)</p>
         </div>
         <div class="header-actions">
             <!-- Nút thêm chỉ duy nhất 1 dấu + tinh tế -->
@@ -637,6 +636,65 @@
         font-weight: 600;
         color: #0f172a;
         cursor: pointer;
+    }
+
+    @@media (max-width: 768px) {
+        .banners-admin-container {
+            padding: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.2rem;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .btn-add-banner {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .admin-table {
+            min-width: 720px;
+        }
+
+        .modal-dialog-custom {
+            max-width: 95vw;
+            margin: 10px;
+            max-height: 92vh;
+        }
+
+        .modal-header-custom {
+            padding: 14px 16px;
+        }
+
+        .modal-body-custom {
+            padding: 16px;
+        }
+
+        .form-row-2 {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .modal-footer-custom {
+            flex-direction: column-reverse;
+            gap: 8px;
+            padding: 12px 16px;
+        }
+
+        .modal-footer-custom .btn-modal {
+            width: 100%;
+            justify-content: center;
+        }
     }
 </style>
 

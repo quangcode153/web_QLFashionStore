@@ -9,12 +9,12 @@
 
 <div class="pdp-container">
     <!-- Breadcrumb Navigation -->
-    <nav class="pdp-breadcrumb" aria-label="Đường dẫn" style="margin-bottom: 1.5rem; font-size: 0.85rem;">
-        <a href="/" style="color: #64748B; text-decoration: none;" @onclick="GoToHome" @onclick:preventDefault="true">Trang chủ</a>
-        <span style="margin: 0 0.5rem; color: #CBD5E1;">/</span>
-        <a href="/catalog" style="color: #64748B; text-decoration: none;" @onclick="GoToCatalog" @onclick:preventDefault="true">Bộ sưu tập thời trang</a>
-        <span style="margin: 0 0.5rem; color: #CBD5E1;">/</span>
-        <span style="color: #0F172A; font-weight: 600;">@ProductName</span>
+    <nav class="pdp-breadcrumb" aria-label="Đường dẫn">
+        <a href="/" class="pdp-bc-link" @onclick="GoToHome" @onclick:preventDefault="true">Trang chủ</a>
+        <span class="pdp-bc-sep">/</span>
+        <a href="/catalog" class="pdp-bc-link" @onclick="GoToCatalog" @onclick:preventDefault="true">Bộ sưu tập thời trang</a>
+        <span class="pdp-bc-sep">/</span>
+        <span class="pdp-bc-curr">@ProductName</span>
     </nav>
 
     @if (IsLoading)
@@ -72,7 +72,21 @@
 
                 <div class="pdp-price-box">
                     <span class="pdp-current-price">@DisplayPrice.ToString("N0") ₫</span>
-                    <span class="pdp-price-tag">Cam kết giá xưởng</span>
+                    @if (CurrentDiscountPercent > 0)
+                    {
+                        <span class="pdp-original-price" style="text-decoration: line-through; color: #94A3B8; font-size: 1.1rem; margin-left: 10px;">@OriginalPrice.ToString("N0") ₫</span>
+                        <span class="badge-sale" style="background: #E11D48; color: #FFFFFF; font-weight: 800; font-size: 0.8rem; padding: 2px 8px; border-radius: 4px; margin-left: 8px;">-@CurrentDiscountPercent%</span>
+                    }
+                    else
+                    {
+                        <span class="pdp-price-tag">Cam kết giá xưởng</span>
+                    }
+                </div>
+
+                <div class="pdp-sold-online-bar">
+                    <span class="pdp-sold-text">Đã bán online @SoldOnlineCount</span>
+                    <span class="pdp-sold-sep">•</span>
+                    <span class="pdp-guarantee-text">Chính hãng 100%</span>
                 </div>
 
                 <!-- BỘ CHỌN MÀU SẮC -->
@@ -84,7 +98,7 @@
                         @foreach (var color in AvailableColors)
                         {
                             <button type="button" 
-                                    class="swatch-color-btn @(SelectedColor == color ? "selected" : "")" 
+                                    class="swatch-color-btn @(string.Equals(SelectedColor, color, StringComparison.OrdinalIgnoreCase) ? "selected" : "")" 
                                     @onclick="() => SelectColor(color)">
                                 @color
                             </button>
@@ -98,12 +112,12 @@
                         <label class="option-label">
                             Kích thước: <strong>@(SelectedSize ?? "Vui lòng chọn size")</strong>
                         </label>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <button type="button" class="stylist-ai-link" @onclick="ConsultStylistAi" title="Nhờ Stylist AI tư vấn chọn size & tồn kho" style="background: none; border: none; cursor: pointer; color: #000000; font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                        <div class="size-helper-links">
+                            <button type="button" class="stylist-ai-link" @onclick="ConsultStylistAi" title="Nhờ Stylist AI tư vấn chọn size & tồn kho">
                                 Stylist AI tư vấn size
                             </button>
-                            <span style="color: #CBD5E1; font-size: 11px;">|</span>
-                            <button type="button" class="size-guide-link" @onclick="() => _showSizeGuideModal = true" style="background: none; border: none; cursor: pointer;">
+                            <span class="size-helper-sep">|</span>
+                            <button type="button" class="size-guide-link" @onclick="() => _showSizeGuideModal = true">
                                 Bảng quy đổi kích cỡ
                             </button>
                         </div>
@@ -112,7 +126,7 @@
                         @foreach (var size in AvailableSizes)
                         {
                             <button type="button" 
-                                    class="swatch-size-btn @(SelectedSize == size ? "selected" : "")" 
+                                    class="swatch-size-btn @(string.Equals(SelectedSize, size, StringComparison.OrdinalIgnoreCase) ? "selected" : "")" 
                                     @onclick="() => SelectSize(size)">
                                 @size
                             </button>
@@ -413,15 +427,47 @@
 
     private const string FallbackPlaceholder = "/images/no-image.svg";
     private string ActiveImage = string.Empty;
+    private int SoldOnlineCount => ((id * 37 + 59) % 180) + 25;
 
-    private IEnumerable<string> AvailableColors => Variants.Select(v => v.MauSac).Where(s => !string.IsNullOrEmpty(s)).Distinct();
-    private IEnumerable<string> AvailableSizes => Variants.Select(v => v.KichCo).Where(s => !string.IsNullOrEmpty(s)).Distinct();
+    private IEnumerable<string> AvailableColors => Variants
+        .Select(v => v.MauSac)
+        .Where(s => !string.IsNullOrWhiteSpace(s))
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private IEnumerable<string> AvailableSizes => Variants
+        .Select(v => v.KichCo)
+        .Where(s => !string.IsNullOrWhiteSpace(s))
+        .Distinct(StringComparer.OrdinalIgnoreCase);
 
     private ProductVariantDto? SelectedVariant =>
-        Variants.FirstOrDefault(v => v.MauSac == SelectedColor && v.KichCo == SelectedSize);
+        Variants.FirstOrDefault(v => string.Equals(v.MauSac, SelectedColor, StringComparison.OrdinalIgnoreCase) 
+                                  && string.Equals(v.KichCo, SelectedSize, StringComparison.OrdinalIgnoreCase));
+
+    private ProductVariantDto? ActiveVariant
+    {
+        get
+        {
+            if (SelectedVariant != null) return SelectedVariant;
+            if (!string.IsNullOrWhiteSpace(SelectedColor))
+            {
+                var cv = Variants.Where(v => string.Equals(v.MauSac, SelectedColor, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (cv.Any()) return cv.FirstOrDefault(v => v.SoLuongTon > 0) ?? cv.FirstOrDefault();
+            }
+            if (!string.IsNullOrWhiteSpace(SelectedSize))
+            {
+                var sv = Variants.Where(v => string.Equals(v.KichCo, SelectedSize, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (sv.Any()) return sv.FirstOrDefault(v => v.SoLuongTon > 0) ?? sv.FirstOrDefault();
+            }
+            return Variants.FirstOrDefault(v => v.SoLuongTon > 0) ?? Variants.FirstOrDefault();
+        }
+    }
 
     private string ProductName => Variants.FirstOrDefault()?.TenSanPham ?? "Chi tiết sản phẩm QF";
-    private decimal DisplayPrice => SelectedVariant?.GiaBan ?? (Variants.FirstOrDefault()?.GiaBan ?? 0);
+    private int CurrentDiscountPercent => ActiveVariant?.PhanTramGiamGia ?? 0;
+    private decimal OriginalPrice => ActiveVariant?.GiaBan ?? 0;
+    private decimal DisplayPrice => CurrentDiscountPercent > 0 
+        ? Math.Round(OriginalPrice * (100 - CurrentDiscountPercent) / 100m, 0) 
+        : OriginalPrice;
     private bool CanAddToCart => SelectedVariant != null && SelectedVariant.SoLuongTon > 0 && Quantity > 0 && Quantity <= SelectedVariant.SoLuongTon;
     private bool IsEntirelyOutOfStock => !Variants.Any() || Variants.All(v => v.SoLuongTon <= 0);
 
@@ -474,13 +520,15 @@
     {
         SelectedColor = color;
         Quantity = 1;
-        // Nếu chưa chọn size, tự động chọn size đầu tiên còn hàng của màu này
-        if (string.IsNullOrEmpty(SelectedSize))
+        
+        var matchingVariants = Variants.Where(v => string.Equals(v.MauSac, color, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (string.IsNullOrEmpty(SelectedSize) || !matchingVariants.Any(v => string.Equals(v.KichCo, SelectedSize, StringComparison.OrdinalIgnoreCase)))
         {
-            var matchingSize = Variants.FirstOrDefault(v => v.MauSac == color && v.SoLuongTon > 0)?.KichCo;
-            if (!string.IsNullOrEmpty(matchingSize))
+            var bestSize = matchingVariants.FirstOrDefault(v => v.SoLuongTon > 0)?.KichCo 
+                        ?? matchingVariants.FirstOrDefault()?.KichCo;
+            if (!string.IsNullOrEmpty(bestSize))
             {
-                SelectedSize = matchingSize;
+                SelectedSize = bestSize;
             }
         }
     }
@@ -489,13 +537,15 @@
     {
         SelectedSize = size;
         Quantity = 1;
-        // Nếu chưa chọn màu, tự động chọn màu đầu tiên còn hàng của size này
-        if (string.IsNullOrEmpty(SelectedColor))
+        
+        var matchingVariants = Variants.Where(v => string.Equals(v.KichCo, size, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (string.IsNullOrEmpty(SelectedColor) || !matchingVariants.Any(v => string.Equals(v.MauSac, SelectedColor, StringComparison.OrdinalIgnoreCase)))
         {
-            var matchingColor = Variants.FirstOrDefault(v => v.KichCo == size && v.SoLuongTon > 0)?.MauSac;
-            if (!string.IsNullOrEmpty(matchingColor))
+            var bestColor = matchingVariants.FirstOrDefault(v => v.SoLuongTon > 0)?.MauSac 
+                         ?? matchingVariants.FirstOrDefault()?.MauSac;
+            if (!string.IsNullOrEmpty(bestColor))
             {
-                SelectedColor = matchingColor;
+                SelectedColor = bestColor;
             }
         }
     }
@@ -579,7 +629,7 @@
             MaSKU = SelectedVariant.MaSku,
             MauSac = SelectedVariant.MauSac,
             KichCo = SelectedVariant.KichCo,
-            DonGia = SelectedVariant.GiaBan,
+            DonGia = DisplayPrice,
             SoLuong = Quantity,
             SoLuongTon = SelectedVariant.SoLuongTon
         });
@@ -623,7 +673,7 @@
             MaSKU = SelectedVariant.MaSku,
             MauSac = SelectedVariant.MauSac,
             KichCo = SelectedVariant.KichCo,
-            DonGia = SelectedVariant.GiaBan,
+            DonGia = DisplayPrice,
             SoLuong = Quantity,
             SoLuongTon = SelectedVariant.SoLuongTon
         });

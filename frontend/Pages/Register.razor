@@ -312,6 +312,42 @@
     .back-home-link:hover {
         color: #0F172A;
     }
+
+    /* Mobile Responsive Styling */
+    @@media (max-width: 768px) {
+        .register-page-container {
+            padding: 1.25rem 1rem calc(35px + env(safe-area-inset-bottom, 0px)) 1rem;
+            min-height: 70vh;
+        }
+        .register-card {
+            padding: 0.5rem 0;
+        }
+        .register-brand-header {
+            margin-bottom: 1.25rem;
+        }
+        .register-title {
+            font-size: 1.25rem;
+        }
+        .register-subtitle {
+            font-size: 0.78rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-control {
+            padding: 0.65rem 0.85rem 0.65rem 2.2rem;
+            font-size: 0.825rem;
+        }
+        .btn-register-submit {
+            height: 44px;
+            font-size: 0.85rem;
+            margin-top: 1.25rem;
+        }
+        .register-footer-links {
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+        }
+    }
 </style>
 
 @code {

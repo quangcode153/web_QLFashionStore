@@ -228,13 +228,13 @@
         <!-- =========================================================================
              DEDICATED CATEGORY / COLLECTION HEADER (SCREENSHOT: TRANG CHỦ > TÊN DANH MỤC)
              ========================================================================= -->
-        <div class="dedicated-category-header" style="padding-top: 1.5rem; margin-bottom: 1.75rem;">
-            <nav class="dedicated-breadcrumb" aria-label="Đường dẫn" style="font-size: 0.85rem; color: #64748B; margin-bottom: 0.75rem;">
-                <a href="/" style="color: #64748B; text-decoration: none;" @onclick="NavigateToCleanHome" @onclick:preventDefault="true">Trang chủ</a>
-                <span style="margin: 0 0.5rem; color: #CBD5E1;">&gt;</span>
-                <span style="color: #0F172A; font-weight: 600;">@GetActiveCollectionTitle()</span>
+        <div class="dedicated-category-header">
+            <nav class="dedicated-breadcrumb" aria-label="Đường dẫn">
+                <a href="/" class="dedicated-breadcrumb-home" @onclick="NavigateToCleanHome" @onclick:preventDefault="true">Trang chủ</a>
+                <span class="dedicated-breadcrumb-sep">&gt;</span>
+                <span class="dedicated-breadcrumb-current">@GetActiveCollectionTitle()</span>
             </nav>
-            <h1 class="dedicated-category-title" style="font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; letter-spacing: -0.025em; color: #0F172A; margin: 0;">
+            <h1 class="dedicated-category-title">
                 @GetActiveCollectionTitle()
             </h1>
         </div>
@@ -260,61 +260,77 @@
         @if (!IsDedicatedCategoryView)
         {
             <!-- SIDEBAR FILTERS (Chỉ hiển thị cho Trang chủ / Catalog tổng hợp) -->
-            <aside class="catalog-sidebar">
-                <div class="filter-header">
-                    <h3>Bộ Lọc Sản Phẩm</h3>
-                    <button type="button" class="btn-reset-filters" @onclick="ResetFilters">Đặt lại</button>
-                </div>
-
-                <!-- DANH MỤC -->
-                <div class="filter-group">
-                    <h4 class="filter-group-title">Danh Mục</h4>
-                    <div class="filter-options">
-                        <button type="button" 
-                                class="filter-chip @(!Query.CategoryId.HasValue ? "active" : "")" 
-                                @onclick="() => SelectCategory(null)">
-                            Tất cả
-                        </button>
-                        @foreach (var opt in GetAvailableCategoryOptions().Where(o => o.CategoryId.HasValue))
+            <aside class="catalog-sidebar @(_isFilterOpen ? "filter-expanded" : "filter-collapsed")">
+                <div class="filter-header" @onclick="ToggleFilter">
+                    <div class="filter-header-left">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -2px;">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        <h3>Bộ Lọc Sản Phẩm</h3>
+                        @if (Query.CategoryId.HasValue || Query.BrandId.HasValue || Query.MinPrice.HasValue || Query.MaxPrice.HasValue)
                         {
-                            <button type="button" 
-                                    class="filter-chip @(Query.CategoryId == opt.CategoryId ? "active" : "")" 
-                                    @onclick="() => SelectCategory(opt.CategoryId)">
-                                @opt.Name.Replace("— ", "")
-                            </button>
+                            <span class="active-filter-badge">Đang lọc</span>
                         }
                     </div>
-                </div>
-
-                <!-- THƯƠNG HIỆU -->
-                <div class="filter-group">
-                    <h4 class="filter-group-title">Thương Hiệu</h4>
-                    <div class="filter-options">
-                        <button type="button" 
-                                class="filter-chip @(!Query.BrandId.HasValue ? "active" : "")" 
-                                @onclick="() => SelectBrand(null)">
-                            Tất cả
+                    <div class="filter-header-right">
+                        <button type="button" class="btn-reset-filters" @onclick="ResetFilters" @onclick:stopPropagation="true">Đặt lại</button>
+                        <button type="button" class="btn-toggle-filter" @onclick="ToggleFilter" @onclick:stopPropagation="true" title="@(_isFilterOpen ? "Thu gọn bộ lọc" : "Mở rộng bộ lọc")" aria-label="Đóng mở bộ lọc">
+                            <span class="filter-chevron">@(_isFilterOpen ? "▲" : "▼")</span>
                         </button>
-                        @foreach (var brand in Brands)
-                        {
-                            <button type="button" 
-                                    class="filter-chip @(Query.BrandId == brand.MaThuongHieu ? "active" : "")" 
-                                    @onclick="() => SelectBrand(brand.MaThuongHieu)">
-                                @brand.TenThuongHieu
-                            </button>
-                        }
                     </div>
                 </div>
 
-                <!-- KHOẢNG GIÁ -->
-                <div class="filter-group">
-                    <h4 class="filter-group-title">Khoảng Giá</h4>
-                    <div class="price-filter-inputs">
-                        <input type="number" class="price-input" placeholder="Từ" @bind="Query.MinPrice" />
-                        <span>—</span>
-                        <input type="number" class="price-input" placeholder="Đến" @bind="Query.MaxPrice" />
+                <div class="filter-collapsible-body">
+                    <!-- DANH MỤC -->
+                    <div class="filter-group filter-group-categories">
+                        <h4 class="filter-group-title">Danh Mục</h4>
+                        <div class="filter-options">
+                            <button type="button" 
+                                    class="filter-chip @(!Query.CategoryId.HasValue ? "active" : "")" 
+                                    @onclick="() => SelectCategory(null)">
+                                Tất cả
+                            </button>
+                            @foreach (var opt in GetAvailableCategoryOptions().Where(o => o.CategoryId.HasValue))
+                            {
+                                <button type="button" 
+                                        class="filter-chip @(Query.CategoryId == opt.CategoryId ? "active" : "")" 
+                                        @onclick="() => SelectCategory(opt.CategoryId)">
+                                    @opt.Name.Replace("— ", "")
+                                </button>
+                            }
+                        </div>
                     </div>
-                    <button type="button" class="btn-apply-filters" @onclick="ApplyFilters">Áp dụng giá</button>
+
+                    <!-- THƯƠNG HIỆU -->
+                    <div class="filter-group">
+                        <h4 class="filter-group-title">Thương Hiệu</h4>
+                        <div class="filter-options">
+                            <button type="button" 
+                                    class="filter-chip @(!Query.BrandId.HasValue ? "active" : "")" 
+                                    @onclick="() => SelectBrand(null)">
+                                Tất cả
+                            </button>
+                            @foreach (var brand in Brands)
+                            {
+                                <button type="button" 
+                                        class="filter-chip @(Query.BrandId == brand.MaThuongHieu ? "active" : "")" 
+                                        @onclick="() => SelectBrand(brand.MaThuongHieu)">
+                                    @brand.TenThuongHieu
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- KHOẢNG GIÁ -->
+                    <div class="filter-group">
+                        <h4 class="filter-group-title">Khoảng Giá</h4>
+                        <div class="price-filter-inputs">
+                            <input type="number" class="price-input" placeholder="Từ" @bind="Query.MinPrice" />
+                            <span>—</span>
+                            <input type="number" class="price-input" placeholder="Đến" @bind="Query.MaxPrice" />
+                        </div>
+                        <button type="button" class="btn-apply-filters" @onclick="ApplyFilters">Áp dụng giá</button>
+                    </div>
                 </div>
             </aside>
         }
@@ -325,11 +341,29 @@
             {
                 <!-- DEDICATED HORIZONTAL TOOLBAR 100% REAL DATABASE DATA (SCOPED TO CURRENT HEADER BRANCH) -->
                 <div class="dedicated-horizontal-toolbar">
+                    <!-- GOM DANH MỤC THÀNH DANH SÁCH (SELECT BOX) CHO MOBILE CHỐNG TRÀN VỠ KHUNG -->
+                    <div class="dedicated-mobile-category-bar">
+                        <label for="mobile-category-select" class="mobile-cat-label">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 6h16M4 12h16M4 18h7"></path>
+                            </svg>
+                            <span>Danh mục:</span>
+                        </label>
+                        <select id="mobile-category-select" class="mobile-cat-select" @onchange="OnMobileCategoryChange">
+                            @foreach (var opt in GetAvailableCategoryOptions())
+                            {
+                                <option value="@opt.Slug" selected="@(IsActiveCategoryOption(opt))">
+                                    @opt.Name.Replace("— ", "")
+                                </option>
+                            }
+                        </select>
+                    </div>
+
                     <div class="dedicated-filter-tags">
                         <span class="filter-lead">Bộ lọc:</span>
 
-                        <!-- 1. Danh mục sản phẩm (Được giới hạn theo chuyên mục Header đã chọn) -->
-                        <div class="filter-dropdown-wrapper">
+                        <!-- 1. Danh mục sản phẩm (Được giới hạn theo chuyên mục Header đã chọn) - Ẩn trên mobile vì đã có hộp chọn ở trên -->
+                        <div class="filter-dropdown-wrapper filter-dropdown-category-desktop">
                             <button type="button" 
                                     class="filter-tag-chip @(ActiveDropdown == "cat" ? "active-open" : "") @(HasActiveCategoryFilter ? "has-val" : "")" 
                                     @onclick='() => ToggleDropdown("cat")'>
@@ -1033,7 +1067,7 @@
 
     private string GetActiveCollectionTitle()
     {
-        if (SaleQuery == true)
+        if (SaleQuery == true || Query.IsSale == true || CurrentBranch == CatalogBranch.Sale)
         {
             var activeOpt = GetActiveOption();
             if (activeOpt != null && !activeOpt.IsParentAll)
@@ -1174,6 +1208,7 @@
         Query.PageNumber = 1;
         Query.CategoryId = null;
         Query.Search = null;
+        Query.IsSale = SaleQuery == true ? true : null;
 
         if (CategoryIdQuery.HasValue)
         {
@@ -1182,11 +1217,31 @@
         else if (!string.IsNullOrWhiteSpace(CategoryQuery))
         {
             var slug = CategoryQuery.Trim().ToLowerInvariant();
-            var opt = GetActiveOption();
+            if (slug.StartsWith("sale") || slug == "xa-kho" || slug == "flash-sale" || slug == "gia-dac-biet")
+            {
+                Query.IsSale = true;
+            }
 
-            // 1. Nếu có Categories nạp từ API (hoặc mock test), ưu tiên tra cứu theo tên danh mục
+            var opt = GetActiveOption();
             CategoryDto? matchedCat = null;
-            if (Categories != null && Categories.Any())
+
+            if (slug == "sale-quan-ao")
+            {
+                Query.CategoryId = 1; // Thời trang Nam (Áo & Quần)
+                Query.Search = null;
+            }
+            else if (slug == "sale-phu-kien")
+            {
+                Query.CategoryId = 3; // Phụ Kiện
+                Query.Search = null;
+            }
+            else if (slug == "sale" || slug == "xa-kho" || slug == "flash-sale" || slug == "gia-dac-biet")
+            {
+                Query.CategoryId = null;
+                Query.Search = null;
+            }
+            // 1. Nếu có Categories nạp từ API (hoặc mock test), ưu tiên tra cứu theo tên danh mục
+            else if (Categories != null && Categories.Any())
             {
                 if (slug == "ao" || slug == "shirt")
                     matchedCat = Categories.FirstOrDefault(c => c.TenDanhMuc.Equals("Áo Nam", StringComparison.OrdinalIgnoreCase))
@@ -1297,7 +1352,8 @@
                 BrandId = Query.BrandId,
                 MinPrice = Query.MinPrice,
                 MaxPrice = Query.MaxPrice,
-                SortBy = Query.SortBy
+                SortBy = Query.SortBy,
+                IsSale = Query.IsSale
             };
 
             PagedResult = await CatalogApi.GetProductsAsync(queryCopy);
@@ -1317,7 +1373,8 @@
                     BrandId = Query.BrandId,
                     MinPrice = Query.MinPrice,
                     MaxPrice = Query.MaxPrice,
-                    SortBy = Query.SortBy
+                    SortBy = Query.SortBy,
+                    IsSale = Query.IsSale
                 };
                 PagedResult = await CatalogApi.GetProductsAsync(retryQuery);
             }
@@ -1489,7 +1546,7 @@
             MaSKU = variant.MaSku,
             MauSac = variant.MauSac,
             KichCo = variant.KichCo,
-            DonGia = variant.GiaBan > 0 ? variant.GiaBan : product.GiaThapNhat,
+            DonGia = (variant.PhanTramGiamGia > 0 && variant.GiaSauGiam > 0) ? variant.GiaSauGiam : (variant.GiaBan > 0 ? variant.GiaBan : product.GiaThapNhat),
             SoLuong = 1,
             SoLuongTon = variant.SoLuongTon
         });
@@ -1659,11 +1716,16 @@
     {
         get
         {
-            if (SaleQuery == true) return CatalogBranch.Sale;
+            if (SaleQuery == true || Query.IsSale == true) return CatalogBranch.Sale;
 
             var slug = (CategoryQuery ?? string.Empty).Trim().ToLowerInvariant();
             if (!string.IsNullOrEmpty(slug))
             {
+                if (slug.StartsWith("sale") || slug == "xa-kho" || slug == "flash-sale" || slug == "gia-dac-biet")
+                {
+                    return CatalogBranch.Sale;
+                }
+
                 if (slug.StartsWith("phukien") || slug.Contains("that-lung") || slug == "vo" || slug.Contains("gang") || slug.Contains("balo") || slug.Contains("vi") || slug.Contains("non") || slug.Contains("tui"))
                 {
                     return CatalogBranch.Accessory;
@@ -1752,7 +1814,8 @@
             {
                 new() { Slug = "sale", Name = "Tất cả Deal SALE", IsParentAll = true },
                 new() { Slug = "sale-quan-ao", Name = "Sale Quần Áo", CategoryId = 1 },
-                new() { Slug = "sale-phu-kien", Name = "Sale Phụ Kiện", CategoryId = 3 }
+                new() { Slug = "sale-phu-kien", Name = "Sale Phụ Kiện", CategoryId = 3 },
+                new() { Slug = "flash-sale", Name = "Deal Độc Quyền Online" }
             },
             _ => new List<CategoryFilterOption>
             {
@@ -1902,6 +1965,16 @@
         }
     }
 
+    private void OnMobileCategoryChange(ChangeEventArgs e)
+    {
+        var selectedSlug = e.Value?.ToString();
+        var opt = GetAvailableCategoryOptions().FirstOrDefault(o => o.Slug == selectedSlug);
+        if (opt != null)
+        {
+            SelectCategoryOption(opt);
+        }
+    }
+
     private void ResetToBranchDefault()
     {
         ActiveDropdown = null;
@@ -1992,6 +2065,11 @@
     }
 
     private bool _hasActiveFilters => HasActiveCategoryFilter || _selectedKieuFilters.Any() || Query.BrandId.HasValue || Query.MinPrice.HasValue || Query.MaxPrice.HasValue || _onlyInStock;
+
+    private bool _isFilterOpen = false;
+    private void ToggleFilter() => _isFilterOpen = !_isFilterOpen;
+    private bool _isMobileFilterOpen => _isFilterOpen;
+    private void ToggleMobileFilter() => ToggleFilter();
 
     private void ClearAllHorizontalFilters()
     {

@@ -22,6 +22,8 @@ public interface ICatalogService
     Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
     Task<bool> UpdateProductAsync(UpdateProductRequest request);
     Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds);
+    Task<bool> UpdateVariantDiscountAsync(int variantId, int discountPercent);
+    Task<bool> UpdateProductDiscountAsync(int productId, int discountPercent);
 }
 
 public class CatalogService : ICatalogService
@@ -136,7 +138,8 @@ public class CatalogService : ICatalogService
             MaxPrice = query.MaxPrice,
             SortBy = query.SortBy,
             DaXoa = query.DaXoa,
-            IncludeAll = query.IncludeAll
+            IncludeAll = query.IncludeAll,
+            IsSale = query.IsSale
         };
 
         return await _catalogRepository.GetProductsPagedAsync(normalizedQuery);
@@ -243,5 +246,25 @@ public class CatalogService : ICatalogService
             return Enumerable.Empty<VariantAvailabilityDto>();
 
         return await _catalogRepository.CheckVariantsAvailabilityAsync(variantIds);
+    }
+
+    public async Task<bool> UpdateVariantDiscountAsync(int variantId, int discountPercent)
+    {
+        if (variantId <= 0)
+            throw new ArgumentException("Mã biến thể không hợp lệ.");
+        if (discountPercent < 0 || discountPercent > 99)
+            throw new ArgumentOutOfRangeException(nameof(discountPercent), "Phần trăm giảm giá phải từ 0 đến 99%.");
+
+        return await _catalogRepository.UpdateVariantDiscountAsync(variantId, discountPercent);
+    }
+
+    public async Task<bool> UpdateProductDiscountAsync(int productId, int discountPercent)
+    {
+        if (productId <= 0)
+            throw new ArgumentException("Mã sản phẩm không hợp lệ.");
+        if (discountPercent < 0 || discountPercent > 99)
+            throw new ArgumentOutOfRangeException(nameof(discountPercent), "Phần trăm giảm giá phải từ 0 đến 99%.");
+
+        return await _catalogRepository.UpdateProductDiscountAsync(productId, discountPercent);
     }
 }

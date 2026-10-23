@@ -34,4 +34,5 @@ public class ProductQueryParameters
     public string? SortBy { get; set; } = "newest";
     public bool? DaXoa { get; set; }
     public bool IncludeAll { get; set; } = false;
+    public bool? IsSale { get; set; }
 }

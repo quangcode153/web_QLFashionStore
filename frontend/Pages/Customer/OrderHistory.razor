@@ -2,6 +2,7 @@
 @page "/orders"
 @namespace Frontend.Pages.Customer
 @inject ICustomerApiClient CustomerApi
+@inject ICatalogApiClient CatalogApi
 @inject NavigationManager Navigation
 @inject IToastService Toast
 
@@ -16,46 +17,65 @@
             <span class="bc-curr">Lịch sử đơn hàng</span>
         </nav>
 
-        <h1 class="orders-page-title">LỊCH SỬ ĐƠN HÀNG CỦA BẠN</h1>
+        <!-- TikTok Shop Header & Search -->
+        <div class="tiktok-header-bar">
+            <div class="tiktok-title-row">
+                <h1 class="orders-page-title mb-0">LỊCH SỬ ĐƠN HÀNG CỦA BẠN</h1>
+                <span class="tiktok-title-sub">Theo dõi vận chuyển & Quản lý đơn hàng trực quan</span>
+            </div>
+            
+            <div class="tiktok-search-box">
+                <span class="tiktok-search-icon">🔍</span>
+                <input type="text" 
+                       class="tiktok-search-input" 
+                       placeholder="Tìm kiếm theo mã đơn #DH, địa chỉ nhận hàng, phương thức thanh toán..." 
+                       @bind="_searchQuery" 
+                       @bind:event="oninput" />
+                @if (!string.IsNullOrEmpty(_searchQuery))
+                {
+                    <button type="button" class="btn-clear-search" @onclick='() => _searchQuery = ""' title="Xóa tìm kiếm">✕</button>
+                }
+            </div>
+        </div>
 
         @if (_orders != null && _orders.Any())
         {
-            <div class="customer-order-tabs">
+            <div class="customer-order-tabs tiktok-tabs-bar">
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == null ? "active" : "")" 
                         data-tab="Tất cả"
                         @onclick="() => FilterOrdersByTab(null)">
-                    Tất cả (@_orders.Count)
+                    Tất cả <span class="tab-count-pill">@_orders.Count</span>
                 </button>
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == "Chờ xử lý" ? "active" : "")" 
                         data-tab="Chờ xử lý"
                         @onclick='() => FilterOrdersByTab("Chờ xử lý")'>
-                    Chờ xử lý (@_orders.Count(x => x.TrangThai == "Chờ xử lý"))
+                    Chờ thanh toán <span class="tab-count-pill">@_orders.Count(x => x.TrangThai == "Chờ xử lý")</span>
                 </button>
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == "Đang giao hàng" ? "active" : "")" 
                         data-tab="Đang giao hàng"
                         @onclick='() => FilterOrdersByTab("Đang giao hàng")'>
-                    Đang giao hàng (@_orders.Count(x => x.TrangThai == "Đang giao hàng"))
+                    Chờ vận chuyển <span class="tab-count-pill">@_orders.Count(x => x.TrangThai == "Đang giao hàng")</span>
                 </button>
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == "Đã hoàn thành" ? "active" : "")" 
                         data-tab="Thành công"
                         @onclick='() => FilterOrdersByTab("Đã hoàn thành")'>
-                    Thành công (@_orders.Count(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && !IsOrderReturnedOrPending(x)))
+                    Đã hoàn tất <span class="tab-count-pill">@_orders.Count(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && !IsOrderReturnedOrPending(x))</span>
                 </button>
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == "Đã hoàn trả" ? "active" : "")" 
                         data-tab="Đã hoàn trả"
                         @onclick='() => FilterOrdersByTab("Đã hoàn trả")'>
-                    Đã hoàn trả (@_orders.Count(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả"))
+                    Đã hoàn trả <span class="tab-count-pill">@_orders.Count(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả")</span>
                 </button>
                 <button type="button" 
                         class="order-tab-btn @(_selectedStatusTab == "Đã hủy" ? "active" : "")" 
                         data-tab="Đã hủy"
                         @onclick='() => FilterOrdersByTab("Đã hủy")'>
-                    Đã hủy (@_orders.Count(x => x.TrangThai == "Đã hủy"))
+                    Đã hủy <span class="tab-count-pill">@_orders.Count(x => x.TrangThai == "Đã hủy")</span>
                 </button>
             </div>
         }
@@ -85,30 +105,26 @@
         else if (!FilteredOrders.Any())
         {
             <div class="orders-empty-state" style="padding: 40px 20px;">
-                <p class="empty-desc" style="margin-bottom: 0;">Không có đơn hàng nào trong mục này.</p>
+                <p class="empty-desc" style="margin-bottom: 0;">Không có đơn hàng nào phù hợp với bộ lọc hoặc tìm kiếm hiện tại.</p>
             </div>
         }
         else
         {
-            <div class="orders-table-card">
-                <div class="orders-table-header">
-                    <span class="th-id">Mã đơn hàng</span>
-                    <span class="th-date">Ngày đặt</span>
-                    <span class="th-qty">Số mặt hàng</span>
-                    <span class="th-total">Tổng thanh toán</span>
-                    <span class="th-status">Trạng thái</span>
-                    <span class="th-action"></span>
-                </div>
-
-                <div class="orders-table-body">
-                    @foreach (var order in FilteredOrders)
-                    {
-                        <div class="order-row">
-                            <span class="cell-id">#DH-@order.MaHoaDon</span>
-                            <span class="cell-date">@order.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
-                            <span class="cell-qty">@order.SoMatHang sản phẩm</span>
-                            <span class="cell-total">@order.TongThanhToan.ToString("N0") ₫</span>
-                            <span class="cell-status">
+            <div class="orders-table-card tiktok-orders-container">
+                @foreach (var order in FilteredOrders)
+                {
+                    <div class="order-row tiktok-order-card">
+                        <!-- 1. Shop Header (TikTok Mall Header) -->
+                        <div class="tiktok-shop-header">
+                            <div class="tiktok-shop-left">
+                                <span class="tiktok-mall-badge">Mall</span>
+                                <span class="tiktok-shop-title">QF NOIR Official</span>
+                                <span class="tiktok-live-badge">
+                                    <span class="live-dot"></span> LIVE
+                                </span>
+                                <span class="tiktok-chevron-arrow">&gt;</span>
+                            </div>
+                            <div class="tiktok-status-right cell-status">
                                 @if (IsOrderReturnPending(order))
                                 {
                                     <span class="status-badge status-return-pending">
@@ -133,13 +149,154 @@
                                         @order.TrangThai
                                     </span>
                                 }
-                            </span>
-                            <span class="cell-action">
+                            </div>
+                        </div>
+
+                        <!-- 2. TikTok Shipping Tracker Box -->
+                        <div class="tiktok-shipping-pill" @onclick="() => OpenOrderDetailsModalAsync(order)">
+                            <div class="shipping-pill-icon">
+                                @if (order.TrangThai == "Đã hoàn thành" || order.TrangThai == "Hoàn thành")
+                                {
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                }
+                                else if (order.TrangThai == "Đang giao hàng")
+                                {
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                }
+                                else if (order.TrangThai == "Chờ xử lý")
+                                {
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                }
+                                else if (order.TrangThai == "Đã hủy")
+                                {
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                }
+                                else
+                                {
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                }
+                            </div>
+                            <div class="shipping-pill-text">
+                                <div class="shipping-pill-status">
+                                    @if (order.TrangThai == "Đã hoàn thành" || order.TrangThai == "Hoàn thành")
+                                    {
+                                        <strong>@order.NgayLapHoaDon.ToString("HH:mm") Đã giao</strong>
+                                    }
+                                    else if (order.TrangThai == "Đang giao hàng")
+                                    {
+                                        <strong>Đang vận chuyển giao hàng</strong>
+                                    }
+                                    else if (order.TrangThai == "Chờ xử lý")
+                                    {
+                                        <strong>Đang chuẩn bị kiện hàng tại kho</strong>
+                                    }
+                                    else if (order.TrangThai == "Đã hủy")
+                                    {
+                                        <strong>Đơn hàng đã được hủy</strong>
+                                    }
+                                    else
+                                    {
+                                        <strong>Tiếp nhận yêu cầu hoàn trả</strong>
+                                    }
+                                </div>
+                                <div class="shipping-pill-sub">
+                                    @if (order.TrangThai == "Đã hoàn thành" || order.TrangThai == "Hoàn thành")
+                                    {
+                                        <span>Kiện hàng của bạn đã được giao đến nơi thành công....</span>
+                                    }
+                                    else if (order.TrangThai == "Đang giao hàng")
+                                    {
+                                        <span>Kiện hàng đang được bưu tá phát đến địa chỉ nhận.</span>
+                                    }
+                                    else if (order.TrangThai == "Chờ xử lý")
+                                    {
+                                        <span>Shop đang đóng gói và sắp xếp chuyển giao cho bưu cục.</span>
+                                    }
+                                    else if (order.TrangThai == "Đã hủy")
+                                    {
+                                        <span>Đơn hàng đã đóng lại theo chính sách sàn.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Bộ phận CSKH đang xử lý hồ sơ đổi trả của quý khách.</span>
+                                    }
+                                </div>
+                            </div>
+                            <span class="shipping-pill-arrow">&gt;</span>
+                        </div>
+
+                        <!-- 3. TikTok Order Item Preview -->
+                        <div class="tiktok-item-preview" @onclick="() => OpenOrderDetailsModalAsync(order)">
+                            <div class="tiktok-item-thumb-wrapper">
+                                <div class="tiktok-item-thumb">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="tiktok-item-details">
+                                <div class="tiktok-item-header-line">
+                                    <span class="cell-id tiktok-order-code">#DH-@order.MaHoaDon</span>
+                                    <span class="tiktok-order-title">Thời trang cao cấp QF NOIR Official</span>
+                                </div>
+                                <div class="tiktok-item-meta-line">
+                                    <span class="cell-date">@order.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
+                                    <span class="meta-dot">•</span>
+                                    <span class="cell-qty">@order.SoMatHang sản phẩm</span>
+                                    @if (!string.IsNullOrEmpty(order.DiaChiGiaoHangClean))
+                                    {
+                                        <span class="meta-dot">•</span>
+                                        <span class="tiktok-addr-preview" title="@order.DiaChiGiaoHangClean">📍 @order.DiaChiGiaoHangClean</span>
+                                    }
+                                </div>
+                                <div class="tiktok-pttt-box">
+                                    <span class="order-pttt-pill @(order.PhuongThucThanhToan.Contains("VietQR") ? "pill-vietqr" : order.PhuongThucThanhToan.Contains("MoMo") ? "pill-momo" : "pill-cod")">
+                                        @(order.PhuongThucThanhToan.Contains("VietQR") ? "🔷 VietQR" : order.PhuongThucThanhToan.Contains("MoMo") ? "🟣 MoMo" : "💵 COD")
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="tiktok-item-price-col cell-total">
+                                <div class="tiktok-unit-price">@order.TongThanhToan.ToString("N0") ₫</div>
+                                <div class="tiktok-qty-tag">x@order.SoMatHang</div>
+                            </div>
+                        </div>
+
+                        <!-- 4. TikTok Card Bottom: Subtotal, Social Bubble & Action Buttons -->
+                        <div class="tiktok-card-bottom">
+                            <div class="tiktok-total-row">
+                                <span class="tiktok-total-lead">Tổng:</span>
+                                <span class="tiktok-total-amount">@order.TongThanhToan.ToString("N0") ₫</span>
+                            </div>
+                            <div class="tiktok-actions-row cell-action">
+                                <a href="/cart" class="btn-tiktok-cart" title="Giỏ hàng của bạn">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="9" cy="21" r="1"></circle>
+                                        <circle cx="20" cy="21" r="1"></circle>
+                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                                    </svg>
+                                </a>
+
+                                <button type="button" 
+                                        class="btn-tiktok-repurchase" 
+                                        @onclick="() => RepurchaseOrderAsync(order)"
+                                        disabled="@_isRepurchasing"
+                                        title="Xem và mua lại sản phẩm trong đơn này">
+                                    @if (_repurchasingOrderId == order.MaHoaDon)
+                                    {
+                                        <span>Đang mở...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Mua lại</span>
+                                    }
+                                </button>
+
                                 <button type="button" 
                                         class="btn-view-order-details" 
                                         @onclick="() => OpenOrderDetailsModalAsync(order)">
                                     Chi tiết
                                 </button>
+
                                 @if (order.TrangThai == "Chờ xử lý" || order.TrangThai == "Chờ thanh toán")
                                 {
                                     <a href="/order-success/@order.MaHoaDon?payment=MOMO" 
@@ -148,6 +305,7 @@
                                         💳 Thanh toán QR
                                     </a>
                                 }
+
                                 @if (order.ConHangCoTheHoan)
                                 {
                                     <button type="button" 
@@ -157,10 +315,10 @@
                                         Hoàn trả
                                     </button>
                                 }
-                            </span>
+                            </div>
                         </div>
-                    }
-                </div>
+                    </div>
+                }
             </div>
         }
 
@@ -172,7 +330,27 @@
                 <div class="modal-header">
                     <div class="modal-title-box">
                         <h3 class="modal-title">CHI TIẾT ĐƠN HÀNG #DH-@_selectedOrder.MaHoaDon</h3>
-                        <span class="modal-subtitle">Ngày đặt: @_selectedOrder.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
+                        <div class="modal-subtitle-row">
+                            <span class="modal-subtitle">Ngày đặt: @_selectedOrder.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
+                            <span class="modal-pttt-badge @(_selectedOrder.PhuongThucThanhToan.Contains("VietQR") ? "badge-vietqr" : _selectedOrder.PhuongThucThanhToan.Contains("MoMo") ? "badge-momo" : "badge-cod")">
+                                @if (_selectedOrder.PhuongThucThanhToan.Contains("VietQR"))
+                                {
+                                    <span>🔷 Chuyển khoản VietQR</span>
+                                }
+                                else if (_selectedOrder.PhuongThucThanhToan.Contains("MoMo"))
+                                {
+                                    <span>🟣 Ví điện tử MoMo</span>
+                                }
+                                else if (_selectedOrder.LoaiDonHang == "TAI_QUAY")
+                                {
+                                    <span>🏪 Mua tại quầy POS</span>
+                                }
+                                else
+                                {
+                                    <span>💵 Thanh toán khi nhận hàng (COD)</span>
+                                }
+                            </span>
+                        </div>
                     </div>
                     <button type="button" class="btn-close-modal" @onclick="CloseModal" aria-label="Đóng">✕</button>
                 </div>
@@ -193,16 +371,56 @@
                             {
                                 <div class="modal-item-row">
                                     <div class="item-main">
-                                        <h4 class="item-name">@item.TenSanPham</h4>
+                                        <h4 class="item-name item-name-link" @onclick="() => RepurchaseSingleItemAsync(item.TenSanPham)" title="Bấm để xem trang sản phẩm và mua lại">
+                                            @item.TenSanPham
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="vertical-align: middle; margin-left: 3px;">
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                                <polyline points="15 3 21 3 21 9"></polyline>
+                                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                                            </svg>
+                                        </h4>
                                         <span class="item-variant">@item.MauSac / @item.KichCo</span>
                                         <span class="item-qty">Số lượng: <strong>@item.SoLuong</strong> x @item.DonGia.ToString("N0") ₫</span>
                                     </div>
-                                    <span class="item-subtotal">@item.ThanhTien.ToString("N0") ₫</span>
+                                    <div class="item-actions-side">
+                                        <span class="item-subtotal">@item.ThanhTien.ToString("N0") ₫</span>
+                                        <button type="button" class="btn-item-repurchase" @onclick="() => RepurchaseSingleItemAsync(item.TenSanPham)" title="Xem và mua lại sản phẩm này">
+                                            Mua lại
+                                        </button>
+                                    </div>
                                 </div>
                             }
                         </div>
 
                         <div class="modal-summary-box">
+                            <div class="sum-row pttt-highlight-row">
+                                <span class="sum-label-bold">Phương thức thanh toán:</span>
+                                <span class="pttt-status-text @(_selectedOrder.PhuongThucThanhToan.Contains("VietQR") ? "text-vietqr" : _selectedOrder.PhuongThucThanhToan.Contains("MoMo") ? "text-momo" : "text-cod")">
+                                    @if (_selectedOrder.PhuongThucThanhToan.Contains("VietQR"))
+                                    {
+                                        <strong>🔷 Chuyển khoản QR (VietQR Napas 24/7)</strong>
+                                    }
+                                    else if (_selectedOrder.PhuongThucThanhToan.Contains("MoMo"))
+                                    {
+                                        <strong>🟣 Ví MoMo (Chuyển khoản QR)</strong>
+                                    }
+                                    else if (_selectedOrder.LoaiDonHang == "TAI_QUAY")
+                                    {
+                                        <strong>🏪 Mua & Thanh toán tại quầy</strong>
+                                    }
+                                    else
+                                    {
+                                        <strong>💵 Thanh toán khi nhận hàng (COD)</strong>
+                                    }
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_selectedOrder.DiaChiGiaoHangClean))
+                            {
+                                <div class="sum-row delivery-address-row">
+                                    <span>Địa chỉ giao hàng:</span>
+                                    <span class="delivery-address-val">@_selectedOrder.DiaChiGiaoHangClean</span>
+                                </div>
+                            }
                             <div class="sum-row">
                                 <span>Tiền hàng:</span>
                                 <span>@_selectedOrder.TienHang.ToString("N0") ₫</span>
@@ -510,57 +728,548 @@
     .btn-explore-shop:hover {
         background: #BE123C;
     }
-    .orders-table-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    .orders-table-header {
-        display: grid;
-        grid-template-columns: 1.5fr 2fr 1.5fr 2fr 1.8fr 1.5fr;
-        padding: 16px 20px;
-        background: #F8FAFC;
-        border-bottom: 1px solid #E2E8F0;
-        font-size: 0.85rem;
-        font-weight: 800;
-        color: #475569;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-    }
-    .orders-table-body {
+    .tiktok-header-bar {
         display: flex;
         flex-direction: column;
+        gap: 14px;
+        margin-bottom: 20px;
     }
-    .order-row {
-        display: grid;
-        grid-template-columns: 1.5fr 2fr 1.5fr 2fr 1.8fr 1.5fr;
-        padding: 18px 20px;
-        border-bottom: 1px solid #F1F5F9;
+    .tiktok-title-row {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .tiktok-title-sub {
+        font-size: 0.9rem;
+        color: #64748B;
+        font-weight: 500;
+    }
+    .mb-0 { margin-bottom: 0 !important; }
+
+    /* TikTok Style Search Box */
+    .tiktok-search-box {
+        position: relative;
+        display: flex;
         align-items: center;
+        background: #FFFFFF;
+        border: 1.5px solid #E2E8F0;
+        border-radius: 999px;
+        padding: 0 16px;
+        height: 44px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        transition: all 0.2s ease;
+    }
+    .tiktok-search-box:focus-within {
+        border-color: #0F172A;
+        box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+    }
+    .tiktok-search-icon {
+        font-size: 1.05rem;
+        color: #94A3B8;
+        margin-right: 10px;
+        flex-shrink: 0;
+    }
+    .tiktok-search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
         font-size: 0.92rem;
+        color: #0F172A;
+        font-family: inherit;
     }
-    .order-row:last-child {
-        border-bottom: none;
+    .tiktok-search-input::placeholder {
+        color: #94A3B8;
     }
-    @@media (max-width: 900px) {
-        .orders-table-header { display: none; }
-        .order-row {
-            grid-template-columns: 1fr;
-            gap: 10px;
-            padding: 16px;
-            border-bottom: 1px solid #E2E8F0;
-        }
+    .btn-clear-search {
+        background: none;
+        border: none;
+        color: #94A3B8;
+        font-size: 1rem;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 50%;
+        line-height: 1;
     }
-    .cell-id {
+    .btn-clear-search:hover {
+        color: #0F172A;
+        background: #F1F5F9;
+    }
+
+    /* TikTok Style Horizontal Tabs */
+    .customer-order-tabs.tiktok-tabs-bar {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 8px;
+        border-bottom: 1.5px solid #E2E8F0;
+        padding-bottom: 4px;
+        margin-bottom: 24px;
+    }
+    .customer-order-tabs.tiktok-tabs-bar::-webkit-scrollbar {
+        display: none;
+    }
+    .order-tab-btn {
+        background: transparent;
+        border: none;
+        padding: 10px 16px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #64748B;
+        cursor: pointer;
+        white-space: nowrap;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 8px;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+    .order-tab-btn:hover {
+        color: #0F172A;
+        background: #F1F5F9;
+    }
+    .order-tab-btn.active {
+        color: #FE2C55;
+        font-weight: 800;
+        background: #FFF1F2;
+    }
+    .order-tab-btn.active::after {
+        content: "";
+        position: absolute;
+        bottom: -5.5px;
+        left: 12px;
+        right: 12px;
+        height: 3px;
+        background: #FE2C55;
+        border-radius: 3px 3px 0 0;
+    }
+    .tab-count-pill {
+        display: inline-block;
+        font-size: 0.72rem;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #E2E8F0;
+        color: #475569;
+        font-weight: 700;
+    }
+    .order-tab-btn.active .tab-count-pill {
+        background: #FE2C55;
+        color: #FFFFFF;
+    }
+
+    /* TikTok Orders Container & Cards */
+    .orders-table-card.tiktok-orders-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: transparent;
+        border: none;
+        overflow: visible;
+        max-width: 920px;
+        margin: 0 auto;
+    }
+    .order-row.tiktok-order-card {
+        display: flex;
+        flex-direction: column;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 18px 20px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+        transition: all 0.2s ease;
+    }
+    .order-row.tiktok-order-card:hover {
+        border-color: #CBD5E1;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        transform: translateY(-1px);
+    }
+
+    /* 1. TikTok Shop Header */
+    .tiktok-shop-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #F1F5F9;
+    }
+    .tiktok-shop-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .tiktok-mall-badge {
+        background: #000000;
+        color: #FFD700;
+        font-size: 0.72rem;
+        font-weight: 900;
+        padding: 2px 7px;
+        border-radius: 4px;
+        letter-spacing: 0.04em;
+        line-height: 1.2;
+    }
+    .tiktok-shop-title {
+        font-size: 0.95rem;
         font-weight: 800;
         color: #0F172A;
     }
-    .cell-date { color: #64748B; font-size: 0.85rem; }
-    .cell-qty { color: #475569; }
-    .cell-total {
+    .tiktok-live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #FE2C55;
+        color: #FFFFFF;
+        font-size: 0.65rem;
         font-weight: 800;
-        color: #E11D48;
+        padding: 2px 6px;
+        border-radius: 4px;
+        line-height: 1.2;
+    }
+    .live-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #FFFFFF;
+        animation: tiktokPulse 1.2s infinite;
+    }
+    @@keyframes tiktokPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .tiktok-chevron-arrow {
+        color: #94A3B8;
+        font-size: 0.85rem;
+        font-weight: 700;
+    }
+    .tiktok-status-right {
+        display: flex;
+        align-items: center;
+    }
+
+    /* 2. TikTok Shipping Tracker Box */
+    .tiktok-shipping-pill {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-top: 12px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .tiktok-shipping-pill:hover {
+        background: #F1F5F9;
+        border-color: #CBD5E1;
+    }
+    .shipping-pill-icon {
+        font-size: 1.35rem;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .shipping-pill-text {
+        flex: 1;
+        min-width: 0;
+    }
+    .shipping-pill-status {
+        font-size: 0.88rem;
+        color: #0F172A;
+        font-weight: 700;
+    }
+    .shipping-pill-sub {
+        font-size: 0.8rem;
+        color: #64748B;
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .shipping-pill-arrow {
+        color: #94A3B8;
+        font-size: 0.95rem;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    /* 3. TikTok Order Item Preview */
+    .tiktok-item-preview {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 0;
+        border-bottom: 1px solid #F1F5F9;
+        cursor: pointer;
+    }
+    .tiktok-item-thumb-wrapper {
+        flex-shrink: 0;
+    }
+    .tiktok-item-thumb {
+        width: 72px;
+        height: 72px;
+        border-radius: 8px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.15s;
+    }
+    .tiktok-item-preview:hover .tiktok-item-thumb {
+        transform: scale(1.02);
+    }
+    .tiktok-item-details {
+        flex: 1;
+        min-width: 0;
+    }
+    .tiktok-item-header-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
+    }
+    .tiktok-order-code {
+        font-weight: 800;
+        color: #0F172A;
+        font-size: 0.95rem;
+    }
+    .tiktok-order-title {
+        font-size: 0.88rem;
+        color: #475569;
+        font-weight: 600;
+    }
+    .tiktok-item-meta-line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        color: #64748B;
+        flex-wrap: wrap;
+    }
+    .meta-dot { color: #CBD5E1; }
+    .tiktok-addr-preview {
+        color: #475569;
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .tiktok-pttt-box {
+        margin-top: 6px;
+    }
+    .tiktok-item-price-col {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        flex-shrink: 0;
+        gap: 3px;
+    }
+    .tiktok-unit-price {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .tiktok-qty-tag {
+        font-size: 0.8rem;
+        color: #64748B;
+        font-weight: 600;
+    }
+
+    /* 4. TikTok Card Bottom: Subtotal, Social Bubble & Actions */
+    .tiktok-card-bottom {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding-top: 14px;
+    }
+    .tiktok-total-row {
+        display: flex;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: 8px;
+    }
+    .tiktok-total-lead {
+        font-size: 0.92rem;
+        color: #64748B;
+        font-weight: 600;
+    }
+    .tiktok-total-amount {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: #0F172A;
+    }
+    .tiktok-social-bubble-wrap {
+        display: flex;
+        justify-content: flex-end;
+    }
+    .tiktok-social-bubble {
+        position: relative;
+        background: #475569;
+        color: #FFFFFF;
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 4px 12px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        letter-spacing: 0.01em;
+    }
+    .bubble-caret {
+        position: absolute;
+        bottom: -5px;
+        right: 36px;
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 5px solid #475569;
+    }
+
+    /* TikTok Action Buttons */
+    .tiktok-actions-row {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 2px;
+    }
+    .btn-tiktok-cart {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid #E2E8F0;
+        background: #F8FAFC;
+        color: #0F172A;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+    .btn-tiktok-cart:hover {
+        background: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
+    }
+    .btn-tiktok-repurchase {
+        background: #FE2C55;
+        color: #FFFFFF !important;
+        font-weight: 800;
+        font-size: 0.88rem;
+        padding: 9px 24px;
+        border-radius: 999px;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        box-shadow: 0 2px 8px rgba(254, 44, 85, 0.25);
+    }
+    .btn-tiktok-repurchase:hover {
+        background: #E0264B;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(254, 44, 85, 0.35);
+    }
+    .btn-view-order-details {
+        background: #FFFFFF;
+        border: 1.5px solid #CBD5E1;
+        color: #0F172A;
+        font-weight: 700;
+        padding: 8px 18px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .btn-view-order-details:hover {
+        background: #0F172A;
+        color: #FFFFFF;
+        border-color: #0F172A;
+    }
+    .btn-open-return-modal {
+        background: #FFF1F2;
+        border: 1px solid #FECDD3;
+        color: #BE123C;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .btn-open-return-modal:hover {
+        background: #FFE4E6;
+        border-color: #FDA4AF;
+        color: #9F1239;
+    }
+    .order-pttt-pill {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 4px;
+        margin-top: 4px;
+        width: fit-content;
+    }
+    .order-pttt-pill.pill-vietqr, .modal-pttt-badge.badge-vietqr {
+        background: #f0f9ff;
+        color: #0284c7;
+        border: 1px solid #bae6fd;
+    }
+    .order-pttt-pill.pill-momo, .modal-pttt-badge.badge-momo {
+        background: #fdf4ff;
+        color: #a21caf;
+        border: 1px solid #f5d0fe;
+    }
+    .order-pttt-pill.pill-cod, .modal-pttt-badge.badge-cod {
+        background: #fefce8;
+        color: #ca8a04;
+        border: 1px solid #fef08a;
+    }
+    .modal-subtitle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+    }
+    .modal-pttt-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 6px;
+    }
+    .sum-row.pttt-highlight-row {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 8px 12px;
+        border-radius: 6px;
+        align-items: center;
+    }
+    .sum-label-bold {
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .pttt-status-text.text-vietqr { color: #0284c7; }
+    .pttt-status-text.text-momo { color: #a21caf; }
+    .pttt-status-text.text-cod { color: #b45309; }
+    .sum-row.delivery-address-row {
+        font-size: 0.84rem;
+        color: #64748b;
+        padding: 0 4px;
+    }
+    .delivery-address-val {
+        font-weight: 600;
+        color: #334155;
+        text-align: right;
+        max-width: 65%;
     }
     .btn-pay-qr {
         display: inline-flex;
@@ -611,51 +1320,6 @@
     .status-badge.status-default {
         background: #F1F5F9;
         color: #475569;
-    }
-
-    /* Customer Order Tabs */
-    .customer-order-tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 20px;
-    }
-    .order-tab-btn {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 6px;
-        padding: 8px 16px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        color: #64748B;
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-    .order-tab-btn:hover {
-        border-color: #CBD5E1;
-        color: #0F172A;
-        background: #F8FAFC;
-    }
-    .order-tab-btn.active {
-        background: #0F172A;
-        color: #FFFFFF;
-        border-color: #0F172A;
-    }
-    .btn-view-order-details {
-        background: transparent;
-        border: 1px solid #CBD5E1;
-        color: #0F172A;
-        font-weight: 700;
-        padding: 6px 14px;
-        border-radius: 4px;
-        font-size: 0.82rem;
-        cursor: pointer;
-        transition: all 0.15s;
-    }
-    .btn-view-order-details:hover {
-        background: #0F172A;
-        color: #FFFFFF;
-        border-color: #0F172A;
     }
     .modal-backdrop {
         position: fixed;
@@ -741,6 +1405,39 @@
         font-weight: 800;
         color: #E11D48;
         font-size: 0.95rem;
+    }
+    .item-name-link {
+        cursor: pointer;
+        transition: color 0.15s ease;
+    }
+    .item-name-link:hover {
+        color: #2563EB;
+        text-decoration: underline;
+    }
+    .item-actions-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+    .btn-item-repurchase {
+        background: #0F172A;
+        color: #FFFFFF;
+        border: 1px solid #0F172A;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .btn-item-repurchase:hover {
+        background: #1E293B;
+        border-color: #1E293B;
     }
     .modal-summary-box {
         background: #F8FAFC;
@@ -1029,6 +1726,271 @@
         padding: 6px 10px;
         border-radius: 6px;
     }
+
+    /* =========================================================
+       COMPREHENSIVE MOBILE RESPONSIVE STYLING (max-width: 768px)
+       ========================================================= */
+    @@media (max-width: 768px) {
+        .orders-page-wrapper {
+            padding: 12px 0 calc(35px + env(safe-area-inset-bottom, 0px)) 0;
+        }
+        .orders-breadcrumb {
+            margin-bottom: 12px;
+            font-size: 0.76rem;
+        }
+        .orders-page-title {
+            font-size: 1.25rem;
+            margin-bottom: 2px;
+        }
+        .tiktok-title-sub {
+            font-size: 0.78rem;
+        }
+        .tiktok-header-bar {
+            margin-bottom: 12px;
+            gap: 10px;
+        }
+        .tiktok-search-box {
+            height: 38px;
+            padding: 0 12px;
+        }
+        .tiktok-search-icon {
+            font-size: 0.92rem;
+            margin-right: 8px;
+        }
+        .tiktok-search-input {
+            font-size: 0.82rem;
+        }
+
+        /* Tabs on Mobile */
+        .customer-order-tabs.tiktok-tabs-bar {
+            gap: 6px;
+            margin-bottom: 14px;
+            padding-bottom: 2px;
+        }
+        .order-tab-btn {
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            gap: 4px;
+        }
+        .tab-count-pill {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+        }
+
+        /* Order Cards */
+        .orders-table-card.tiktok-orders-container {
+            gap: 12px;
+        }
+        .order-row.tiktok-order-card {
+            padding: 12px 14px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        .tiktok-shop-header {
+            padding-bottom: 8px;
+        }
+        .tiktok-mall-badge {
+            font-size: 0.65rem;
+            padding: 1px 5px;
+        }
+        .tiktok-shop-title {
+            font-size: 0.85rem;
+        }
+        .status-badge {
+            font-size: 0.72rem;
+            padding: 3px 8px;
+        }
+
+        /* Shipping Pill */
+        .tiktok-shipping-pill {
+            padding: 8px 10px;
+            gap: 8px;
+            margin-top: 8px;
+            border-radius: 8px;
+        }
+        .shipping-pill-icon {
+            font-size: 1.15rem;
+        }
+        .shipping-pill-status {
+            font-size: 0.8rem;
+        }
+        .shipping-pill-sub {
+            font-size: 0.72rem;
+        }
+
+        /* Item Preview */
+        .tiktok-item-preview {
+            padding: 10px 0;
+            gap: 10px;
+        }
+        .tiktok-item-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: 6px;
+        }
+        .tiktok-item-thumb svg {
+            width: 28px;
+            height: 28px;
+        }
+        .tiktok-order-code {
+            font-size: 0.84rem;
+        }
+        .tiktok-order-title {
+            font-size: 0.78rem;
+        }
+        .tiktok-item-meta-line {
+            font-size: 0.74rem;
+            gap: 4px;
+        }
+        .tiktok-addr-preview {
+            max-width: 140px;
+        }
+        .order-pttt-pill {
+            font-size: 0.68rem;
+            padding: 1px 6px;
+        }
+        .tiktok-unit-price {
+            font-size: 0.92rem;
+        }
+        .tiktok-qty-tag {
+            font-size: 0.74rem;
+        }
+
+        /* Card Bottom */
+        .tiktok-card-bottom {
+            padding-top: 10px;
+            gap: 8px;
+        }
+        .tiktok-total-row {
+            gap: 6px;
+        }
+        .tiktok-total-lead {
+            font-size: 0.8rem;
+        }
+        .tiktok-total-amount {
+            font-size: 1.1rem;
+        }
+        .tiktok-social-bubble {
+            font-size: 0.68rem;
+            padding: 2px 8px;
+        }
+        .bubble-caret {
+            right: 20px;
+        }
+
+        /* Action Buttons */
+        .tiktok-actions-row {
+            gap: 6px;
+            justify-content: flex-end;
+            margin-top: 2px;
+        }
+        .btn-tiktok-cart {
+            width: 32px;
+            height: 32px;
+        }
+        .btn-tiktok-cart svg {
+            width: 15px;
+            height: 15px;
+        }
+        .btn-tiktok-repurchase {
+            padding: 7px 16px;
+            font-size: 0.8rem;
+        }
+        .btn-view-order-details {
+            padding: 6px 12px;
+            font-size: 0.78rem;
+        }
+        .btn-pay-qr {
+            padding: 5px 8px;
+            font-size: 0.74rem;
+            margin-left: 0;
+        }
+        .btn-open-return-modal {
+            padding: 6px 10px;
+            font-size: 0.78rem;
+        }
+
+        /* Order Details Modal on Mobile */
+        .order-details-modal {
+            width: 95%;
+            max-height: 92vh;
+            border-radius: 10px;
+        }
+        .modal-header {
+            padding: 14px 16px;
+        }
+        .modal-title {
+            font-size: 1rem;
+        }
+        .modal-subtitle-row {
+            gap: 6px;
+        }
+        .modal-body {
+            padding: 14px 16px;
+        }
+        .modal-items-list {
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .item-name {
+            font-size: 0.85rem;
+        }
+        .item-variant {
+            font-size: 0.75rem;
+        }
+        .item-subtotal {
+            font-size: 0.88rem;
+        }
+        .modal-summary-box {
+            padding: 12px;
+            font-size: 0.82rem;
+        }
+        .modal-footer {
+            padding: 12px 16px;
+            gap: 8px;
+        }
+        .btn-modal-close-action, .btn-modal-cancel {
+            padding: 8px 16px;
+            font-size: 0.82rem;
+        }
+        .btn-modal-submit-return {
+            padding: 8px 18px;
+            font-size: 0.82rem;
+        }
+
+        /* Return Modal Form on Mobile */
+        .return-methods-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+        .return-grid-2col {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .return-method-card {
+            padding: 10px 12px;
+        }
+        .return-item-choice {
+            padding: 10px 12px;
+            gap: 10px;
+        }
+        .item-choice-title {
+            font-size: 0.85rem;
+        }
+        .item-choice-meta {
+            font-size: 0.76rem;
+        }
+        .item-choice-price {
+            font-size: 0.84rem;
+        }
+        .return-summary-pill {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            font-size: 0.78rem;
+            padding: 8px 10px;
+        }
+    }
 </style>
 
 @code {
@@ -1054,12 +2016,84 @@
     private string _returnCustomerEmail = string.Empty;
     private bool _isSubmittingReturn = false;
 
-    // Filter Tabs & Return Checks
+    // Filter Tabs, Search & Return Checks
     private string? _selectedStatusTab = null;
+    private string _searchQuery = string.Empty;
 
     private void FilterOrdersByTab(string? tab)
     {
         _selectedStatusTab = tab;
+    }
+
+    private bool _isRepurchasing = false;
+    private int? _repurchasingOrderId = null;
+
+    private async Task RepurchaseOrderAsync(CustomerOrderHistoryItemDto order)
+    {
+        if (_isRepurchasing) return;
+        _isRepurchasing = true;
+        _repurchasingOrderId = order.MaHoaDon;
+        try
+        {
+            var details = await CustomerApi.GetOrderDetailsAsync(order.MaHoaDon);
+            if (details != null && details.Any())
+            {
+                if (details.Count == 1)
+                {
+                    var singleItem = details.First();
+                    await RepurchaseSingleItemAsync(singleItem.TenSanPham);
+                    return;
+                }
+                else
+                {
+                    await OpenOrderDetailsModalAsync(order);
+                    Toast.ShowInfo("Đơn hàng gồm nhiều mặt hàng. Vui lòng chọn 'Mua lại' tại sản phẩm mong muốn.");
+                    return;
+                }
+            }
+
+            Toast.ShowWarning("Không tìm thấy thông tin mặt hàng trong đơn.");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi tải thông tin mua lại: {ex.Message}");
+        }
+        finally
+        {
+            _isRepurchasing = false;
+            _repurchasingOrderId = null;
+        }
+    }
+
+    private async Task RepurchaseSingleItemAsync(string productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName)) return;
+        try
+        {
+            var result = await CatalogApi.GetProductsAsync(new ProductQueryParameters
+            {
+                Search = productName.Trim(),
+                PageSize = 5
+            });
+
+            var matched = result?.Items?.FirstOrDefault(p => 
+                string.Equals(p.TenSanPham.Trim(), productName.Trim(), StringComparison.OrdinalIgnoreCase)) 
+                ?? result?.Items?.FirstOrDefault();
+
+            if (matched != null && matched.MaSanPham > 0)
+            {
+                CloseModal();
+                Navigation.NavigateTo($"/product/{matched.MaSanPham}");
+            }
+            else
+            {
+                Toast.ShowWarning($"Sản phẩm \"{productName}\" tạm thời không khả dụng trên gian hàng.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tìm sản phẩm: {ex.Message}");
+        }
     }
 
     private bool IsOrderReturned(CustomerOrderHistoryItemDto order) =>
@@ -1081,19 +2115,36 @@
         get
         {
             if (_orders == null) return Enumerable.Empty<CustomerOrderHistoryItemDto>();
-            if (string.IsNullOrEmpty(_selectedStatusTab)) return _orders;
+            var query = _orders.AsEnumerable();
 
-            if (_selectedStatusTab == "Đã hoàn thành")
+            if (!string.IsNullOrEmpty(_selectedStatusTab))
             {
-                return _orders.Where(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && (x.TongSoLuongDaMua > x.TongSoLuongDaTra));
+                if (_selectedStatusTab == "Đã hoàn thành")
+                {
+                    query = query.Where(x => (x.TrangThai == "Đã hoàn thành" || x.TrangThai == "Hoàn thành") && (x.TongSoLuongDaMua > x.TongSoLuongDaTra));
+                }
+                else if (_selectedStatusTab == "Đã hoàn trả")
+                {
+                    query = query.Where(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả" || x.TongSoLuongDaTra > 0);
+                }
+                else
+                {
+                    query = query.Where(x => x.TrangThai == _selectedStatusTab);
+                }
             }
 
-            if (_selectedStatusTab == "Đã hoàn trả")
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
             {
-                return _orders.Where(x => IsOrderReturnedOrPending(x) || x.TrangThai == "Đã hoàn trả" || x.TongSoLuongDaTra > 0);
+                var q = _searchQuery.Trim().ToLowerInvariant();
+                query = query.Where(x => 
+                    x.MaHoaDon.ToString().Contains(q) || 
+                    (x.DiaChiGiaoHang != null && x.DiaChiGiaoHang.ToLowerInvariant().Contains(q)) ||
+                    x.TrangThai.ToLowerInvariant().Contains(q) ||
+                    x.PhuongThucThanhToan.ToLowerInvariant().Contains(q)
+                );
             }
 
-            return _orders.Where(x => x.TrangThai == _selectedStatusTab);
+            return query;
         }
     }
 

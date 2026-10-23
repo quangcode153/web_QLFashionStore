@@ -108,14 +108,29 @@
                                                 <span class="unavail-icon">⚠️</span> Sản phẩm tạm thời không cung cấp
                                             </div>
                                         }
+                                        <!-- Mobile Price & Qty Stepper (Single neat row on mobile) -->
+                                        <div class="mobile-item-pricing-row">
+                                            <div class="mobile-price-box">
+                                                <span class="mobile-cell-subtotal">@item.ThanhTien.ToString("N0") ₫</span>
+                                                @if (item.SoLuong > 1)
+                                                {
+                                                    <span class="mobile-cell-unit">(@item.DonGia.ToString("N0") ₫/cái)</span>
+                                                }
+                                            </div>
+                                            <div class="item-qty-picker mobile-qty-picker">
+                                                <button type="button" class="btn-qty" @onclick="() => DecrementQty(item)">−</button>
+                                                <span class="qty-num">@item.SoLuong</span>
+                                                <button type="button" class="btn-qty" @onclick="() => IncrementQty(item)" disabled="@(item.SoLuong >= item.SoLuongTon)">+</button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div class="col-price">
+                                <div class="col-price desktop-only-col">
                                     <span class="cell-price">@item.DonGia.ToString("N0") ₫</span>
                                 </div>
 
-                                <div class="col-qty">
+                                <div class="col-qty desktop-only-col">
                                     <div class="item-qty-picker">
                                         <button type="button" class="btn-qty" @onclick="() => DecrementQty(item)">−</button>
                                         <span class="qty-num">@item.SoLuong</span>
@@ -123,7 +138,7 @@
                                     </div>
                                 </div>
 
-                                <div class="col-total">
+                                <div class="col-total desktop-only-col">
                                     <span class="cell-subtotal">@item.ThanhTien.ToString("N0") ₫</span>
                                 </div>
 
@@ -583,6 +598,268 @@
         border-radius: 4px;
         border: 1px solid #FCA5A5;
         margin-top: 6px;
+    }
+
+    .mobile-item-pricing-row {
+        display: none;
+    }
+
+    @@media (max-width: 768px) {
+        .cart-page-wrapper {
+            padding: 12px 0 40px 0 !important;
+        }
+        .cart-breadcrumb {
+            font-size: 0.75rem !important;
+            margin-bottom: 8px !important;
+            gap: 6px !important;
+        }
+        .cart-page-title {
+            font-size: 1.25rem !important;
+            margin-bottom: 12px !important;
+            letter-spacing: -0.01em !important;
+        }
+        .cart-freeship-box {
+            padding: 10px 12px !important;
+            margin-bottom: 14px !important;
+            border-radius: 6px !important;
+        }
+        .freeship-header-row {
+            gap: 6px !important;
+            margin-bottom: 6px !important;
+            font-size: 0.78rem !important;
+            flex-wrap: wrap !important;
+        }
+        .fs-badge {
+            font-size: 0.7rem !important;
+            padding: 2px 6px !important;
+        }
+        .fs-text {
+            font-size: 0.78rem !important;
+            line-height: 1.35 !important;
+        }
+        .freeship-track {
+            height: 6px !important;
+        }
+
+        /* Hide desktop table header and separate desktop columns */
+        .cart-table-header,
+        .desktop-only-col {
+            display: none !important;
+        }
+
+        .cart-items-column {
+            padding: 10px 12px !important;
+            border-radius: 8px !important;
+        }
+        .cart-item-row {
+            display: flex !important;
+            align-items: flex-start !important;
+            position: relative !important;
+            padding: 12px 0 !important;
+            gap: 10px !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+        }
+        .cart-item-row:last-child {
+            border-bottom: none !important;
+        }
+
+        .col-product.item-meta {
+            display: flex !important;
+            flex: 1 !important;
+            gap: 10px !important;
+            align-items: flex-start !important;
+            min-width: 0 !important;
+        }
+        .item-thumb {
+            width: 68px !important;
+            height: 85px !important;
+            min-width: 68px !important;
+            border-radius: 6px !important;
+            object-fit: cover !important;
+            background: #F8FAFC !important;
+            flex-shrink: 0 !important;
+        }
+        .item-text {
+            flex: 1 !important;
+            min-width: 0 !important;
+            padding-right: 28px !important;
+        }
+        .item-title {
+            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+            line-height: 1.35 !important;
+            margin-bottom: 3px !important;
+            color: #0F172A !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        .item-variant-label {
+            font-size: 0.72rem !important;
+            color: #64748B !important;
+            margin-bottom: 2px !important;
+        }
+        .item-sku-label {
+            font-size: 0.68rem !important;
+            color: #94A3B8 !important;
+            margin-bottom: 4px !important;
+        }
+
+        /* Mobile single row for subtotal + quantity controls */
+        .mobile-item-pricing-row {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 8px !important;
+            margin-top: 6px !important;
+        }
+        .mobile-price-box {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 1px !important;
+        }
+        .mobile-cell-subtotal {
+            font-size: 0.95rem !important;
+            font-weight: 800 !important;
+            color: #E11D48 !important;
+            letter-spacing: -0.01em !important;
+        }
+        .mobile-cell-unit {
+            font-size: 0.68rem !important;
+            color: #94A3B8 !important;
+        }
+        .item-qty-picker.mobile-qty-picker {
+            display: inline-flex !important;
+            align-items: center !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 4px !important;
+            height: 26px !important;
+            overflow: hidden !important;
+            background: #FFFFFF !important;
+        }
+        .item-qty-picker.mobile-qty-picker .btn-qty {
+            width: 26px !important;
+            height: 26px !important;
+            font-size: 0.85rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 0 !important;
+            background: #F8FAFC !important;
+        }
+        .item-qty-picker.mobile-qty-picker .qty-num {
+            min-width: 26px !important;
+            font-size: 0.8rem !important;
+            line-height: 26px !important;
+        }
+
+        /* Delete button pinned top-right */
+        .col-action {
+            position: absolute !important;
+            top: 10px !important;
+            right: 0 !important;
+            width: auto !important;
+        }
+        .btn-delete-item {
+            padding: 4px !important;
+            color: #94A3B8 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .btn-delete-item svg {
+            width: 15px !important;
+            height: 15px !important;
+        }
+
+        /* Bottom actions */
+        .cart-bottom-actions {
+            flex-direction: column-reverse !important;
+            gap: 10px !important;
+            align-items: stretch !important;
+            margin-top: 14px !important;
+        }
+        .btn-continue-shopping.secondary {
+            width: 100% !important;
+            text-align: center !important;
+            padding: 10px !important;
+            font-size: 0.82rem !important;
+        }
+        .btn-clear-cart {
+            text-align: center !important;
+            font-size: 0.8rem !important;
+            padding: 4px !important;
+        }
+
+        /* Summary card */
+        .summary-card {
+            padding: 16px !important;
+            border-radius: 8px !important;
+        }
+        .summary-card-title {
+            font-size: 0.95rem !important;
+            margin-bottom: 12px !important;
+            padding-bottom: 8px !important;
+        }
+        .summary-line {
+            font-size: 0.85rem !important;
+            margin-bottom: 8px !important;
+        }
+        .summary-divider {
+            margin: 12px 0 !important;
+        }
+        .summary-line.line-total {
+            font-size: 1rem !important;
+        }
+        .line-val.total-price {
+            font-size: 1.15rem !important;
+        }
+        .summary-note {
+            font-size: 0.72rem !important;
+            margin-bottom: 16px !important;
+        }
+        .btn-proceed-checkout {
+            padding: 12px !important;
+            font-size: 0.92rem !important;
+        }
+
+        /* Empty state */
+        .cart-page-empty {
+            padding: 40px 16px !important;
+        }
+        .empty-icon-lg svg {
+            width: 36px !important;
+            height: 36px !important;
+        }
+        .empty-title-lg {
+            font-size: 1.15rem !important;
+        }
+        .empty-desc-lg {
+            font-size: 0.82rem !important;
+            margin-bottom: 20px !important;
+        }
+        .btn-continue-shopping {
+            padding: 10px 24px !important;
+            font-size: 0.85rem !important;
+        }
+
+        /* Unavailable warning */
+        .cart-unavailable-warning-banner {
+            padding: 10px 12px !important;
+            font-size: 0.8rem !important;
+            gap: 10px !important;
+        }
+        .warning-banner-text {
+            font-size: 0.8rem !important;
+        }
+        .btn-remove-unavailable {
+            width: 100% !important;
+            padding: 7px 12px !important;
+            font-size: 0.78rem !important;
+            text-align: center !important;
+        }
     }
 </style>
 

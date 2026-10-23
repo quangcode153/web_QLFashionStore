@@ -314,4 +314,67 @@
     .btn-shop-now:hover {
         background: #F1F5F9;
     }
+
+    /* Mobile Responsive Styling */
+    @@media (max-width: 768px) {
+        .vip-page-container {
+            padding: 1rem 0 calc(35px + env(safe-area-inset-bottom, 0px)) 0;
+        }
+        .vip-breadcrumb {
+            margin-bottom: 1rem;
+            font-size: 0.76rem;
+        }
+        .vip-header {
+            margin-bottom: 1.5rem;
+        }
+        .vip-title {
+            font-size: 1.35rem;
+            margin-bottom: 0.35rem;
+        }
+        .vip-subtitle {
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+        .vip-tiers-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .tier-card {
+            padding: 1.25rem 1rem;
+        }
+        .tier-name {
+            font-size: 1.3rem;
+        }
+        .tier-threshold {
+            font-size: 0.8rem;
+        }
+        .tier-benefits {
+            gap: 0.5rem;
+        }
+        .benefit-row {
+            font-size: 0.8rem;
+        }
+        .vip-action-section {
+            padding: 1.5rem 1rem;
+        }
+        .action-heading {
+            font-size: 1.05rem;
+        }
+        .action-desc {
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+        }
+        .action-btn-row {
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+        .btn-check-vip, .btn-shop-now {
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+            padding: 0.7rem 1rem;
+            font-size: 0.82rem;
+        }
+    }
 </style>

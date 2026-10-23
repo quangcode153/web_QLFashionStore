@@ -9,7 +9,6 @@
     <div class="page-header">
         <div>
             <h2 class="page-title">NHẬT KÝ HỆ THỐNG & BIẾN ĐỘNG VẬN HÀNH</h2>
-            <p class="page-subtitle">Ghi nhận lịch sử chi tiết ai đã tạo tài khoản, ai đã nhập kho và các sửa đổi toàn chuỗi</p>
         </div>
         <div class="header-actions">
             <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadLogs" disabled="@_isLoading" title="Tải lại dữ liệu">
@@ -26,22 +25,18 @@
         <div class="kpi-card @(_currentFilter == "ALL" ? "active" : "")" @onclick='() => SetFilter("ALL")'>
             <div class="kpi-label">Tổng số thao tác</div>
             <div class="kpi-value">@_logs.Count</div>
-            <div class="kpi-sub">Lịch sử toàn hệ thống</div>
         </div>
         <div class="kpi-card text-success @(_currentFilter == "NHAP_HANG" ? "active" : "")" @onclick='() => SetFilter("NHAP_HANG")'>
             <div class="kpi-label">Nhập kho hàng</div>
             <div class="kpi-value text-success">@_logs.Count(l => l.LoaiThaoTac == "NHAP_HANG")</div>
-            <div class="kpi-sub">Lượng hàng bổ sung</div>
         </div>
         <div class="kpi-card text-primary @(_currentFilter == "TAO_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("TAO_TAI_KHOAN")'>
             <div class="kpi-label">Tạo tài khoản</div>
             <div class="kpi-value text-primary">@_logs.Count(l => l.LoaiThaoTac == "TAO_TAI_KHOAN")</div>
-            <div class="kpi-sub">Cấp quyền nhân viên</div>
         </div>
         <div class="kpi-card text-warning @(_currentFilter == "CAP_NHAT_TAI_KHOAN" ? "active" : "")" @onclick='() => SetFilter("CAP_NHAT_TAI_KHOAN")'>
             <div class="kpi-label">Đổi quyền / Khóa</div>
             <div class="kpi-value text-warning">@_logs.Count(l => l.LoaiThaoTac == "CAP_NHAT_TAI_KHOAN" || l.LoaiThaoTac == "KHOA_TAI_KHOAN" || l.LoaiThaoTac == "MO_KHOA_TAI_KHOAN")</div>
-            <div class="kpi-sub">Biến động nhân sự & tài khoản</div>
         </div>
     </div>
 
@@ -715,6 +710,67 @@
         border-top-color: #0f172a;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+    }
+
+    @@media (max-width: 768px) {
+        .audit-container {
+            padding: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.2rem;
+        }
+
+        .btn-refresh {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .filter-card {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .filter-tags {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            padding-bottom: 4px;
+            width: 100%;
+        }
+
+        .tag-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .table-card-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .table-scroll-container table {
+            min-width: 720px;
+        }
+
+        .table-pagination-bar {
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
     }
 </style>
 

@@ -44,6 +44,8 @@ public interface IAdminApiClient
     Task<ApiResponse<bool>> ToggleProductStatusAsync(int productId);
     Task<ApiResponse<bool>> ToggleVariantStatusAsync(int variantId);
     Task<ApiResponse<int>> CreateProductVariantAsync(CreateProductVariantRequest request);
+    Task<ApiResponse<bool>> UpdateVariantDiscountAsync(int variantId, int discountPercent);
+    Task<ApiResponse<bool>> UpdateProductDiscountAsync(int productId, int discountPercent);
     Task<List<CategoryDto>> GetCategoriesAsync();
     Task<List<BrandDto>> GetBrandsAsync();
     Task<ApiResponse<int>> CreateCategoryAsync(CreateCategoryRequest request);
@@ -73,5 +75,11 @@ public interface IAdminApiClient
     // Thông báo nội bộ (Internal Announcements)
     Task<List<global::Shared.DTOs.Announcement.InternalAnnouncementDto>?> GetAnnouncementsAsync(string? phamVi = null, int? maChiNhanh = null);
     Task<ApiResponse<int>> CreateAnnouncementAsync(global::Shared.DTOs.Announcement.CreateAnnouncementRequestDto request);
+
+    // Quản lý Mã giảm giá & Khuyến mãi (FEAT-PRO)
+    Task<List<global::Shared.DTOs.Promotion.PromotionDto>?> GetAllPromotionsAsync();
+    Task<ApiResponse<int>> CreatePromotionAsync(global::Shared.DTOs.Promotion.CreatePromotionRequestDto request);
+    Task<ApiResponse<bool>> UpdatePromotionAsync(int id, global::Shared.DTOs.Promotion.UpdatePromotionRequestDto request);
+    Task<ApiResponse<bool>> DeletePromotionAsync(int id);
 }
 

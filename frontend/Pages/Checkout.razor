@@ -36,7 +36,13 @@
                 <!-- Left Column: Delivery Form & Payment Methods -->
                 <div class="checkout-form-column">
                     <section class="form-section">
-                        <h2 class="section-title">1. THÔNG TIN GIAO HÀNG</h2>
+                        <h2 class="section-title">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            <span>1. THÔNG TIN GIAO HÀNG</span>
+                        </h2>
 
                         @if (!string.IsNullOrEmpty(_validationError))
                         {
@@ -50,26 +56,28 @@
                             </div>
                         }
 
-                        <div class="form-group">
-                            <label class="form-label" for="fullName">Họ và tên người nhận <span class="req">*</span></label>
-                            <input type="text" 
-                                   id="fullName"
-                                   name="fullName" 
-                                   class="form-control" 
-                                   placeholder="Ví dụ: Nguyễn Văn A" 
-                                   value="@_fullName" 
-                                   @onchange="e => _fullName = e.Value?.ToString() ?? string.Empty" />
-                        </div>
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label class="form-label" for="fullName">Họ và tên người nhận <span class="req">*</span></label>
+                                <input type="text" 
+                                       id="fullName"
+                                       name="fullName" 
+                                       class="form-control" 
+                                       placeholder="Ví dụ: Nguyễn Văn A" 
+                                       value="@_fullName" 
+                                       @onchange="e => _fullName = e.Value?.ToString() ?? string.Empty" />
+                            </div>
 
-                        <div class="form-group">
-                            <label class="form-label" for="phoneNumber">Số điện thoại liên hệ <span class="req">*</span></label>
-                            <input type="tel" 
-                                   id="phoneNumber"
-                                   name="phoneNumber" 
-                                   class="form-control" 
-                                   placeholder="Ví dụ: 0901234567" 
-                                   value="@_phoneNumber" 
-                                   @onchange="e => _phoneNumber = e.Value?.ToString() ?? string.Empty" />
+                            <div class="form-group">
+                                <label class="form-label" for="phoneNumber">Số điện thoại liên hệ <span class="req">*</span></label>
+                                <input type="tel" 
+                                       id="phoneNumber"
+                                       name="phoneNumber" 
+                                       class="form-control" 
+                                       placeholder="Ví dụ: 0901234567" 
+                                       value="@_phoneNumber" 
+                                       @onchange="e => _phoneNumber = e.Value?.ToString() ?? string.Empty" />
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -77,13 +85,13 @@
                             <textarea id="address"
                                       name="address" 
                                       class="form-control" 
-                                      rows="3" 
+                                      rows="2" 
                                       placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố" 
                                       value="@_address" 
                                       @onchange="e => _address = e.Value?.ToString() ?? string.Empty"></textarea>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" style="margin-bottom: 0;">
                             <label class="form-label" for="note">Ghi chú đơn hàng (Tùy chọn)</label>
                             <textarea id="note"
                                       name="note" 
@@ -96,7 +104,13 @@
                     </section>
 
                     <section class="form-section">
-                        <h2 class="section-title">2. PHƯƠNG THỨC THANH TOÁN</h2>
+                        <h2 class="section-title">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                <line x1="2" y1="10" x2="22" y2="10"></line>
+                            </svg>
+                            <span>2. PHƯƠNG THỨC THANH TOÁN</span>
+                        </h2>
                         
                         <div class="payment-methods-list">
                             <label class="payment-option @(_paymentMethod == "COD" ? "selected" : "")">
@@ -157,7 +171,14 @@
                 <!-- Right Column: Order Summary & Voucher -->
                 <div class="checkout-summary-column">
                     <div class="summary-box">
-                        <h3 class="summary-heading">ĐƠN HÀNG CỦA BẠN (@CartService.TotalCount món)</h3>
+                        <h3 class="summary-heading">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <path d="M16 10a4 4 0 0 1-8 0"></path>
+                            </svg>
+                            <span>ĐƠN HÀNG CỦA BẠN (@CartService.TotalCount món)</span>
+                        </h3>
 
                         <!-- Mini Items List -->
                         <div class="checkout-items-preview">
@@ -176,7 +197,10 @@
 
                         <!-- Voucher Input Block (FR-12) -->
                         <div class="voucher-box">
-                            <label class="voucher-label" for="voucherCode">Mã Giảm Giá / Voucher</label>
+                            <label class="voucher-label" for="voucherCode">
+                                Mã Giảm Giá / Voucher 
+                                <span style="font-size: 0.78rem; font-weight: 500; color: #64748B; margin-left: 6px;">(Áp dụng tối đa 1 mã/đơn)</span>
+                            </label>
                             <div class="voucher-input-row">
                                 <input type="text" 
                                        id="voucherCode"
@@ -549,6 +573,173 @@
         opacity: 0.6;
         cursor: not-allowed;
     }
+
+    .form-row-2col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    @@media (max-width: 768px) {
+        .checkout-page-wrapper {
+            padding: 8px 0 85px 0 !important;
+            background: #F8FAFC !important;
+        }
+        .checkout-breadcrumb {
+            font-size: 0.74rem !important;
+            margin-bottom: 6px !important;
+            gap: 4px !important;
+        }
+        .checkout-page-title {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            margin-bottom: 10px !important;
+            letter-spacing: -0.01em !important;
+        }
+        .checkout-grid {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+        }
+        .checkout-form-column {
+            gap: 8px !important;
+        }
+        .form-section, .summary-box {
+            padding: 12px 14px !important;
+            border-radius: 8px !important;
+            border: 1px solid #E2E8F0 !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+        }
+        .section-title, .summary-heading {
+            font-size: 0.86rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 8px !important;
+            padding-bottom: 6px !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            letter-spacing: 0.01em !important;
+            color: #0F172A !important;
+        }
+        .form-row-2col {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+        }
+        .form-group {
+            margin-bottom: 8px !important;
+        }
+        .form-label {
+            font-size: 0.74rem !important;
+            font-weight: 600 !important;
+            color: #475569 !important;
+            margin-bottom: 3px !important;
+        }
+        .form-control {
+            padding: 6px 10px !important;
+            font-size: 0.82rem !important;
+            height: 36px !important;
+            border-radius: 6px !important;
+            border-color: #CBD5E1 !important;
+        }
+        textarea.form-control {
+            height: auto !important;
+            min-height: 46px !important;
+            line-height: 1.35 !important;
+            padding: 6px 10px !important;
+        }
+        .validation-alert {
+            padding: 8px 12px !important;
+            font-size: 0.78rem !important;
+            margin-bottom: 10px !important;
+        }
+        .payment-methods-list {
+            gap: 6px !important;
+        }
+        .payment-option {
+            padding: 8px 10px !important;
+            gap: 8px !important;
+            border-radius: 6px !important;
+        }
+        .payment-option input {
+            margin-top: 3px !important;
+        }
+        .payment-name {
+            font-size: 0.82rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 2px !important;
+            line-height: 1.25 !important;
+        }
+        .payment-desc {
+            font-size: 0.7rem !important;
+            line-height: 1.25 !important;
+            color: #64748B !important;
+        }
+        .checkout-items-preview {
+            max-height: 120px !important;
+            margin-bottom: 8px !important;
+            padding-bottom: 6px !important;
+        }
+        .preview-item {
+            font-size: 0.78rem !important;
+            margin-bottom: 6px !important;
+        }
+        .voucher-box {
+            padding: 8px 10px !important;
+            margin-bottom: 10px !important;
+            background: #F8FAFC !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 6px !important;
+        }
+        .voucher-label {
+            font-size: 0.74rem !important;
+            font-weight: 600 !important;
+            margin-bottom: 4px !important;
+        }
+        .voucher-input-row {
+            gap: 6px !important;
+        }
+        .input-voucher {
+            height: 32px !important;
+            font-size: 0.78rem !important;
+            padding: 4px 8px !important;
+        }
+        .btn-apply-voucher {
+            height: 32px !important;
+            padding: 0 12px !important;
+            font-size: 0.74rem !important;
+            border-radius: 6px !important;
+        }
+        .voucher-message {
+            font-size: 0.72rem !important;
+            margin-top: 4px !important;
+        }
+        .calc-section {
+            margin-bottom: 10px !important;
+        }
+        .calc-row {
+            font-size: 0.78rem !important;
+            margin-bottom: 6px !important;
+        }
+        .calc-divider {
+            margin: 8px 0 !important;
+        }
+        .final-total-row {
+            font-size: 0.88rem !important;
+        }
+        .final-val {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+        }
+        .btn-submit-order {
+            padding: 11px 14px !important;
+            font-size: 0.88rem !important;
+            font-weight: 800 !important;
+            border-radius: 6px !important;
+            letter-spacing: 0.02em !important;
+        }
+    }
 </style>
 
 @code {
@@ -669,7 +860,8 @@
             var request = new ValidateVoucherRequestDto
             {
                 MaGiamGia = _voucherCode,
-                TongTienDonHang = CartService.SubTotal
+                TongTienDonHang = CartService.SubTotal,
+                MaKhachHang = _customerProfile?.MaKhachHang
             };
 
             _voucherResult = await OrderApiClient.ValidateVoucherAsync(request);
@@ -688,8 +880,16 @@
     {
         var subTotal = CartService.SubTotal;
         var shippingFee = subTotal >= 50000m ? 0m : 30000m;
-        var discount = (_voucherResult != null && _voucherResult.Valid) ? _voucherResult.DiscountAmount : 0m;
-        var final = subTotal + shippingFee - discount - _vipDiscountAmount;
+        var voucherDiscount = (_voucherResult != null && _voucherResult.Valid) ? _voucherResult.DiscountAmount : 0m;
+        
+        // RÀNG BUỘC TOÁN HỌC: Tổng tiền giảm (Voucher + VIP) không được vượt quá tổng tiền hàng
+        var totalDiscount = voucherDiscount + _vipDiscountAmount;
+        if (totalDiscount > subTotal)
+        {
+            totalDiscount = subTotal;
+        }
+
+        var final = subTotal + shippingFee - totalDiscount;
         return final < 0 ? 0 : final;
     }
 

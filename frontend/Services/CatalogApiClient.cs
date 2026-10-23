@@ -21,6 +21,7 @@ public class CatalogApiClient : ICatalogApiClient
         if (query.BrandId.HasValue) url += $"&brandId={query.BrandId.Value}";
         if (query.MinPrice.HasValue) url += $"&minPrice={query.MinPrice.Value}";
         if (query.MaxPrice.HasValue) url += $"&maxPrice={query.MaxPrice.Value}";
+        if (query.IsSale.HasValue) url += $"&isSale={query.IsSale.Value.ToString().ToLower()}";
 
         var resp = await _http.GetFromJsonAsync<ApiResponse<PagedResult<ProductListItemDto>>>(url);
         return resp?.Data ?? new PagedResult<ProductListItemDto>();

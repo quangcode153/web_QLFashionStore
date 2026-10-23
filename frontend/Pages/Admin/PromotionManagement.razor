@@ -1,0 +1,935 @@
+@page "/admin/promotions"
+@layout AdminLayout
+@namespace Frontend.Pages.Admin
+@inject IAdminApiClient AdminApi
+@inject IToastService Toast
+@inject NavigationManager Navigation
+
+<div class="promotions-admin-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">QUẢN LÝ MÃ GIẢM GIÁ & VOUCHER</h2>
+            <p class="page-subtitle">Cấu hình mã code, mức chiết khấu, giá trị đơn tối thiểu và thời gian khả dụng phục vụ bán hàng.</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-create-promo" @onclick="OpenCreateModal" title="Tạo mã giảm giá mới">
+                <span class="plus-icon">+</span>
+                <span>Tạo Mã Giảm Giá Mới</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats Summary -->
+    <div class="stats-overview-grid">
+        <div class="stat-card">
+            <div class="stat-icon bg-blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+            </div>
+            <div class="stat-data">
+                <span class="stat-num">@_promotions.Count</span>
+                <span class="stat-label">Tổng số Voucher</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon bg-green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <div class="stat-data">
+                <span class="stat-num text-success">@_promotions.Count(p => p.ConHieuLuc)</span>
+                <span class="stat-label">Đang có hiệu lực</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon bg-red">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+            </div>
+            <div class="stat-data">
+                <span class="stat-num text-danger">@_promotions.Count(p => !p.ConHieuLuc)</span>
+                <span class="stat-label">Hết hạn / Hết lượt</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card toolbar-card">
+        <div class="toolbar-wrapper">
+            <div class="search-input-box">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" class="form-control" placeholder="Tìm theo mã voucher hoặc tên chương trình..." @bind="_searchText" @bind:event="oninput" />
+            </div>
+
+            <div class="filter-dropdown-box">
+                <select class="form-select" @bind="_statusFilter">
+                    <option value="ALL">Tất cả trạng thái</option>
+                    <option value="ACTIVE">Đang có hiệu lực</option>
+                    <option value="EXPIRED">Đã hết hạn / Thu hồi</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Danh Sách Voucher -->
+    <div class="card table-card">
+        <div class="table-responsive">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th style="width: 130px;">Mã Voucher</th>
+                        <th style="min-width: 200px;">Tên chương trình</th>
+                        <th style="width: 170px;">Mức giảm</th>
+                        <th style="width: 150px;">Đơn tối thiểu</th>
+                        <th style="width: 210px;">Thời gian khả dụng</th>
+                        <th class="text-center" style="width: 120px;">Lượt dùng</th>
+                        <th class="text-center" style="width: 140px;">Trạng thái</th>
+                        <th class="text-center" style="width: 140px;">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_isLoading)
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <span class="spinner-border spinner-border-sm me-2"></span> Đang nạp danh sách mã giảm giá từ hệ thống...
+                            </td>
+                        </tr>
+                    }
+                    else if (!FilteredPromotions.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                Không tìm thấy mã giảm giá nào phù hợp với bộ lọc.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in FilteredPromotions)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="voucher-code-badge" title="Mã nhập tại Checkout/POS">@p.MaGiamGia</span>
+                                </td>
+                                <td>
+                                    <strong class="promo-name">@p.TenKhuyenMai</strong>
+                                </td>
+                                <td>
+                                    @if (p.PhanTramGiam > 0)
+                                    {
+                                        <div class="discount-value">
+                                            <span class="badge-percent">Giảm @p.PhanTramGiam%</span>
+                                            @if (p.SoTienGiam > 0)
+                                            {
+                                                <small class="text-muted d-block">Tối đa @p.SoTienGiam.ToString("N0") ₫</small>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-amount">Giảm @p.SoTienGiam.ToString("N0") ₫</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (p.MuaToiThieu > 0)
+                                    {
+                                        <span>Từ @p.MuaToiThieu.ToString("N0") ₫</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Mọi giá trị</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="validity-dates">
+                                        <div class="date-row">
+                                            <span class="date-lbl">Từ:</span>
+                                            <span>@(p.NgayBatDau.HasValue ? p.NgayBatDau.Value.ToString("dd/MM/yyyy") : "Vô thời hạn")</span>
+                                        </div>
+                                        <div class="date-row">
+                                            <span class="date-lbl">Đến:</span>
+                                            <span>@(p.NgayKetThuc.HasValue ? p.NgayKetThuc.Value.ToString("dd/MM/yyyy") : "Vô thời hạn")</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="usage-count">@(p.SoLuongDung.HasValue ? $"{p.SoLuongDung.Value} lượt" : "Không giới hạn")</span>
+                                </td>
+                                <td class="text-center">
+                                    @if (p.ConHieuLuc)
+                                    {
+                                        <span class="status-pill status-active">Đang áp dụng</span>
+                                    }
+                                    else if (p.NgayKetThuc.HasValue && p.NgayKetThuc.Value.Date < DateTime.UtcNow.Date)
+                                    {
+                                        <span class="status-pill status-expired">Đã hết hạn</span>
+                                    }
+                                    else if (p.SoLuongDung.HasValue && p.SoLuongDung.Value <= 0)
+                                    {
+                                        <span class="status-pill status-out">Hết lượt dùng</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-pill status-upcoming">Chưa bắt đầu</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="action-btn-group">
+                                        <button class="btn-action btn-edit" @onclick="() => OpenEditModal(p)" title="Chỉnh sửa mã & thời hạn">✎</button>
+                                        <button class="btn-action btn-delete" @onclick="() => ConfirmDelete(p)" title="Xóa hoặc thu hồi mã">🗑</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL TẠO / CHỈNH SỬA MÃ GIẢM GIÁ -->
+    @if (_showEditModal)
+    {
+        <div class="modal-backdrop">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>@(_isEditMode ? "CHỈNH SỬA MÃ GIẢM GIÁ" : "TẠO MÃ GIẢM GIÁ MỚI")</h3>
+                    <button type="button" class="btn-close-modal" @onclick="CloseEditModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="row-2-col">
+                        <div class="form-group">
+                            <label>Mã Voucher (Code) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control text-uppercase" placeholder="VD: SUMMER2026, SALE50K..." @bind="_editModel.MaGiamGia" />
+                            <small class="text-muted">Mã không dấu, viết liền để khách nhập khi thanh toán.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Tên chương trình khuyến mãi <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" placeholder="VD: Ưu Đãi Chào Hè, Giảm 50K Đơn 400K..." @bind="_editModel.TenKhuyenMai" />
+                        </div>
+                    </div>
+
+                    <div class="row-2-col mt-3">
+                        <div class="form-group">
+                            <label>Mức giảm theo phần trăm (%)</label>
+                            <div class="input-unit-box">
+                                <input type="number" min="0" max="100" class="form-control" placeholder="0" @bind="_editModel.PhanTramGiam" />
+                                <span class="unit-text">%</span>
+                            </div>
+                            <small class="text-muted">Nhập 0 nếu giảm số tiền cố định.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Số tiền giảm / Trần tối đa (₫)</label>
+                            <div class="input-unit-box">
+                                <input type="number" min="0" step="1000" class="form-control" placeholder="0" @bind="_editModel.SoTienGiam" />
+                                <span class="unit-text">₫</span>
+                            </div>
+                            <small class="text-muted">Nếu có %: Là số tiền giảm tối đa. Nếu % = 0: Là số tiền giảm trực tiếp.</small>
+                        </div>
+                    </div>
+
+                    <div class="row-2-col mt-3">
+                        <div class="form-group">
+                            <label>Giá trị đơn hàng tối thiểu (₫)</label>
+                            <div class="input-unit-box">
+                                <input type="number" min="0" step="10000" class="form-control" placeholder="0" @bind="_editModel.MuaToiThieu" />
+                                <span class="unit-text">₫</span>
+                            </div>
+                            <small class="text-muted">Đơn hàng cần đạt mức này để mã có hiệu lực.</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Số lượt sử dụng tối đa</label>
+                            <input type="number" min="0" class="form-control" placeholder="Để trống nếu không giới hạn" @bind="_editModel.SoLuongDung" />
+                            <small class="text-muted">Hệ thống tự động trừ 1 lượt khi đơn hàng thành công.</small>
+                        </div>
+                    </div>
+
+                    <div class="date-range-box mt-3">
+                        <h4 class="date-range-title">Thời Gian Khả Dụng Của Mã (Hiệu Lực)</h4>
+                        <div class="row-2-col">
+                            <div class="form-group">
+                                <label>Ngày bắt đầu áp dụng</label>
+                                <input type="date" class="form-control" @bind="_editModel.NgayBatDau" />
+                            </div>
+                            <div class="form-group">
+                                <label>Ngày kết thúc (Hết hạn)</label>
+                                <input type="date" class="form-control" @bind="_editModel.NgayKetThuc" />
+                            </div>
+                        </div>
+                        <small class="text-muted d-block mt-1">Để trống nếu mã có hiệu lực vĩnh viễn không giới hạn ngày.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" @onclick="CloseEditModal">Hủy bỏ</button>
+                    <button type="button" class="btn-save" @onclick="SavePromotionAsync" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Đang lưu...</span>
+                        }
+                        else
+                        {
+                            <span>@(_isEditMode ? "Lưu Thay Đổi" : "Khởi Tạo Mã")</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL XÁC NHẬN XÓA -->
+    @if (_showDeleteModal && _selectedPromotion != null)
+    {
+        <div class="modal-backdrop">
+            <div class="modal-card modal-delete">
+                <div class="modal-header">
+                    <h3>XÁC NHẬN THU HỒI / XÓA MÃ</h3>
+                    <button type="button" class="btn-close-modal" @onclick="() => _showDeleteModal = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa mã voucher <strong>@_selectedPromotion.MaGiamGia</strong> (@_selectedPromotion.TenKhuyenMai)?</p>
+                    <small class="text-muted">Nếu mã đã từng được sử dụng trong các đơn hàng trước đây, hệ thống sẽ tự động vô hiệu hóa lượt dùng và đóng hạn để bảo toàn lịch sử hóa đơn tài chính.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel" @onclick="() => _showDeleteModal = false">Hủy</button>
+                    <button type="button" class="btn-confirm-delete" @onclick="ExecuteDeleteAsync">Xác Nhận Xóa</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<PromotionDto> _promotions = new();
+    private bool _isLoading = true;
+    private bool _isSaving = false;
+    private string _searchText = string.Empty;
+    private string _statusFilter = "ALL";
+
+    private bool _showEditModal = false;
+    private bool _isEditMode = false;
+    private UpdatePromotionRequestDto _editModel = new();
+
+    private bool _showDeleteModal = false;
+    private PromotionDto? _selectedPromotion;
+
+    private IEnumerable<PromotionDto> FilteredPromotions
+    {
+        get
+        {
+            var query = _promotions.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                var term = _searchText.Trim().ToLowerInvariant();
+                query = query.Where(p => 
+                    p.MaGiamGia.ToLowerInvariant().Contains(term) || 
+                    p.TenKhuyenMai.ToLowerInvariant().Contains(term));
+            }
+
+            if (_statusFilter == "ACTIVE")
+            {
+                query = query.Where(p => p.ConHieuLuc);
+            }
+            else if (_statusFilter == "EXPIRED")
+            {
+                query = query.Where(p => !p.ConHieuLuc);
+            }
+
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPromotionsAsync();
+    }
+
+    private async Task LoadPromotionsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var list = await AdminApi.GetAllPromotionsAsync();
+            _promotions = list ?? new List<PromotionDto>();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi nạp danh sách mã giảm giá: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        _isEditMode = false;
+        _editModel = new UpdatePromotionRequestDto
+        {
+            NgayBatDau = DateTime.UtcNow.Date,
+            NgayKetThuc = DateTime.UtcNow.Date.AddDays(30),
+            MuaToiThieu = 0,
+            SoLuongDung = 100,
+            PhanTramGiam = 10
+        };
+        _showEditModal = true;
+    }
+
+    private void OpenEditModal(PromotionDto p)
+    {
+        _isEditMode = true;
+        _editModel = new UpdatePromotionRequestDto
+        {
+            MaKhuyenMai = p.MaKhuyenMai,
+            MaGiamGia = p.MaGiamGia,
+            TenKhuyenMai = p.TenKhuyenMai,
+            PhanTramGiam = p.PhanTramGiam,
+            SoTienGiam = p.SoTienGiam,
+            MuaToiThieu = p.MuaToiThieu,
+            SoLuongDung = p.SoLuongDung,
+            NgayBatDau = p.NgayBatDau,
+            NgayKetThuc = p.NgayKetThuc
+        };
+        _showEditModal = true;
+    }
+
+    private void CloseEditModal()
+    {
+        _showEditModal = false;
+    }
+
+    private async Task SavePromotionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editModel.MaGiamGia))
+        {
+            Toast.ShowWarning("Vui lòng nhập Mã Voucher.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_editModel.TenKhuyenMai))
+        {
+            Toast.ShowWarning("Vui lòng nhập Tên chương trình khuyến mãi.");
+            return;
+        }
+
+        if (_editModel.PhanTramGiam <= 0 && _editModel.SoTienGiam <= 0)
+        {
+            Toast.ShowWarning("Vui lòng nhập mức giảm theo % hoặc theo số tiền (₫).");
+            return;
+        }
+
+        if (_editModel.NgayBatDau.HasValue && _editModel.NgayKetThuc.HasValue && 
+            _editModel.NgayBatDau.Value.Date > _editModel.NgayKetThuc.Value.Date)
+        {
+            Toast.ShowWarning("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.");
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            if (_isEditMode)
+            {
+                var res = await AdminApi.UpdatePromotionAsync(_editModel.MaKhuyenMai, _editModel);
+                if (res.Success)
+                {
+                    Toast.ShowSuccess("Cập nhật mã giảm giá thành công!");
+                    _showEditModal = false;
+                    await LoadPromotionsAsync();
+                }
+                else
+                {
+                    Toast.ShowError(res.Message ?? "Cập nhật mã giảm giá thất bại.");
+                }
+            }
+            else
+            {
+                var res = await AdminApi.CreatePromotionAsync(_editModel);
+                if (res.Success)
+                {
+                    Toast.ShowSuccess("Tạo mã giảm giá mới thành công!");
+                    _showEditModal = false;
+                    await LoadPromotionsAsync();
+                }
+                else
+                {
+                    Toast.ShowError(res.Message ?? "Tạo mã giảm giá thất bại.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi lưu mã giảm giá: {ex.Message}");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void ConfirmDelete(PromotionDto p)
+    {
+        _selectedPromotion = p;
+        _showDeleteModal = true;
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_selectedPromotion == null) return;
+        try
+        {
+            var res = await AdminApi.DeletePromotionAsync(_selectedPromotion.MaKhuyenMai);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã xóa/thu hồi mã voucher {_selectedPromotion.MaGiamGia}!");
+                _showDeleteModal = false;
+                await LoadPromotionsAsync();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể xóa mã voucher.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi xóa mã: {ex.Message}");
+        }
+    }
+}
+
+<style>
+    .promotions-admin-container {
+        padding: 1.5rem;
+        background: #F8FAFC;
+        min-height: calc(100vh - 70px);
+    }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .page-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #0F172A;
+        letter-spacing: -0.02em;
+        margin: 0;
+    }
+    .page-subtitle {
+        font-size: 0.85rem;
+        color: #64748B;
+        margin: 4px 0 0;
+    }
+    .btn-create-promo {
+        background: #000000;
+        color: #FFFFFF;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.15s ease;
+    }
+    .btn-create-promo:hover {
+        background: #1E293B;
+    }
+    .plus-icon {
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+    .stats-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .stat-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .bg-blue { background: #EFF6FF; color: #2563EB; }
+    .bg-green { background: #ECFDF5; color: #059669; }
+    .bg-red { background: #FEF2F2; color: #DC2626; }
+    .stat-num {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #0F172A;
+        display: block;
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.78rem;
+        color: #64748B;
+        font-weight: 600;
+    }
+    .toolbar-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 0.85rem 1.25rem;
+        margin-bottom: 1.25rem;
+    }
+    .toolbar-wrapper {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    .search-input-box {
+        position: relative;
+        flex: 1;
+        min-width: 280px;
+    }
+    .search-input-box .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94A3B8;
+    }
+    .search-input-box input {
+        padding-left: 36px;
+        height: 38px;
+        border-radius: 6px;
+        border: 1px solid #CBD5E1;
+        width: 100%;
+        font-size: 0.85rem;
+    }
+    .filter-dropdown-box select {
+        height: 38px;
+        border-radius: 6px;
+        border: 1px solid #CBD5E1;
+        font-size: 0.85rem;
+        padding: 0 12px;
+        min-width: 180px;
+    }
+    .table-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+    .admin-table th {
+        background: #F8FAFC;
+        padding: 12px 14px;
+        text-align: left;
+        font-weight: 700;
+        color: #475569;
+        border-bottom: 1px solid #E2E8F0;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.03em;
+    }
+    .admin-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #F1F5F9;
+        vertical-align: middle;
+        color: #1E293B;
+    }
+    .admin-table tr:hover {
+        background: #F8FAFC;
+    }
+    .voucher-code-badge {
+        font-family: monospace;
+        font-size: 0.88rem;
+        font-weight: 800;
+        background: #EFF6FF;
+        color: #1D4ED8;
+        border: 1px dashed #93C5FD;
+        padding: 3px 8px;
+        border-radius: 4px;
+        display: inline-block;
+        letter-spacing: 0.05em;
+    }
+    .promo-name {
+        color: #0F172A;
+    }
+    .badge-percent {
+        font-weight: 700;
+        color: #DC2626;
+    }
+    .badge-amount {
+        font-weight: 700;
+        color: #059669;
+    }
+    .validity-dates {
+        font-size: 0.8rem;
+    }
+    .date-row {
+        display: flex;
+        gap: 6px;
+    }
+    .date-lbl {
+        color: #64748B;
+        font-weight: 600;
+        width: 28px;
+    }
+    .usage-count {
+        font-weight: 600;
+        color: #334155;
+    }
+    .status-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .status-active { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+    .status-expired { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+    .status-out { background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; }
+    .status-upcoming { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+    .action-btn-group {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+    }
+    .btn-action {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        transition: all 0.15s ease;
+    }
+    .btn-edit:hover { background: #EFF6FF; border-color: #93C5FD; color: #2563EB; }
+    .btn-delete:hover { background: #FEF2F2; border-color: #FECACA; color: #DC2626; }
+
+    /* Modal Backdrop & Card */
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+        padding: 1rem;
+    }
+    .modal-card {
+        background: #FFFFFF;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 620px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .modal-delete {
+        max-width: 450px;
+    }
+    .modal-header {
+        padding: 1.25rem 1.5rem;
+        background: #F8FAFC;
+        border-bottom: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #0F172A;
+    }
+    .btn-close-modal {
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        color: #64748B;
+        cursor: pointer;
+    }
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        max-height: calc(85vh - 120px);
+    }
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        background: #F8FAFC;
+        border-top: 1px solid #E2E8F0;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    .row-2-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .form-group label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 5px;
+    }
+    .input-unit-box {
+        position: relative;
+    }
+    .input-unit-box input {
+        padding-right: 32px;
+    }
+    .unit-text {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #64748B;
+    }
+    .date-range-box {
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    .date-range-title {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #0F172A;
+        margin: 0 0 10px 0;
+    }
+    .btn-cancel {
+        background: #FFFFFF;
+        border: 1px solid #CBD5E1;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        color: #475569;
+        cursor: pointer;
+    }
+    .btn-save {
+        background: #000000;
+        color: #FFFFFF;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .btn-confirm-delete {
+        background: #DC2626;
+        color: #FFFFFF;
+        border: none;
+        padding: 8px 20px;
+        border-radius: 6px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    @@media (max-width: 768px) {
+        .promotions-admin-container {
+            padding: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.2rem;
+        }
+
+        .btn-create-promo {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .stats-overview-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .toolbar-wrapper {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .search-input-box {
+            min-width: 100%;
+            width: 100%;
+        }
+
+        .filter-dropdown-box {
+            width: 100%;
+        }
+
+        .filter-dropdown-box select {
+            width: 100%;
+        }
+
+        .admin-table {
+            min-width: 780px;
+        }
+
+        .modal-dialog {
+            max-width: 95vw;
+            margin: 10px;
+        }
+
+        .row-2-col {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .modal-footer {
+            flex-direction: column-reverse;
+            gap: 8px;
+        }
+
+        .btn-cancel, .btn-save, .btn-confirm-delete {
+            width: 100%;
+            justify-content: center;
+            text-align: center;
+        }
+    }
+</style>

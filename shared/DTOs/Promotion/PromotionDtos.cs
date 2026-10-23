@@ -6,6 +6,7 @@ public class ValidateVoucherRequestDto
 {
     public string? MaGiamGia { get; set; }
     public decimal TongTienDonHang { get; set; }
+    public int? MaKhachHang { get; set; }
 
     // Hỗ trợ alias linh hoạt theo đặc tả FEAT-PRO-02
     public string? Code
@@ -24,6 +25,12 @@ public class ValidateVoucherRequestDto
                 TongTienDonHang = value.Value;
             }
         }
+    }
+
+    public int? CustomerId
+    {
+        get => MaKhachHang;
+        set => MaKhachHang ??= value;
     }
 }
 
@@ -56,3 +63,21 @@ public class PromotionDto
     public int? SoLuongDung { get; set; }
     public bool ConHieuLuc { get; set; }
 }
+
+public class CreatePromotionRequestDto
+{
+    public string TenKhuyenMai { get; set; } = string.Empty;
+    public string MaGiamGia { get; set; } = string.Empty;
+    public decimal PhanTramGiam { get; set; }
+    public decimal SoTienGiam { get; set; }
+    public DateTime? NgayBatDau { get; set; }
+    public DateTime? NgayKetThuc { get; set; }
+    public decimal MuaToiThieu { get; set; }
+    public int? SoLuongDung { get; set; }
+}
+
+public class UpdatePromotionRequestDto : CreatePromotionRequestDto
+{
+    public int MaKhuyenMai { get; set; }
+}
+

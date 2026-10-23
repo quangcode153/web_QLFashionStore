@@ -34,8 +34,7 @@ secrets.json
 *.credential
 *.credentials
 *.token
-tests/
-Tests/
+# tests/ được theo dõi bởi git để phục vụ CI/CD pipeline
 doc/
 DOC/
 .agents/
@@ -88,7 +87,9 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
-Chat_bot/
+Chat_bot/node_modules/
+Chat_bot/.env
+Chat_bot/.env.*
 pair_ai.py
 __pycache__/
 *.pyc

@@ -431,7 +431,7 @@
                                     <span class="ticket-id font-weight-bold">#PH-@fb.MaPhanHoi</span>
                                     <span class="badge badge-info ml-2">@fb.LoaiPhanHoi</span>
                                     <span class="ticket-order-ref text-muted ml-2">Đơn hàng #DH-@fb.MaHoaDon</span>
-                                    <span class="ticket-customer-name ml-3">👤 @fb.HoTen - 📞 @fb.DienThoai</span>
+                                    <span class="ticket-customer-name ml-3"><strong>@fb.HoTen</strong> &bull; <span class="text-muted">@fb.DienThoai</span></span>
                                 </div>
                                 <div>
                                     <span class="status-badge status-@GetReturnStatusCss(fb.TrangThai)">@fb.TrangThai</span>
@@ -446,7 +446,7 @@
 
                                 <div class="ticket-address-box">
                                     <div class="address-type-tag font-weight-bold">
-                                        @(fb.HinhThucHoan == "Thu hồi tại nhà" ? "🚚 THU HỒI TẬN NƠI TẠI NHÀ KHÁCH HÀNG:" : "🏬 KHÁCH MANG ĐẾN CHI NHÁNH HẸN TRƯỚC:")
+                                        @(fb.HinhThucHoan == "Thu hồi tại nhà" ? "THU HỒI TẬN NƠI TẠI NHÀ KHÁCH HÀNG:" : "KHÁCH MANG ĐẾN CHI NHÁNH HẸN TRƯỚC:")
                                     </div>
                                     <div class="address-val">
                                         @(fb.HinhThucHoan == "Thu hồi tại nhà" ? fb.DiaChiThuHoi : (fb.DiaChiChiNhanhHen ?? fb.DiaChiNhanHangHoanVe))
@@ -459,34 +459,34 @@
                                 {
                                     <button class="btn btn-sm btn-success btn-approve-return" 
                                             @onclick="() => ApproveReturn(fb.MaPhanHoi)">
-                                        ✅ Phê duyệt thu hồi
+                                        Phê duyệt thu hồi
                                     </button>
                                     <button class="btn btn-sm btn-danger ml-2" 
                                             @onclick="() => RejectReturn(fb.MaPhanHoi)">
-                                        ❌ Từ chối
+                                        Từ chối
                                     </button>
                                 }
                                 else if (fb.TrangThai == "Đã duyệt")
                                 {
                                     <button class="btn btn-sm btn-primary btn-receive-return" 
                                             @onclick="() => ReceiveDefectiveStock(fb.MaPhanHoi)">
-                                        📥 Đã nhận bưu phẩm hoàn (Nhập kho lỗi)
+                                        Xác nhận nhận hàng hoàn (Nhập kho lỗi)
                                     </button>
                                     <button class="btn btn-sm btn-danger ml-2" 
                                             @onclick="() => RejectReturn(fb.MaPhanHoi)">
-                                        ❌ Hủy duyệt / Từ chối
+                                        Hủy duyệt / Từ chối
                                     </button>
                                 }
                                 else if (fb.TrangThai == "Đã hoàn tất" || fb.TrangThai == "Đã nhận hàng hoàn" || fb.TrangThai == "Đã xử lý")
                                 {
-                                    <span class="text-success font-weight-bold">✓ Đã nhập kho lỗi thành công</span>
+                                    <span class="text-success font-weight-bold">Đã nhập kho lỗi thành công</span>
                                 }
                                 else if (fb.TrangThai == "Từ chối")
                                 {
-                                    <span class="text-danger font-weight-bold">✕ Đã từ chối yêu cầu</span>
+                                    <span class="text-danger font-weight-bold">Đã từ chối yêu cầu</span>
                                     <button class="btn btn-sm btn-outline-success ml-2" 
                                             @onclick="() => ApproveReturn(fb.MaPhanHoi)">
-                                        🔄 Duyệt lại
+                                        Duyệt lại
                                     </button>
                                 }
                             </div>
@@ -1228,6 +1228,168 @@
     .btn-action-shipping:hover {
         background: #1d4ed8;
         color: #ffffff;
+    }
+
+    /* RESPONSIVE DESIGN CHO ORDER MANAGEMENT (MOBILE & TABLET) */
+    @@media (max-width: 768px) {
+        .orders-container {
+            gap: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .page-title {
+            font-size: 1.15rem;
+        }
+
+        .header-right-actions {
+            width: 100%;
+        }
+
+        .branch-dropdown-wrapper {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+        }
+
+        .branch-select-box {
+            width: 100%;
+            max-width: none;
+            font-size: 0.76rem;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .kpi-card {
+            padding: 10px 12px;
+        }
+
+        .kpi-title {
+            font-size: 0.65rem;
+        }
+
+        .kpi-val {
+            font-size: 1.15rem;
+        }
+
+        .main-portal-tabs {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            gap: 4px;
+        }
+
+        .main-portal-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .main-tab-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+        }
+
+        .toolbar-card {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            padding: 12px;
+        }
+
+        .search-box-wrapper {
+            width: 100%;
+            max-width: none;
+        }
+
+        .order-search-input {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.8rem;
+        }
+
+        .filter-tabs {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 2px;
+        }
+
+        .filter-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+            font-size: 0.72rem;
+            padding: 4px 8px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+        }
+
+        .orders-table, .order-table {
+            min-width: 650px;
+            font-size: 0.78rem;
+        }
+
+        .orders-table th, .orders-table td,
+        .order-table th, .order-table td {
+            padding: 8px 10px;
+        }
+
+        .pagination-footer {
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+        }
+
+        .return-ticket-card {
+            padding: 10px 12px;
+        }
+
+        .ticket-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .ticket-actions-bar {
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 6px;
+        }
+
+        .modal-dialog-custom {
+            width: 95vw;
+            max-width: 95vw;
+            margin: 10px auto;
+            max-height: 92vh;
+        }
+
+        .order-summary-grid {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .totals-row {
+            min-width: 100%;
+        }
     }
 </style>
 

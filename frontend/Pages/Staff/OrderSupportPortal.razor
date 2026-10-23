@@ -38,15 +38,11 @@
             </div>
             <h1 class="portal-title">QUẢN LÝ ĐỔI TRẢ & HOÀN KHO LỖI</h1>
             <p class="portal-subtitle">
-                @if (_isChainAdmin)
-                {
-                    <span>Xem toàn chuỗi hoặc lọc theo từng chi nhánh để kiểm tra tiếp nhận và lưu kho hàng lỗi.</span>
-                }
-                else if (_isOrderCoordinator)
+                @if (_isOrderCoordinator)
                 {
                     <span>Tiếp nhận yêu cầu thu hồi hàng tận nơi và hoàn kho lỗi tại @_userBranchName.</span>
                 }
-                else
+                else if (!_isChainAdmin)
                 {
                     <span>Tiếp nhận, kiểm tra và xác nhận hoàn kho lỗi cho các đơn có địa chỉ nhận tại @_userBranchName.</span>
                 }
@@ -315,17 +311,20 @@
 
                             <div class="ticket-footer">
                                 <div class="ticket-action-btns">
+                                    <button type="button" class="btn btn-view-ticket-detail" @onclick="() => OpenDetailModal(fb)">
+                                        Chi tiết
+                                    </button>
                                     @if (fb.TrangThai == "Cần duyệt" || fb.TrangThai == "Chưa xử lý" || fb.TrangThai == "Chờ xử lý" || string.IsNullOrWhiteSpace(fb.TrangThai))
                                     {
                                         <button class="btn btn-approve-return" 
                                                 data-feedback-id="@fb.MaPhanHoi" 
                                                 @onclick="() => ApproveReturn(fb.MaPhanHoi)">
-                                            ✅ Phê duyệt thu hồi
+                                            Phê duyệt thu hồi
                                         </button>
                                         <button class="btn btn-reject-return" 
                                                 data-feedback-id="@fb.MaPhanHoi" 
                                                 @onclick="() => RejectReturn(fb.MaPhanHoi)">
-                                            ❌ Từ chối
+                                            Từ chối
                                         </button>
                                     }
                                     else if (fb.TrangThai == "Đã duyệt")
@@ -333,29 +332,29 @@
                                         <button class="btn btn-receive-return" 
                                                 data-feedback-id="@fb.MaPhanHoi" 
                                                 @onclick="() => ReceiveDefectiveStock(fb.MaPhanHoi)">
-                                            📥 Đã nhận bưu phẩm hoàn (Nhập kho lỗi)
+                                            Xác nhận nhận hàng hoàn (Nhập kho lỗi)
                                         </button>
                                         <button class="btn btn-reject-return" 
                                                 data-feedback-id="@fb.MaPhanHoi" 
                                                 @onclick="() => RejectReturn(fb.MaPhanHoi)">
-                                            ❌ Hủy duyệt / Từ chối
+                                            Hủy duyệt / Từ chối
                                         </button>
                                     }
                                     else if (fb.TrangThai == "Đã hoàn tất" || fb.TrangThai == "Đã nhận hàng hoàn" || fb.TrangThai == "Đã xử lý")
                                     {
                                         <div class="completed-receipt-badge">
-                                            ✓ Đã nhập kho lỗi thành công
+                                            Đã nhập kho lỗi thành công
                                         </div>
                                     }
                                     else if (fb.TrangThai == "Từ chối")
                                     {
                                         <div class="rejected-badge">
-                                            ✕ Yêu cầu đã bị từ chối
+                                            Yêu cầu đã bị từ chối
                                         </div>
                                         <button class="btn btn-approve-return" style="padding: 6px 12px; font-size: 12px; margin-left: 8px;"
                                                 data-feedback-id="@fb.MaPhanHoi" 
                                                 @onclick="() => ApproveReturn(fb.MaPhanHoi)">
-                                            🔄 Duyệt lại
+                                            Duyệt lại
                                         </button>
                                     }
                                 </div>
@@ -548,10 +547,101 @@
     }
 </div>
 
+@if (_selectedDetailFeedback != null)
+{
+    <div class="portal-modal-overlay" @onclick="CloseDetailModal">
+        <div class="portal-modal-sheet" @onclick:stopPropagation="true">
+            <div class="modal-sheet-header">
+                <div>
+                    <div class="modal-sheet-title">CHI TIẾT PHIẾU #PH-@_selectedDetailFeedback.MaPhanHoi</div>
+                    <div class="modal-sheet-sub">Đơn hàng liên quan: <strong>#DH-@_selectedDetailFeedback.MaHoaDon</strong></div>
+                </div>
+                <button type="button" class="btn-close-sheet" @onclick="CloseDetailModal">&times;</button>
+            </div>
+
+            <div class="modal-sheet-body">
+                <div class="sheet-status-row">
+                    <span class="status-pill status-@GetStatusClass(_selectedDetailFeedback.TrangThai)">@_selectedDetailFeedback.TrangThai</span>
+                    <span class="sheet-date">Gửi lúc: @_selectedDetailFeedback.NgayGui.ToString("dd/MM/yyyy HH:mm")</span>
+                </div>
+
+                <div class="sheet-card">
+                    <div class="sheet-card-title">THÔNG TIN KHÁCH HÀNG</div>
+                    <div class="sheet-info-line"><strong>Họ tên:</strong> @_selectedDetailFeedback.HoTen</div>
+                    <div class="sheet-info-line"><strong>Số điện thoại:</strong> <a href="tel:@_selectedDetailFeedback.DienThoai" class="phone-link">@_selectedDetailFeedback.DienThoai</a></div>
+                </div>
+
+                <div class="sheet-card">
+                    <div class="sheet-card-title">LÝ DO & MÔ TẢ LỖI</div>
+                    <div class="sheet-reason-text">"@_selectedDetailFeedback.NoiDung"</div>
+                    <div class="sheet-qty-badge">Số lượng đề xuất trả: <strong>@_selectedDetailFeedback.SoLuongTra sản phẩm</strong></div>
+                </div>
+
+                <div class="sheet-card">
+                    <div class="sheet-card-title">HÌNH THỨC & ĐỊA CHỈ TIẾP NHẬN</div>
+                    <div class="sheet-method-pill">Hình thức hoàn trả: <strong>@_selectedDetailFeedback.HinhThucHoan</strong></div>
+                    @if (_selectedDetailFeedback.HinhThucHoan == "Thu hồi tại nhà")
+                    {
+                        <div class="sheet-addr-box pickup">
+                            <span class="addr-tag">ĐỊA CHỈ THU HỒI TẠI NHÀ (BƯU TÁ LẤY):</span>
+                            <div class="addr-val">@_selectedDetailFeedback.DiaChiThuHoi</div>
+                        </div>
+                        <div class="sheet-addr-box dest">
+                            <span class="addr-tag">KHO TIẾP NHẬN BƯU PHẨM HOÀN VỀ:</span>
+                            <div class="addr-val">
+                                @(string.IsNullOrWhiteSpace(_selectedDetailFeedback.DiaChiNhanHangHoanVe) 
+                                    ? "Kho Tổng Tân Bình - 100 Cộng Hòa, P.4, Q.Tân Bình, TP.HCM" 
+                                    : _selectedDetailFeedback.DiaChiNhanHangHoanVe)
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="sheet-addr-box branch">
+                            <span class="addr-tag">CHI NHÁNH TIẾP NHẬN HÀNG TRẢ (KHÁCH MANG ĐẾN):</span>
+                            <div class="addr-val">
+                                @(!string.IsNullOrWhiteSpace(_selectedDetailFeedback.DiaChiChiNhanhHen) 
+                                    ? _selectedDetailFeedback.DiaChiChiNhanhHen 
+                                    : (!string.IsNullOrWhiteSpace(_selectedDetailFeedback.DiaChiNhanHangHoanVe) ? _selectedDetailFeedback.DiaChiNhanHangHoanVe : "Chi nhánh hẹn trước"))
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="modal-sheet-footer">
+                @if (_selectedDetailFeedback.TrangThai == "Cần duyệt" || _selectedDetailFeedback.TrangThai == "Chưa xử lý" || _selectedDetailFeedback.TrangThai == "Chờ xử lý" || string.IsNullOrWhiteSpace(_selectedDetailFeedback.TrangThai))
+                {
+                    <button class="btn btn-approve-return" @onclick="async () => { var id = _selectedDetailFeedback.MaPhanHoi; CloseDetailModal(); await ApproveReturn(id); }">
+                        Phê duyệt thu hồi
+                    </button>
+                    <button class="btn btn-reject-return" @onclick="async () => { var id = _selectedDetailFeedback.MaPhanHoi; CloseDetailModal(); await RejectReturn(id); }">
+                        Từ chối
+                    </button>
+                }
+                else if (_selectedDetailFeedback.TrangThai == "Đã duyệt")
+                {
+                    <button class="btn btn-receive-return" @onclick="async () => { var id = _selectedDetailFeedback.MaPhanHoi; CloseDetailModal(); await ReceiveDefectiveStock(id); }">
+                        Xác nhận nhận hàng hoàn (Nhập kho lỗi)
+                    </button>
+                    <button class="btn btn-reject-return" @onclick="async () => { var id = _selectedDetailFeedback.MaPhanHoi; CloseDetailModal(); await RejectReturn(id); }">
+                        Hủy duyệt / Từ chối
+                    </button>
+                }
+                <button type="button" class="btn btn-outline" @onclick="CloseDetailModal">Đóng</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool _isLoading = false;
     private string _activeTab = "RETURNS";
     private string _defectiveSearch = string.Empty;
+    private FeedbackDto? _selectedDetailFeedback;
+
+    private void OpenDetailModal(FeedbackDto fb) => _selectedDetailFeedback = fb;
+    private void CloseDetailModal() => _selectedDetailFeedback = null;
 
     private List<FeedbackDto> _allFeedbacks = new();
     private List<FeedbackDto> _returnFeedbacks = new();
@@ -675,16 +765,6 @@
 
     private bool BelongsToBranch(FeedbackDto f, int branchId)
     {
-        if (_isOrderCoordinator)
-        {
-            // Điều phối viên phụ trách điều phối thu hồi tại nhà hoặc đơn thuộc chi nhánh mình
-            if (string.Equals(f.HinhThucHoan?.Trim(), "Thu hồi tại nhà", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            return f.MaChiNhanhHen == branchId || f.MaChiNhanhDonHang == branchId;
-        }
-
         if (branchId == 9)
         {
             // Chi nhánh Online / Kho tổng Online tiếp nhận đơn thu hồi tại nhà hoặc hẹn tại kho tổng 9

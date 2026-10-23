@@ -395,7 +395,6 @@
                                 <span class="step-num">01</span>
                             <div>
                                 <h3 class="card-title">LẬP PHIẾU NHẬP KHO TỨC THÌ</h3>
-                                <p class="card-desc">Cập nhật số lượng tồn vào kho và ghi vết kiểm toán hệ thống</p>
                             </div>
                         </div>
                         <button type="button" class="btn-clear-form" @onclick="ResetImportForm" title="Xóa dữ liệu để nhập mới">
@@ -539,7 +538,6 @@
                             <div class="form-group">
                                 <label class="form-label">
                                     Mã biến thể ID (*) 
-                                    <span class="text-muted" style="font-size: 0.72rem; font-weight: normal;">(Tự khóa theo mặt hàng)</span>
                                 </label>
                                 <input type="text" 
                                        class="form-control font-mono font-weight-bold" 
@@ -659,9 +657,6 @@
                         <div class="header-left">
                             <div>
                                 <h3 class="card-title">TỔNG HỢP TỒN KHO TOÀN HỆ THỐNG (@FilteredInventoryList.Count() SKU)</h3>
-                                <p class="card-desc" style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
-                                    💡 Hệ thống hiển thị tổng sản lượng hàng hóa của cả chuỗi (@(_branches.Any() ? $"{_branches.Count} kho" : "toàn chuỗi")). Để xem chi tiết kho nào đang thiếu hàng hoặc lập phiếu nhập, vui lòng chọn kho chi nhánh trên thanh điều hành ở trên.
-                                </p>
                             </div>
                         </div>
                         <div class="header-filter-bar">
@@ -733,9 +728,6 @@
                         <div class="header-left">
                             <div>
                                 <h3 class="card-title">CẢNH BÁO THIẾU HÀNG & KIỂM KÊ - @CurrentWarehouseDisplayName</h3>
-                                <p class="card-desc" style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
-                                    Danh sách các mặt hàng tại cơ sở này cần lập kế hoạch bổ sung hàng hóa.
-                                </p>
                             </div>
                         </div>
                         <div class="header-filter-bar">
@@ -1122,28 +1114,32 @@
     }
 
     .wh-branch-scope-select {
-        background: rgba(255, 255, 255, 0.05);
+        background: #1e293b;
         color: #f8fafc;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 3px 10px;
+        border: 1px solid rgba(234, 179, 8, 0.45);
+        padding: 4px 14px;
         border-radius: 9999px;
-        font-size: 0.73rem;
+        font-size: 0.74rem;
         font-weight: 600;
         cursor: pointer;
         outline: none;
-        transition: all 0.2s ease;
-        max-width: 260px;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 280px;
         text-overflow: ellipsis;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
     }
 
     .wh-branch-scope-select:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.09);
-        border-color: rgba(234, 179, 8, 0.35);
+        background: #334155;
+        border-color: #f59e0b;
+        box-shadow: 0 0 12px rgba(234, 179, 8, 0.35);
+        transform: translateY(-1px);
     }
 
     .wh-branch-scope-select:focus {
+        background: #0f172a;
         border-color: #eab308;
-        box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
+        box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.3);
     }
 
     .wh-branch-scope-select:disabled {
@@ -1151,6 +1147,22 @@
         color: #94a3b8;
         cursor: not-allowed;
         border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Tùy chỉnh màu nền và chữ của danh sách các chi nhánh khi bấm mở (Options dropdown) */
+    .wh-branch-scope-select option {
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .wh-branch-scope-select option:hover,
+    .wh-branch-scope-select option:focus,
+    .wh-branch-scope-select option:checked {
+        background-color: #1e293b !important;
+        color: #fbbf24 !important;
     }
 
     .scope-lock-indicator {
@@ -2481,6 +2493,359 @@
     @@keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+    }
+
+    /* ==========================================================================
+       RESPONSIVE MOBILE STYLING FOR WAREHOUSE PORTAL (MOBILE AND TABLET)
+       ========================================================================== */
+    @@media (max-width: 992px) {
+        .wh-main-content {
+            padding: 14px 16px;
+            gap: 12px;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .import-tab-layout {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .wh-topbar {
+            height: auto;
+            min-height: auto;
+            padding: 10px 12px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .wh-brand {
+            gap: 8px;
+        }
+
+        .wh-brand-icon {
+            width: 30px;
+            height: 30px;
+        }
+
+        .brand-title {
+            font-size: 0.8rem;
+        }
+
+        .brand-sub {
+            display: none;
+        }
+
+        .topbar-brand-divider {
+            display: none;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 8px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-portal-shortcut span {
+            display: none;
+        }
+
+        .btn-portal-shortcut {
+            padding: 0 8px;
+            height: 30px;
+        }
+
+        .wh-user-profile {
+            gap: 6px;
+        }
+
+        .profile-info {
+            max-width: 110px;
+        }
+
+        .profile-name {
+            font-size: 0.72rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-role {
+            font-size: 0.6rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .wh-scope-capsule {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 8px;
+            gap: 6px;
+            box-sizing: border-box;
+        }
+
+        .capsule-scope-select {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .wh-branch-scope-select {
+            flex: 1;
+            min-width: 0;
+            max-width: none;
+            width: 100%;
+            padding: 4px 8px;
+            font-size: 0.72rem;
+        }
+
+        .scope-lock-indicator span {
+            display: none;
+        }
+
+        .scope-lock-indicator {
+            padding: 2px 5px;
+        }
+
+        /* KPI RIBBON COMPACT FOR MOBILE */
+        .wh-main-content {
+            padding: 10px 8px;
+            gap: 10px;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .kpi-card {
+            padding: 10px 10px;
+            gap: 8px;
+            border-radius: 8px;
+        }
+
+        .kpi-icon {
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+        }
+
+        .kpi-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .kpi-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.02em;
+            line-height: 1.25;
+        }
+
+        .kpi-value {
+            font-size: 1.15rem;
+        }
+
+        .kpi-hint {
+            display: none;
+        }
+
+        /* TABS: HORIZONTAL TOUCH-SCROLL STRIP CHỐNG VỠ CHỮ */
+        .wh-tabs-bar {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding: 4px;
+            gap: 6px;
+        }
+
+        .wh-tabs-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .wh-tab-btn {
+            flex: 0 0 auto;
+            white-space: nowrap;
+            padding: 8px 12px;
+            font-size: 0.74rem;
+            gap: 6px;
+        }
+
+        .wh-tab-btn svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        /* FORM ROWS: CHUYỂN TỪ MULTI-COL SANG 1 CỘT RỘNG RÃI */
+        .form-row-2,
+        .form-row-3 {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .card-header {
+            padding: 10px 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .card-body {
+            padding: 12px;
+            gap: 12px;
+        }
+
+        .quick-add-supplier-box {
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .selected-variant-card {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .variant-details {
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .btn-clear-selected {
+            margin-left: 0;
+            align-self: flex-start;
+        }
+
+        .preview-total-box {
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        .total-value {
+            font-size: 1.1rem;
+        }
+
+        .btn-submit-import {
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            white-space: normal;
+            line-height: 1.35;
+            text-align: center;
+        }
+
+        /* URGENT STOCK LIST */
+        .urgent-stock-panel {
+            max-height: none;
+        }
+
+        .urgent-item {
+            padding: 8px 10px;
+            gap: 8px;
+        }
+
+        .item-action {
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        /* TABLES IN INVENTORY & HISTORY: HORIZONTAL SCROLL SAFE */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+        }
+
+        .wh-table {
+            min-width: 620px;
+            font-size: 0.76rem;
+        }
+
+        .wh-table th,
+        .wh-table td {
+            padding: 8px 10px;
+        }
+
+        .header-filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .search-box {
+            width: 100%;
+        }
+
+        .search-box .form-control {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .status-filters {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 2px;
+        }
+
+        .filter-chip {
+            flex-shrink: 0;
+            white-space: nowrap;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+        }
+
+        /* CHAIN DISPATCH GUIDES */
+        .dispatch-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .chain-guide-header {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* MODAL */
+        .modal-backdrop {
+            padding: 10px;
+        }
+
+        .modal-card.dispatch-modal-box {
+            max-width: 100%;
+            max-height: 92vh;
+        }
     }
 </style>
 

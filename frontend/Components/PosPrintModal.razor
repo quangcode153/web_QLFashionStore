@@ -323,6 +323,37 @@
             margin: 0;
         }
     }
+
+    @@media (max-width: 480px) {
+        .pos-modal-content {
+            padding: 14px 10px;
+            width: 95vw;
+            max-width: 95vw;
+        }
+        .pos-receipt-k80 {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 12px 8px;
+        }
+        .pos-modal-header {
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+            margin-bottom: 12px;
+        }
+        .modal-actions {
+            display: flex;
+            width: 100%;
+            gap: 8px;
+        }
+        .modal-actions button {
+            flex: 1;
+            padding: 8px 10px;
+            font-size: 13px;
+            justify-content: center;
+        }
+    }
 </style>
 
 @code {

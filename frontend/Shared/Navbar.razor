@@ -6,6 +6,15 @@
 
 <header class="yame-header">
     <div class="yame-container header-inner">
+        <!-- Mobile 3-Bar Hamburger Button -->
+        <button type="button" class="btn-mobile-menu-toggle" @onclick="ToggleMobileMenu" aria-label="Mở danh mục menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
         <!-- Brand Logo (Emblem + Divider + Name: QF NOIR) -->
         <a href="/" class="header-logo qf-brand-lockup" aria-label="QF Noir Trang chủ" @onclick="NavigateToHome" @onclick:preventDefault="true">
             <img src="images/logo.png" alt="QF Noir" class="qf-emblem-img" />
@@ -26,25 +35,20 @@
                 <!-- SALE with Dropdown -->
                 <li class="nav-item has-dropdown">
                     <a href="/catalog?sale=true" class="nav-link nav-link-sale">
-                        SALE
+                        <span>SALE</span>
                         <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </a>
                     <div class="nav-dropdown-menu">
-                        <a href="/catalog?category=sale-quan-ao" class="dropdown-item">Sale Quần Áo</a>
-                        <a href="/catalog?category=sale-phu-kien" class="dropdown-item">Sale Phụ Kiện</a>
-                        <a href="/catalog?category=xa-kho" class="dropdown-item">Xả Kho Giá Sốc</a>
-                        <a href="/catalog?category=gia-dac-biet" class="dropdown-item">Giá Đặc Biệt</a>
-                        <a href="/catalog?category=flash-sale" class="dropdown-item">Deal Độc Quyền Online</a>
-                        <a href="/catalog?category=mo-ban" class="dropdown-item">Mở Bán Hàng Tuần</a>
-                        <a href="/catalog?category=xu-huong" class="dropdown-item">Sản Phẩm Bán Chạy</a>
-                        <a href="/catalog?category=signature" class="dropdown-item">Signature (Đặc Trưng)</a>
+                        <a href="/catalog?category=sale-quan-ao&sale=true" class="dropdown-item">Sale Quần Áo</a>
+                        <a href="/catalog?category=sale-phu-kien&sale=true" class="dropdown-item">Sale Phụ Kiện</a>
+                        <a href="/catalog?category=flash-sale&sale=true" class="dropdown-item">Deal Độc Quyền Online</a>
                     </div>
                 </li>
 
                 <!-- ÁO with Dropdown -->
                 <li class="nav-item has-dropdown">
                     <a href="/catalog?category=ao" class="nav-link">
-                        ÁO
+                        <span>ÁO</span>
                         <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </a>
                     <div class="nav-dropdown-menu">
@@ -58,7 +62,7 @@
                 <!-- QUẦN with Dropdown -->
                 <li class="nav-item has-dropdown">
                     <a href="/catalog?category=quan" class="nav-link">
-                        QUẦN
+                        <span>QUẦN</span>
                         <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </a>
                     <div class="nav-dropdown-menu">
@@ -72,7 +76,7 @@
                 <!-- JEAN with Dropdown -->
                 <li class="nav-item has-dropdown">
                     <a href="/catalog?category=jean" class="nav-link">
-                        JEAN
+                        <span>JEAN</span>
                         <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </a>
                     <div class="nav-dropdown-menu">
@@ -84,7 +88,7 @@
                 <!-- PHỤ KIỆN with Dropdown -->
                 <li class="nav-item has-dropdown">
                     <a href="/catalog?category=phukien" class="nav-link">
-                        PHỤ KIỆN
+                        <span>PHỤ KIỆN</span>
                         <svg class="nav-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </a>
                     <div class="nav-dropdown-menu">
@@ -299,6 +303,191 @@
     </div>
 </header>
 
+<!-- Mobile Slide-in Drawer Menu (Offcanvas khi nhấn 3 gạch) -->
+@if (_isMobileDrawerOpen)
+{
+    <div class="mobile-drawer-backdrop" @onclick="CloseMobileDrawer"></div>
+    <aside class="mobile-drawer-panel @(_isMobileDrawerOpen ? "open" : "")">
+        <div class="drawer-header">
+            <div class="drawer-brand">
+                <img src="images/logo.png" alt="QF Noir" class="drawer-logo-img" />
+                <span class="drawer-brand-name">QF NOIR</span>
+            </div>
+            <button type="button" class="btn-drawer-close" @onclick="CloseMobileDrawer" aria-label="Đóng menu">
+                ✕
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(CurrentUserRole))
+        {
+            <div class="drawer-user-card">
+                <a href="/profile" class="drawer-user-link" @onclick='() => NavigateAndClose("/profile")'>
+                    <span class="drawer-user-avatar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </span>
+                    <div class="drawer-user-meta">
+                        <span class="drawer-user-label">Tài khoản</span>
+                        <span class="drawer-user-displayname">@(string.IsNullOrEmpty(CurrentUserName) ? "Khách hàng" : CurrentUserName)</span>
+                    </div>
+                </a>
+                <button type="button" class="drawer-logout-action" @onclick="HandleLogoutClick" title="Đăng xuất">Đăng xuất</button>
+            </div>
+        }
+
+        <div class="drawer-body">
+            <nav class="drawer-nav">
+                <a href="/" class="drawer-nav-item" @onclick='() => NavigateAndClose("/")'>
+                    <span class="drawer-nav-text">TRANG CHỦ</span>
+                </a>
+
+                <!-- SALE -->
+                <div class="drawer-collapsible-group">
+                    <div class="drawer-nav-item drawer-nav-sale" @onclick='() => ToggleDrawerSub("sale")'>
+                        <span class="drawer-nav-text">SALE ƯU ĐÃI</span>
+                        <span class="drawer-arrow">@(_drawerOpenSub == "sale" ? "▲" : "▼")</span>
+                    </div>
+                    @if (_drawerOpenSub == "sale")
+                    {
+                        <div class="drawer-sub-menu">
+                            <a href="/catalog?category=sale-quan-ao&sale=true" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=sale-quan-ao&sale=true")'>Sale Quần Áo</a>
+                            <a href="/catalog?category=sale-phu-kien&sale=true" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=sale-phu-kien&sale=true")'>Sale Phụ Kiện</a>
+                            <a href="/catalog?category=flash-sale&sale=true" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=flash-sale&sale=true")'>Deal Độc Quyền Online</a>
+                        </div>
+                    }
+                </div>
+
+                <!-- ÁO -->
+                <div class="drawer-collapsible-group">
+                    <div class="drawer-nav-item" @onclick='() => ToggleDrawerSub("ao")'>
+                        <span class="drawer-nav-text">ÁO NAM</span>
+                        <span class="drawer-arrow">@(_drawerOpenSub == "ao" ? "▲" : "▼")</span>
+                    </div>
+                    @if (_drawerOpenSub == "ao")
+                    {
+                        <div class="drawer-sub-menu">
+                            <a href="/catalog?category=ao" class="drawer-sub-item highlight-all" @onclick='() => NavigateAndClose("/catalog?category=ao")'>Tất cả Áo Nam</a>
+                            <a href="/catalog?category=ao-thun" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=ao-thun")'>Áo Thun & Polo</a>
+                            <a href="/catalog?category=ao-so-mi" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=ao-so-mi")'>Áo Sơ Mi Không Nhăn</a>
+                            <a href="/catalog?category=ao-khoac" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=ao-khoac")'>Áo Khoác Dù / Bomber</a>
+                            <a href="/catalog?category=ao-hoodie" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=ao-hoodie")'>Áo Hoodie & Sweater</a>
+                        </div>
+                    }
+                </div>
+
+                <!-- QUẦN -->
+                <div class="drawer-collapsible-group">
+                    <div class="drawer-nav-item" @onclick='() => ToggleDrawerSub("quan")'>
+                        <span class="drawer-nav-text">QUẦN NAM</span>
+                        <span class="drawer-arrow">@(_drawerOpenSub == "quan" ? "▲" : "▼")</span>
+                    </div>
+                    @if (_drawerOpenSub == "quan")
+                    {
+                        <div class="drawer-sub-menu">
+                            <a href="/catalog?category=quan" class="drawer-sub-item highlight-all" @onclick='() => NavigateAndClose("/catalog?category=quan")'>Tất cả Quần Nam</a>
+                            <a href="/catalog?category=quan-tay" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=quan-tay")'>Quần Tây Lịch Lãm</a>
+                            <a href="/catalog?category=quan-jeans" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=quan-jeans")'>Quần Jeans Cao Cấp</a>
+                            <a href="/catalog?category=quan-dai" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=quan-dai")'>Quần Dài Kaki / Chinos</a>
+                            <a href="/catalog?category=quan-short" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=quan-short")'>Đồ Bộ & Thể Thao</a>
+                        </div>
+                    }
+                </div>
+
+                <!-- JEAN -->
+                <a href="/catalog?category=jean" class="drawer-nav-item" @onclick='() => NavigateAndClose("/catalog?category=jean")'>
+                    <span class="drawer-nav-text">JEAN</span>
+                </a>
+
+                <!-- PHỤ KIỆN -->
+                <div class="drawer-collapsible-group">
+                    <div class="drawer-nav-item" @onclick='() => ToggleDrawerSub("phukien")'>
+                        <span class="drawer-nav-text">PHỤ KIỆN</span>
+                        <span class="drawer-arrow">@(_drawerOpenSub == "phukien" ? "▲" : "▼")</span>
+                    </div>
+                    @if (_drawerOpenSub == "phukien")
+                    {
+                        <div class="drawer-sub-menu">
+                            <a href="/catalog?category=phukien" class="drawer-sub-item highlight-all" @onclick='() => NavigateAndClose("/catalog?category=phukien")'>Tất cả Phụ Kiện</a>
+                            <a href="/catalog?category=that-lung" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=that-lung")'>Thắt Lưng & Ví Da</a>
+                            <a href="/catalog?category=balo" class="drawer-sub-item" @onclick='() => NavigateAndClose("/catalog?category=balo")'>Balo & Túi Xách</a>
+                        </div>
+                    }
+                </div>
+
+                <!-- CỬA HÀNG -->
+                <a href="/stores" class="drawer-nav-item" @onclick='() => NavigateAndClose("/stores")'>
+                    <span class="drawer-nav-text">HỆ THỐNG CỬA HÀNG</span>
+                </a>
+
+                <!-- VIP -->
+                <a href="/vip" class="drawer-nav-item drawer-nav-vip" @onclick='() => NavigateAndClose("/vip")'>
+                    <span class="drawer-nav-text">ĐẶC QUYỀN VIP 2026</span>
+                </a>
+            </nav>
+
+            <div class="drawer-footer-info">
+                <div class="drawer-hotline">
+                    <span>Hotline CSKH:</span>
+                    <strong>1900 8888</strong>
+                </div>
+            </div>
+        </div>
+    </aside>
+}
+
+<!-- Fixed Bottom Navigation Bar for Mobile (Thanh điều hướng dưới cùng điện thoại) -->
+<nav class="mobile-bottom-nav">
+    <a href="/" class="mobile-tab-item @(IsActiveTab("/") ? "active" : "")" @onclick="NavigateToHome" @onclick:preventDefault="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span class="tab-label">Trang chủ</span>
+    </a>
+
+    <a href="/catalog?sale=true" class="mobile-tab-item @(IsActiveTab("/catalog?sale=true") ? "active" : "")">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+        </svg>
+        <span class="tab-label">Sale</span>
+    </a>
+
+    <button type="button" class="mobile-tab-item" @onclick="ToggleMobileMenu" aria-label="Mở menu mục lục">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+        <span class="tab-label">Menu</span>
+    </button>
+
+    <a href="/cart" class="mobile-tab-item @(IsActiveTab("/cart") ? "active" : "")">
+        <div class="mobile-tab-cart-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <path d="M16 10a4 4 0 0 1-8 0"></path>
+            </svg>
+            @if (CartCount > 0)
+            {
+                <span class="mobile-cart-badge">@CartCount</span>
+            }
+        </div>
+        <span class="tab-label">Giỏ</span>
+    </a>
+
+    <a href="/stores" class="mobile-tab-item @(IsActiveTab("/stores") ? "active" : "")">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        <span class="tab-label">Cửa hàng</span>
+    </a>
+</nav>
+
 <style>
     .user-logged-badge {
         display: inline-flex;
@@ -449,6 +638,89 @@
     .suggestions-footer:hover {
         background: #EFF6FF;
     }
+
+    @@media (max-width: 768px) {
+        .user-logged-badge .user-action-text {
+            display: none !important;
+        }
+        .user-logged-badge {
+            padding: 2px 4px !important;
+            gap: 2px !important;
+            height: 32px !important;
+            border-radius: 16px !important;
+            background: #F8FAFC !important;
+        }
+        .user-role-pill {
+            padding: 2px 4px !important;
+        }
+        .user-role-pill .role-icon svg {
+            width: 17px !important;
+            height: 17px !important;
+        }
+        .btn-navbar-logout {
+            width: 24px !important;
+            height: 24px !important;
+        }
+        .drawer-user-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #F8FAFC;
+            border-bottom: 1px solid #E2E8F0;
+            margin-bottom: 8px;
+        }
+        .drawer-user-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #0F172A;
+            min-width: 0;
+            flex: 1;
+        }
+        .drawer-user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #000000;
+            color: #FFFFFF;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .drawer-user-meta {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .drawer-user-label {
+            font-size: 0.68rem;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .drawer-user-displayname {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #0F172A;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .drawer-logout-action {
+            padding: 6px 10px;
+            border: 1px solid #CBD5E1;
+            border-radius: 4px;
+            background: #FFFFFF;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #EF4444;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+    }
 </style>
 
 @code {
@@ -559,5 +831,37 @@
     private void NavigateToHome()
     {
         NavManager.NavigateTo("/");
+    }
+
+    private bool _isMobileDrawerOpen = false;
+    private string? _drawerOpenSub = null;
+
+    private void ToggleMobileMenu()
+    {
+        _isMobileDrawerOpen = !_isMobileDrawerOpen;
+    }
+
+    private void CloseMobileDrawer()
+    {
+        _isMobileDrawerOpen = false;
+        _drawerOpenSub = null;
+    }
+
+    private void ToggleDrawerSub(string key)
+    {
+        _drawerOpenSub = _drawerOpenSub == key ? null : key;
+    }
+
+    private void NavigateAndClose(string url)
+    {
+        CloseMobileDrawer();
+        NavManager.NavigateTo(url);
+    }
+
+    private bool IsActiveTab(string url)
+    {
+        var current = NavManager?.Uri ?? string.Empty;
+        if (url == "/" && (current.EndsWith("/") || current.EndsWith(":3000") || current.EndsWith(":5000"))) return true;
+        return current.Contains(url, StringComparison.OrdinalIgnoreCase);
     }
 }

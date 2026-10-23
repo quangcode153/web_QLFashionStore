@@ -239,4 +239,54 @@ public class ProductsController : ControllerBase
         var result = await _catalogService.CheckVariantsAvailabilityAsync(request.VariantIds);
         return Ok(ApiResponse<IEnumerable<VariantAvailabilityDto>>.Ok(result));
     }
+
+    [HttpPut("variants/{variantId}/discount")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
+    public async Task<IActionResult> UpdateVariantDiscount(int variantId, [FromBody] UpdateVariantDiscountRequest request)
+    {
+        try
+        {
+            if (request == null)
+                return BadRequest(ApiResponse<bool>.Fail("Dữ liệu giảm giá không hợp lệ."));
+
+            var success = await _catalogService.UpdateVariantDiscountAsync(variantId, request.PhanTramGiamGia);
+            if (!success)
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy biến thể để cập nhật giảm giá."));
+
+            return Ok(ApiResponse<bool>.Ok(true, "Cập nhật % giảm giá biến thể thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
+
+    [HttpPut("{id}/discount")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},AdminChuoi,QuanLyChiNhanh,QuanLyHeThong")]
+    public async Task<IActionResult> UpdateProductDiscount(int id, [FromBody] UpdateProductDiscountRequest request)
+    {
+        try
+        {
+            if (request == null)
+                return BadRequest(ApiResponse<bool>.Fail("Dữ liệu giảm giá không hợp lệ."));
+
+            var success = await _catalogService.UpdateProductDiscountAsync(id, request.PhanTramGiamGia);
+            if (!success)
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy sản phẩm để cập nhật giảm giá."));
+
+            return Ok(ApiResponse<bool>.Ok(true, "Cập nhật % giảm giá cho toàn bộ biến thể thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
 }

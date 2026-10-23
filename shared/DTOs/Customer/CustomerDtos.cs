@@ -28,6 +28,47 @@ public class CustomerOrderHistoryItemDto
     public string? TrangThaiHoanTra { get; set; }
     public int TongSoLuongDaMua { get; set; }
     public int TongSoLuongDaTra { get; set; }
+    public string? DiaChiGiaoHang { get; set; }
+    public string? LoaiDonHang { get; set; }
+
+    public string PhuongThucThanhToan
+    {
+        get
+        {
+            if (string.Equals(LoaiDonHang, "TAI_QUAY", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Tại quầy (POS)";
+            }
+            if (string.IsNullOrEmpty(DiaChiGiaoHang))
+            {
+                return "COD (Thanh toán khi nhận hàng)";
+            }
+            if (DiaChiGiaoHang.Contains("VIETQR", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Chuyển khoản VietQR";
+            }
+            if (DiaChiGiaoHang.Contains("MOMO", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ví MoMo";
+            }
+            return "COD (Thanh toán khi nhận hàng)";
+        }
+    }
+
+    public string DiaChiGiaoHangClean
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(DiaChiGiaoHang)) return string.Empty;
+            var idx = DiaChiGiaoHang.IndexOf(']');
+            if (idx >= 0 && idx < DiaChiGiaoHang.Length - 1)
+            {
+                return DiaChiGiaoHang.Substring(idx + 1).Trim();
+            }
+            return DiaChiGiaoHang;
+        }
+    }
+
     public bool ConHangCoTheHoan => 
         (TongSoLuongDaMua > 0 ? (TongSoLuongDaMua > TongSoLuongDaTra) : (SoMatHang > 0 && TongSoLuongDaTra == 0)) && 
         (TrangThai == "Đã hoàn thành" || TrangThai == "Hoàn thành") && 

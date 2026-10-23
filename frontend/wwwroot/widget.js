@@ -19,7 +19,7 @@
     const link = document.createElement('link');
     link.id = 'qf-widget-style';
     link.rel = 'stylesheet';
-    link.href = 'widget.css';
+    link.href = 'widget.css?v=20261022_tiny';
     document.head.appendChild(link);
   }
 
@@ -244,24 +244,47 @@
   };
 
   // ============================================================
-  // QUẢN LÝ HIỂN THỊ CHỈ TẠI TRANG CHỦ (HOME: / HOẶC /catalog)
+  // QUẢN LÝ HIỂN THỊ TRÊN CÁC TRANG KHÁCH HÀNG (TRÁNH CỔNG NỘI BỘ ADMIN / KHO / POS)
   // ============================================================
-  function isHomePage() {
+  function isInternalPortal() {
+    const pathname = window.location.pathname.toLowerCase();
+    return pathname.startsWith('/admin') ||
+           pathname.startsWith('/warehouse') ||
+           pathname.startsWith('/kho') ||
+           pathname.startsWith('/pos') ||
+           pathname.startsWith('/coordinator') ||
+           pathname.startsWith('/support') ||
+           pathname.startsWith('/staff');
+  }
+
+  function isCustomerPage() {
     const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
-    return pathname === '/' || pathname === '/catalog' || pathname === '/index.html';
+    // 1. Cho phép trên trang chủ, danh mục sản phẩm, chi tiết sản phẩm
+    if (pathname === '/' || pathname === '/catalog' || pathname === '/index.html') return true;
+    if (pathname.startsWith('/product')) return true; // Chi tiết sản phẩm (/product/123)
+    if (pathname.startsWith('/cart') || pathname.startsWith('/stores') || pathname.startsWith('/vip') || pathname.startsWith('/policy')) return true;
+
+    // 2. Ẩn trên các cổng nghiệp vụ nội bộ
+    return !isInternalPortal();
   }
 
   function updateVisibilityByRoute() {
-    if (isHomePage()) {
+    // Nếu cửa sổ chat đang mở do người dùng hoặc do nút "Stylist AI tư vấn" kích hoạt thì tuyệt đối giữ hiển thị
+    if (chatWindow && chatWindow.classList.contains('open')) {
+      if (root.style.display === 'none') {
+        root.style.display = '';
+      }
+      return;
+    }
+
+    if (isCustomerPage()) {
       if (root.style.display === 'none') {
         root.style.display = '';
       }
     } else {
       if (root.style.display !== 'none') {
         root.style.display = 'none';
-        if (chatWindow && chatWindow.classList.contains('active')) {
-          chatWindow.classList.remove('active');
-        }
+        closeChat();
       }
     }
   }

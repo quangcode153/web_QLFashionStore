@@ -1116,8 +1116,627 @@
     max-width: 420px;
 }
 
+.btn-view-ticket-detail {
+    display: none;
+}
+
+/* =========================================================================
+   7. DETAIL MODAL BOTTOM SHEET
+   ========================================================================= */
+.portal-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeInOverlay 0.15s ease;
+}
+
+@keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.portal-modal-sheet {
+    background: #ffffff;
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUpSheet 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.modal-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: #0f172a;
+    color: #ffffff;
+}
+
+.modal-sheet-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #f8fafc;
+}
+
+.modal-sheet-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.modal-sheet-sub strong {
+    color: #f1f5f9;
+}
+
+.btn-close-sheet {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+.btn-close-sheet:hover {
+    color: #ffffff;
+}
+
+.modal-sheet-body {
+    padding: 14px 18px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sheet-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sheet-date {
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+.sheet-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sheet-card-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.sheet-info-line {
+    font-size: 0.76rem;
+    color: #1e293b;
+}
+
+.sheet-info-line .phone-link {
+    color: #0284c7;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.sheet-reason-text {
+    font-size: 0.78rem;
+    color: #0f172a;
+    font-style: italic;
+    line-height: 1.4;
+}
+
+.sheet-qty-badge {
+    font-size: 0.72rem;
+    color: #b45309;
+    font-weight: 600;
+}
+
+.sheet-method-pill {
+    font-size: 0.72rem;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.sheet-addr-box {
+    padding: 8px 10px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.sheet-addr-box.pickup {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-left: 3px solid #f59e0b;
+}
+
+.sheet-addr-box.dest {
+    background: #f0f9ff;
+    border: 1px solid #e0f2fe;
+    border-left: 3px solid #0284c7;
+}
+
+.sheet-addr-box.branch {
+    background: #f0fdf4;
+    border: 1px solid #dcfce7;
+    border-left: 3px solid #16a34a;
+}
+
+.modal-sheet-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 18px;
+    background: #f9fafb;
+    border-top: 1px solid #e2e8f0;
+}
+
+.modal-sheet-footer .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 9px;
+    font-size: 0.78rem;
+}
+
+/* =========================================================================
+   8. MOBILE RESPONSIVE OPTIMIZATIONS
+   ========================================================================= */
 @media (max-width: 1024px) {
     .kpi-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+@media (max-width: 768px) {
+    .order-support-portal {
+        padding: 0;
+        min-height: auto;
+    }
+
+    /* Compact Header on Mobile */
+    .portal-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+    }
+
+    .portal-header-left {
+        min-width: unset;
+        width: 100%;
+        gap: 4px;
+    }
+
+    .badge-row {
+        gap: 4px;
+    }
+
+    .role-badge, 
+    .live-status-pill, 
+    .branch-scope-pill {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+
+    .portal-title {
+        font-size: 1.05rem;
+        line-height: 1.25;
+    }
+
+    .portal-subtitle {
+        display: none; /* Tiết kiệm chiều cao màn hình mobile */
+    }
+
+    .portal-header-actions {
+        width: 100%;
+        gap: 6px;
+    }
+
+    .admin-branch-picker {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 4px 8px;
+    }
+
+    .admin-branch-select {
+        min-width: unset;
+        width: 100%;
+        font-size: 0.72rem;
+    }
+
+    .btn-refresh {
+        width: 100%;
+        justify-content: center;
+        height: 32px;
+        font-size: 0.72rem;
+    }
+
+    /* 4 KPI Summary Cards Mobile - Siêu Gọn Gàng (Compact Mini 2x2) */
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .kpi-card {
+        padding: 6px 8px;
+        border-radius: 8px;
+    }
+
+    .kpi-card-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .kpi-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .kpi-title {
+        font-size: 0.65rem;
+        line-height: 1.1;
+        margin-bottom: 0;
+        color: #64748b;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .kpi-value {
+        font-size: 1.15rem;
+        line-height: 1.1;
+        margin-bottom: 0;
+        font-weight: 800;
+    }
+
+    .kpi-sub {
+        display: none; /* Ẩn mô tả phụ trên mobile để thẻ gọn nhẹ */
+    }
+
+    .kpi-icon-box {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        flex-shrink: 0;
+    }
+
+    .kpi-icon-box svg {
+        width: 13px;
+        height: 13px;
+    }
+
+    /* Portal Main Tabs Mobile - 2 Tabs Ngang Gọn Gàng */
+    .portal-main-tabs {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        padding: 2px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        gap: 3px;
+        box-sizing: border-box;
+    }
+
+    .portal-tab-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 6px 4px;
+        font-size: 0.7rem;
+        box-sizing: border-box;
+        border-radius: 6px;
+    }
+
+    .portal-tab-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .portal-tab-btn span:nth-child(2) {
+        text-align: center;
+        flex: none;
+        margin: 0 4px;
+        font-size: 0.68rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tab-badge {
+        font-size: 0.62rem;
+        padding: 1px 6px;
+        flex-shrink: 0;
+    }
+
+    /* Filter Toolbar & Chips Mobile */
+    .filter-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .search-input-box {
+        max-width: 100%;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 10px;
+    }
+
+    .status-chips {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 4px;
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .status-chips::-webkit-scrollbar {
+        display: none;
+    }
+
+    .status-chip {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-size: 0.68rem;
+        padding: 4px 10px;
+    }
+
+    /* Ticket Cards Mobile - TÓM TẮT GỌN GÀNG KÈM NÚT XEM CHI TIẾT */
+    .returns-list-grid {
+        max-height: none;
+        gap: 8px;
+        padding-right: 0;
+        overflow: visible;
+    }
+
+    .return-ticket-card {
+        padding: 10px 12px;
+        border-radius: 8px;
+    }
+
+    .ticket-header {
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+        gap: 6px;
+    }
+
+    .ticket-id-group {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .ticket-id {
+        font-size: 0.85rem;
+        margin-right: 0;
+    }
+
+    .order-ref {
+        font-size: 0.7rem;
+    }
+
+    .customer-info-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.72rem;
+        margin-bottom: 6px;
+    }
+
+    .customer-info-row .ticket-date {
+        margin-left: auto;
+        font-size: 0.65rem;
+        color: #94a3b8;
+    }
+
+    /* Ẩn khối địa chỉ dài lê thê trên thẻ tóm tắt (chỉ xem trong Modal Chi tiết) */
+    .return-address-container {
+        display: none !important;
+    }
+
+    .reason-box {
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        border-left-width: 2px;
+    }
+
+    .reason-title {
+        display: none; /* Ẩn tiêu đề lý do trên thẻ tóm tắt */
+    }
+
+    .reason-text {
+        font-size: 0.72rem;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        margin-bottom: 2px;
+    }
+
+    .reason-qty {
+        font-size: 0.68rem;
+        color: #b45309;
+        font-weight: 600;
+    }
+
+    .ticket-footer {
+        padding-top: 6px;
+        width: 100%;
+    }
+
+    .ticket-action-btns {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    .btn-view-ticket-detail {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        background: #f8fafc;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 7px 10px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        white-space: nowrap;
+        flex: 1;
+        cursor: pointer;
+    }
+
+    .btn-approve-return, 
+    .btn-receive-return, 
+    .btn-reject-return {
+        flex: 1.2;
+        justify-content: center;
+        text-align: center;
+        padding: 7px 8px;
+        font-size: 0.74rem;
+        white-space: nowrap;
+    }
+
+    .completed-receipt-badge, 
+    .rejected-badge {
+        width: 100%;
+        text-align: center;
+        padding: 4px 0;
+        font-size: 0.72rem;
+    }
+
+    /* Pagination Mobile */
+    .pagination-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .pagination-info {
+        text-align: center;
+        font-size: 0.68rem;
+    }
+
+    .pagination-controls {
+        justify-content: space-between;
+        width: 100%;
+        gap: 4px;
+    }
+
+    .page-size-selector {
+        font-size: 0.68rem;
+        margin-right: 0;
+    }
+
+    .page-nav-btn {
+        padding: 4px 8px;
+        font-size: 0.68rem;
+    }
+
+    .page-num-btn {
+        min-width: 22px;
+        height: 22px;
+        font-size: 0.68rem;
+    }
+
+    /* Defective Stock Tab Mobile */
+    .defective-header-banner {
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .banner-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .defective-title {
+        font-size: 0.9rem;
+    }
+
+    .defective-subtitle {
+        display: none;
+    }
+
+    .defective-stats-row {
+        width: 100%;
+        gap: 6px;
+    }
+
+    .defective-stat-box {
+        flex: 1;
+        padding: 6px 8px;
+    }
+
+    .defective-stat-box .stat-num {
+        font-size: 1.15rem;
+    }
+
+    .defective-table-card {
+        border-radius: 8px;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-table-defective {
+        min-width: 720px;
+        font-size: 0.72rem;
+    }
+}
+

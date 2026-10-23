@@ -1,0 +1,116 @@
+name: CI/CD Pipeline - Full Lifecycle (Docker Hub + WSL Runner + Vercel)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================================
+  # 1. TEST GATE: Kiểm tra toàn bộ bài test trước khi build
+  # ============================================================================
+  test:
+    name: Run Automated Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore FashionStore.sln
+
+      - name: Run Full Regression Tests
+        run: dotnet test FashionStore.sln --no-restore --verbosity normal
+
+  # ============================================================================
+  # 2. DOCKER HUB: Tự động Build & Push Backend và Chatbot lên Docker Hub
+  # ============================================================================
+  docker-publish:
+    name: Build & Push Images to Docker Hub
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: actions/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: actions/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build & Push Backend API Image
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: quangcode153/fashion-backend:latest
+
+      # Build & Push Chatbot Stylist AI Image
+      - name: Build and Push Chatbot Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Chat_bot
+          file: ./Chat_bot/Dockerfile
+          push: true
+          tags: quangcode153/fashion-chatbot:latest
+
+  # ============================================================================
+  # 3. WSL RUNNER DEPLOY: Tự động tải Image mới xuống WSL và Restart Container
+  # ============================================================================
+  deploy-wsl:
+    name: Auto Deploy to WSL via Self-Hosted Runner
+    needs: docker-publish
+    runs-on: self-hosted
+    steps:
+      - name: Deploy on WSL
+        run: |
+          mkdir -p ~/fashion_store
+          cp docker-compose.yml ~/fashion_store/ 2>/dev/null || true
+          cd ~/fashion_store
+          docker compose pull
+          docker compose up -d
+
+  # ============================================================================
+  # 4. VERCEL DEPLOY: Build Blazor WebAssembly tĩnh & Đẩy lên Vercel CDN
+  # ============================================================================
+  vercel-deploy:
+    name: Publish Frontend to Vercel
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Blazor WebAssembly (Static Release)
+        run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        if: env.VERCEL_TOKEN != ''
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./release-frontend/wwwroot
+          vercel-args: '--prod'

@@ -82,6 +82,8 @@ public class CustomerRepository : ICustomerRepository
                 hd.tong_thanh_toan AS TongThanhToan,
                 hd.trang_thai AS TrangThai,
                 hd.so_mat_hang AS SoMatHang,
+                actual_hd.dia_chi_giao_hang AS DiaChiGiaoHang,
+                actual_hd.loai_don_hang AS LoaiDonHang,
                 (
                     SELECT TOP 1 dt.trang_thai
                     FROM DonTraHang dt
@@ -96,6 +98,7 @@ public class CustomerRepository : ICustomerRepository
                 ISNULL((SELECT SUM(ct.so_luong) FROM ChiTietHoaDon ct WHERE ct.ma_hoa_don = hd.ma_hoa_don), 0) AS TongSoLuongDaMua,
                 ISNULL((SELECT SUM(dt.so_luong) FROM DonTraHang dt WHERE dt.ma_hoa_don = hd.ma_hoa_don AND dt.trang_thai <> N'Từ chối'), 0) AS TongSoLuongDaTra
             FROM dbo.fn_LichSuMuaHangKhachHang(@CustomerId) hd
+            LEFT JOIN HoaDon actual_hd ON hd.ma_hoa_don = actual_hd.ma_hoa_don
             ORDER BY hd.ngay_lap_hoa_don DESC;";
 
         return await connection.QueryAsync<CustomerOrderHistoryItemDto>(sql, new { CustomerId = customerId });

@@ -12,7 +12,6 @@
         <div>
             <div class="header-breadcrumb">QUẢN TRỊ KHÁCH HÀNG & THÀNH VIÊN</div>
             <h2 class="page-title">QUẢN LÝ TÀI KHOẢN KHÁCH HÀNG</h2>
-            <p class="page-subtitle">Kiểm soát hồ sơ khách hàng, phân hạng thành viên VIP, điểm thưởng tích lũy và bảo mật tài khoản</p>
         </div>
         <div class="header-actions">
             <!-- Nút Tự động xét duyệt hạng VIP -->
@@ -47,26 +46,20 @@
         <div class="kpi-card">
             <div class="kpi-label">TỔNG KHÁCH HÀNG</div>
             <div class="kpi-val">@(_customersList?.Count ?? 0)</div>
-            <div class="kpi-sub">Thành viên đăng ký hệ thống</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">HẠNG THÀNH VIÊN VIP</div>
             <div class="kpi-val text-amber">
                 @(_customersList?.Count(c => c.TenCapDo == "Vàng" || c.TenCapDo == "Bạc" || c.TenCapDo == "Kim Cương") ?? 0)
             </div>
-            <div class="kpi-sub">
-                KC: @(_customersList?.Count(c => c.TenCapDo == "Kim Cương") ?? 0) &bull; Vàng: @(_customersList?.Count(c => c.TenCapDo == "Vàng") ?? 0) &bull; Bạc: @(_customersList?.Count(c => c.TenCapDo == "Bạc") ?? 0)
-            </div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">ĐANG HOẠT ĐỘNG</div>
             <div class="kpi-val text-emerald">@(_customersList?.Count(c => !c.DaXoa) ?? 0)</div>
-            <div class="kpi-sub">Được phép đăng nhập & mua sắm</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">TÀI KHOẢN ĐÃ KHÓA</div>
             <div class="kpi-val text-rose">@(_customersList?.Count(c => c.DaXoa) ?? 0)</div>
-            <div class="kpi-sub">Bị tạm khóa do vi phạm / yêu cầu</div>
         </div>
     </div>
 
@@ -78,52 +71,52 @@
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
             <input type="text" class="search-input" placeholder="Tìm theo tên, SĐT, email, tên đăng nhập..." 
-                   @bind="_searchTerm" @bind:event="oninput" />
+                   @bind="SearchTerm" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_searchTerm))
             {
-                <button type="button" class="clear-btn" @onclick="() => _searchTerm = string.Empty">×</button>
+                <button type="button" class="clear-btn" @onclick="ClearSearch">×</button>
             }
         </div>
 
         <div class="filter-controls">
             <!-- Lọc Cấp độ -->
             <div class="filter-tabs">
-                <button class="tab-btn @(_selectedRankFilter == null ? "active" : "")" @onclick="() => _selectedRankFilter = null">
+                <button class="tab-btn @(_selectedRankFilter == null ? "active" : "")" @onclick="() => SetRankFilter(null)">
                     Tất cả hạng
                 </button>
-                <button class="tab-btn @(_selectedRankFilter == 1 ? "active" : "")" @onclick="() => _selectedRankFilter = 1">
+                <button class="tab-btn @(_selectedRankFilter == 1 ? "active" : "")" @onclick="() => SetRankFilter(1)">
                     Thường
                 </button>
-                <button class="tab-btn @(_selectedRankFilter == 2 ? "active" : "")" @onclick="() => _selectedRankFilter = 2">
+                <button class="tab-btn @(_selectedRankFilter == 2 ? "active" : "")" @onclick="() => SetRankFilter(2)">
                     Bạc (Giảm 5%)
                 </button>
-                <button class="tab-btn @(_selectedRankFilter == 3 ? "active" : "")" @onclick="() => _selectedRankFilter = 3">
+                <button class="tab-btn @(_selectedRankFilter == 3 ? "active" : "")" @onclick="() => SetRankFilter(3)">
                     Vàng (Giảm 10%)
                 </button>
-                <button class="tab-btn @(_selectedRankFilter == 4 ? "active" : "")" @onclick="() => _selectedRankFilter = 4">
+                <button class="tab-btn @(_selectedRankFilter == 4 ? "active" : "")" @onclick="() => SetRankFilter(4)">
                     Kim Cương (Giảm 15%)
                 </button>
             </div>
 
             <!-- Lọc Trạng thái -->
             <div class="filter-tabs">
-                <button class="tab-btn @(_selectedStatusFilter == null ? "active" : "")" @onclick="() => _selectedStatusFilter = null">
+                <button class="tab-btn @(_selectedStatusFilter == null ? "active" : "")" @onclick="() => SetStatusFilter(null)">
                     Tất cả TT
                 </button>
-                <button class="tab-btn @(_selectedStatusFilter == false ? "active" : "")" @onclick="() => _selectedStatusFilter = false">
+                <button class="tab-btn @(_selectedStatusFilter == false ? "active" : "")" @onclick="() => SetStatusFilter(false)">
                     Hoạt động
                 </button>
-                <button class="tab-btn @(_selectedStatusFilter == true ? "active" : "")" @onclick="() => _selectedStatusFilter = true">
+                <button class="tab-btn @(_selectedStatusFilter == true ? "active" : "")" @onclick="() => SetStatusFilter(true)">
                     Đã khóa
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Bảng Danh Sách Tài Khoản Khách Hàng -->
+    <!-- Bảng Danh Sách Tài Khoản Khách Hàng (Dạng Cuộn Nội Bộ & Phân Trang Gọn Gàng) -->
     <div class="card catalog-card">
-        <div class="table-responsive">
-            <table class="admin-table">
+        <div class="table-scroll-container">
+            <table class="admin-table sticky-header-table">
                 <thead>
                     <tr>
                         <th style="width: 75px;">Mã KH</th>
@@ -157,7 +150,7 @@
                     }
                     else
                     {
-                        @foreach (var cus in FilteredCustomers)
+                        @foreach (var cus in PagedCustomers)
                         {
                             <tr class="@(cus.DaXoa ? "row-locked" : "")">
                                 <td class="font-mono text-muted">#KH-@cus.MaKhachHang</td>
@@ -256,6 +249,56 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Thanh phân trang Pagination gọn gàng -->
+        @if (TotalFilteredCount > 0)
+        {
+            <div class="pagination-footer">
+                <div class="pagination-info">
+                    Hiển thị <strong>@((_currentPage - 1) * _pageSize + 1)</strong> - <strong>@(Math.Min(_currentPage * _pageSize, TotalFilteredCount))</strong> trong tổng số <strong>@TotalFilteredCount</strong> khách hàng
+                </div>
+
+                <div class="pagination-controls">
+                    <div class="page-size-selector">
+                        <label>Số dòng:</label>
+                        <select @onchange="HandlePageSizeChange" value="@_pageSize">
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+
+                    <button class="page-nav-btn" 
+                            disabled="@(_currentPage <= 1)" 
+                            @onclick="() => ChangePage(_currentPage - 1)">
+                        &laquo; Trước
+                    </button>
+
+                    @for (int p = 1; p <= TotalPages; p++)
+                    {
+                        var pageNumber = p;
+                        @if (TotalPages <= 7 || pageNumber == 1 || pageNumber == TotalPages || Math.Abs(pageNumber - _currentPage) <= 1)
+                        {
+                            <button class="page-num-btn @(_currentPage == pageNumber ? "active" : "")" 
+                                    @onclick="() => ChangePage(pageNumber)">
+                                @pageNumber
+                            </button>
+                        }
+                        else if (Math.Abs(pageNumber - _currentPage) == 2)
+                        {
+                            <span class="page-ellipsis">...</span>
+                        }
+                    }
+
+                    <button class="page-nav-btn" 
+                            disabled="@(_currentPage >= TotalPages)" 
+                            @onclick="() => ChangePage(_currentPage + 1)">
+                        Sau &raquo;
+                    </button>
+                </div>
+            </div>
+        }
     </div>
 </div>
 
@@ -748,14 +791,46 @@
         overflow: hidden;
     }
 
-    .table-responsive {
+    .table-scroll-container {
+        max-height: 540px;
+        overflow-y: auto;
         overflow-x: auto;
+        position: relative;
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-track {
+        background: #f8fafc;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
     }
 
     .admin-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         font-size: 0.84rem;
+    }
+
+    .sticky-header-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: #f8fafc;
+        box-shadow: 0 1px 0 #e2e8f0;
     }
 
     .admin-table th {
@@ -778,6 +853,84 @@
 
     .admin-table tbody tr:hover {
         background-color: #f8fafc;
+    }
+
+    /* Thanh phân trang Pagination */
+    .pagination-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 11px 16px;
+        background: #ffffff;
+        border-top: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 0.8rem;
+    }
+
+    .pagination-info {
+        color: #64748b;
+    }
+
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .page-size-selector {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78rem;
+        color: #64748b;
+        margin-right: 8px;
+    }
+
+    .page-size-selector select {
+        padding: 4px 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        font-size: 0.78rem;
+        color: #1e293b;
+        background: #ffffff;
+        outline: none;
+        cursor: pointer;
+    }
+
+    .page-nav-btn, .page-num-btn {
+        padding: 4px 10px;
+        font-size: 0.78rem;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        border-radius: 5px;
+        cursor: pointer;
+        color: #334155;
+        font-weight: 600;
+        transition: all 0.15s ease;
+    }
+
+    .page-nav-btn:hover:not(:disabled), .page-num-btn:hover:not(.active) {
+        background: #f8fafc;
+        border-color: #94a3b8;
+    }
+
+    .page-num-btn.active {
+        background: #0f172a;
+        color: #ffffff;
+        border-color: #0f172a;
+        font-weight: 700;
+    }
+
+    .page-nav-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .page-ellipsis {
+        padding: 0 4px;
+        color: #94a3b8;
+        font-size: 0.8rem;
     }
 
     .row-locked {
@@ -1227,6 +1380,94 @@
     .text-center { text-align: center; }
     .text-right { text-align: right; }
     .text-muted { color: #94a3b8; }
+
+    @@media (max-width: 768px) {
+        .customer-management-container {
+            gap: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.25rem;
+        }
+
+        .header-actions {
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .btn-action-primary, .btn-action-secondary {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .search-input-wrapper {
+            min-width: 100%;
+            width: 100%;
+        }
+
+        .filter-controls {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .filter-tabs {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            flex-wrap: nowrap;
+            padding-bottom: 4px;
+            width: 100%;
+        }
+
+        .tab-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .table-container table, .admin-table {
+            min-width: 760px;
+        }
+
+        .modal-panel, .modal-panel-md, .modal-panel-lg {
+            width: 95vw;
+            max-width: 95vw;
+            margin: 10px;
+        }
+
+        .form-row-2 {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .modal-footer {
+            flex-direction: column-reverse;
+            gap: 8px;
+        }
+
+        .modal-footer button {
+            width: 100%;
+            justify-content: center;
+        }
+    }
 </style>
 
 @code {
@@ -1235,6 +1476,41 @@
     private string _searchTerm = string.Empty;
     private int? _selectedRankFilter = null;
     private bool? _selectedStatusFilter = null;
+
+    // Phân trang danh sách khách hàng
+    private int _currentPage = 1;
+    private int _pageSize = 15;
+
+    private string SearchTerm
+    {
+        get => _searchTerm;
+        set
+        {
+            if (_searchTerm != value)
+            {
+                _searchTerm = value;
+                _currentPage = 1;
+            }
+        }
+    }
+
+    private void ClearSearch()
+    {
+        _searchTerm = string.Empty;
+        _currentPage = 1;
+    }
+
+    private void SetRankFilter(int? rank)
+    {
+        _selectedRankFilter = rank;
+        _currentPage = 1;
+    }
+
+    private void SetStatusFilter(bool? status)
+    {
+        _selectedStatusFilter = status;
+        _currentPage = 1;
+    }
 
     // State Tự động xét duyệt hạng
     private bool _isEvaluatingRanks = false;
@@ -1287,6 +1563,37 @@
             }
 
             return list;
+        }
+    }
+
+    private int TotalFilteredCount => FilteredCustomers?.Count() ?? 0;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling((double)TotalFilteredCount / _pageSize));
+
+    private IEnumerable<CustomerAccountDto> PagedCustomers
+    {
+        get
+        {
+            if (FilteredCustomers == null) return Enumerable.Empty<CustomerAccountDto>();
+            return FilteredCustomers
+                .Skip((_currentPage - 1) * _pageSize)
+                .Take(_pageSize);
+        }
+    }
+
+    private void ChangePage(int page)
+    {
+        if (page >= 1 && page <= TotalPages)
+        {
+            _currentPage = page;
+        }
+    }
+
+    private void HandlePageSizeChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int size) && size > 0)
+        {
+            _pageSize = size;
+            _currentPage = 1;
         }
     }
 

@@ -39,6 +39,7 @@ public class ProductRepository : IProductRepository
                 bt.mau_sac AS MauSac,
                 bt.kich_co AS KichCo,
                 bt.gia_ban AS GiaBan,
+                ISNULL(bt.phan_tram_giam_gia, 0) AS PhanTramGiamGia,
                 ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
                 CASE 
                     WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'

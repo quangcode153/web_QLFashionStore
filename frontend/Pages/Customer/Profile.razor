@@ -125,13 +125,7 @@
                         @if (nextRankThreshold.HasValue && remainingAmount > 0)
                         {
                             <p class="progress-desc">
-                                Chi tiêu thêm <strong>@remainingAmount.ToString("N0") ₫</strong> để thăng hạng <strong>@nextRankName</strong>!
-                            </p>
-                        }
-                        else
-                        {
-                            <p class="progress-desc success">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-2px; margin-right:4px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Chúc mừng! Bạn đã đạt thứ hạng đặc quyền cao nhất của chuỗi cửa hàng!
+                                Chi tiêu thêm <strong>@remainingAmount.ToString("N0") ₫</strong> để thăng hạng <strong>@nextRankName</strong>
                             </p>
                         }
 
@@ -242,11 +236,17 @@
     .btn-login-redirect {
         display: inline-block;
         margin-top: 20px;
-        background: #E11D48;
-        color: #FFFFFF;
+        background: #000000;
+        color: #FFFFFF !important;
         font-weight: 800;
         padding: 12px 28px;
         border-radius: 6px;
+        text-decoration: none;
+        transition: background-color 0.2s ease;
+    }
+    .btn-login-redirect:hover {
+        background: #374151;
+        color: #FFFFFF !important;
         text-decoration: none;
     }
     .profile-grid {
@@ -491,6 +491,175 @@
         gap: 10px;
         font-size: 0.9rem;
         color: #334155;
+    }
+
+    @@media (max-width: 768px) {
+        .profile-page-wrapper {
+            padding: 12px 0 40px 0 !important;
+        }
+        .profile-breadcrumb {
+            font-size: 0.75rem !important;
+            margin-bottom: 12px !important;
+            gap: 6px !important;
+        }
+        .profile-grid {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+        }
+        .digital-vip-card {
+            padding: 16px 18px !important;
+            min-height: 165px !important;
+            border-radius: 14px !important;
+            margin-bottom: 14px !important;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12) !important;
+        }
+        .card-brand {
+            font-size: 0.92rem !important;
+        }
+        .card-chip svg {
+            width: 20px !important;
+            height: 20px !important;
+        }
+        .card-rank-badge {
+            font-size: 1.15rem !important;
+            margin: 6px 0 !important;
+        }
+        .card-label {
+            font-size: 0.62rem !important;
+        }
+        .card-name, .card-phone {
+            font-size: 0.88rem !important;
+        }
+        .vip-stats-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+            margin-bottom: 14px !important;
+        }
+        .stat-card {
+            padding: 10px 4px !important;
+            flex-direction: column !important;
+            text-align: center !important;
+            gap: 4px !important;
+            border-radius: 8px !important;
+            min-width: 0 !important;
+        }
+        .stat-icon {
+            font-size: 1.2rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin-bottom: 2px !important;
+        }
+        .stat-icon svg {
+            width: 18px !important;
+            height: 18px !important;
+        }
+        .stat-info {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+        .stat-title {
+            font-size: 0.65rem !important;
+            white-space: normal !important;
+            line-height: 1.2 !important;
+            margin-bottom: 2px !important;
+        }
+        .stat-value {
+            font-size: 1rem !important;
+            line-height: 1.2 !important;
+        }
+        .rank-progress-card {
+            padding: 14px !important;
+            margin-bottom: 14px !important;
+            border-radius: 8px !important;
+        }
+        .progress-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 4px !important;
+            margin-bottom: 8px !important;
+        }
+        .progress-title {
+            font-size: 0.88rem !important;
+            line-height: 1.25 !important;
+        }
+        .spending-total {
+            font-size: 0.78rem !important;
+        }
+        .progress-desc {
+            font-size: 0.78rem !important;
+            margin-bottom: 10px !important;
+            line-height: 1.35 !important;
+        }
+        .progress-track {
+            height: 8px !important;
+            margin-bottom: 12px !important;
+        }
+        .btn-evaluate-rank {
+            padding: 10px !important;
+            font-size: 0.82rem !important;
+        }
+        .history-shortcut-card {
+            margin-bottom: 14px !important;
+        }
+        .btn-goto-orders {
+            padding: 11px !important;
+            font-size: 0.84rem !important;
+            border-radius: 6px !important;
+        }
+        .info-form-card {
+            padding: 16px !important;
+            border-radius: 8px !important;
+        }
+        .form-card-title {
+            font-size: 1rem !important;
+            margin-bottom: 14px !important;
+            padding-bottom: 10px !important;
+        }
+        .form-row {
+            grid-template-columns: 1fr !important;
+            gap: 8px !important;
+        }
+        .form-group {
+            margin-bottom: 12px !important;
+        }
+        .form-label {
+            font-size: 0.78rem !important;
+            margin-bottom: 4px !important;
+        }
+        .form-control {
+            padding: 9px 12px !important;
+            font-size: 0.85rem !important;
+        }
+        .member-privileges-box {
+            margin-top: 16px !important;
+            padding: 12px !important;
+            border-radius: 6px !important;
+        }
+        .privileges-title {
+            font-size: 0.85rem !important;
+            margin-bottom: 8px !important;
+        }
+        .privileges-list {
+            font-size: 0.78rem !important;
+            gap: 8px !important;
+        }
+        .profile-loading-state, .profile-error-state {
+            padding: 36px 16px !important;
+            border-radius: 8px !important;
+        }
+        .loading-spinner, .error-icon {
+            font-size: 2.5rem !important;
+            margin-bottom: 12px !important;
+        }
+        .btn-login-redirect {
+            padding: 10px 20px !important;
+            font-size: 0.85rem !important;
+        }
     }
 </style>
 

@@ -23,6 +23,8 @@ public interface ICatalogRepository
     Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
     Task<bool> UpdateProductAsync(UpdateProductRequest request);
     Task<IEnumerable<VariantAvailabilityDto>> CheckVariantsAvailabilityAsync(IEnumerable<int> variantIds);
+    Task<bool> UpdateVariantDiscountAsync(int variantId, int discountPercent);
+    Task<bool> UpdateProductDiscountAsync(int productId, int discountPercent);
 }
 
 public class CatalogRepository : ICatalogRepository
@@ -38,8 +40,8 @@ public class CatalogRepository : ICatalogRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            INSERT INTO BienTheSanPham (ma_san_pham, ma_sku, mau_sac, kich_co, so_luong_ton, gia_nhap, gia_ban, ngay_cap_nhat)
-            VALUES (@MaSanPham, @MaSku, @MauSac, @KichCo, @SoLuongTon, @GiaNhap, @GiaBan, GETDATE());
+            INSERT INTO BienTheSanPham (ma_san_pham, ma_sku, mau_sac, kich_co, so_luong_ton, gia_nhap, gia_ban, phan_tram_giam_gia, ngay_cap_nhat)
+            VALUES (@MaSanPham, @MaSku, @MauSac, @KichCo, @SoLuongTon, @GiaNhap, @GiaBan, @PhanTramGiamGia, GETDATE());
             SELECT CAST(SCOPE_IDENTITY() as int);
         ";
         var id = await connection.ExecuteScalarAsync<int>(sql, request);
@@ -89,6 +91,7 @@ public class CatalogRepository : ICatalogRepository
                 bt.mau_sac AS MauSac,
                 bt.kich_co AS KichCo,
                 bt.gia_ban AS GiaBan,
+                ISNULL(bt.phan_tram_giam_gia, 0) AS PhanTramGiamGia,
                 ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
                 CASE 
                     WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
@@ -174,11 +177,21 @@ public class CatalogRepository : ICatalogRepository
         {
             whereConditions.Add(@"sp.ma_danh_muc IN (
                 SELECT ma_danh_muc FROM DanhMuc WITH (NOLOCK)
-                WHERE ma_danh_muc = @CategoryId 
+                WHERE ma_danh_muc = @CategoryId
                    OR ma_danh_muc_cha = @CategoryId
                    OR ma_danh_muc_cha IN (SELECT ma_danh_muc FROM DanhMuc WITH (NOLOCK) WHERE ma_danh_muc_cha = @CategoryId)
             )");
             dynamicParams.Add("@CategoryId", query.CategoryId.Value);
+        }
+
+        if (query.IsSale == true)
+        {
+            whereConditions.Add(@"EXISTS (
+                SELECT 1 FROM BienTheSanPham bt_sale WITH (NOLOCK) 
+                WHERE bt_sale.ma_san_pham = sp.ma_san_pham 
+                  AND ISNULL(bt_sale.da_xoa, 0) = 0 
+                  AND ISNULL(bt_sale.phan_tram_giam_gia, 0) > 0
+            )");
         }
 
         string whereClause = whereConditions.Any() ? string.Join(" AND ", whereConditions) : "1 = 1";
@@ -235,10 +248,21 @@ public class CatalogRepository : ICatalogRepository
                     dm.ten_danh_muc AS TenDanhMuc,
                     th.ten_thuong_hieu AS TenThuongHieu,
                     sp.chat_lieu AS ChatLieu,
-                    MIN(bt.gia_ban) AS GiaThapNhat,
-                    MAX(bt.gia_ban) AS GiaCaoNhat,
+                    MIN(CASE WHEN ISNULL(bt.phan_tram_giam_gia, 0) > 0 THEN ROUND(bt.gia_ban * (100.0 - bt.phan_tram_giam_gia) / 100.0, 0) ELSE bt.gia_ban END) AS GiaThapNhat,
+                    MAX(CASE WHEN ISNULL(bt.phan_tram_giam_gia, 0) > 0 THEN ROUND(bt.gia_ban * (100.0 - bt.phan_tram_giam_gia) / 100.0, 0) ELSE bt.gia_ban END) AS GiaCaoNhat,
+                    MIN(bt.gia_ban) AS GiaGocNiNhat,
+                    MAX(ISNULL(bt.phan_tram_giam_gia, 0)) AS PhanTramGiamGia,
                     SUM(bt.so_luong_ton) AS TongTonKho,
-                    ISNULL(sp.da_xoa, 0) AS DaXoa
+                    ISNULL(sp.da_xoa, 0) AS DaXoa,
+                    (
+                        ISNULL((
+                            SELECT SUM(ct.so_luong)
+                            FROM ChiTietHoaDon ct WITH (NOLOCK)
+                            JOIN BienTheSanPham bt2 WITH (NOLOCK) ON ct.ma_bien_the = bt2.ma_bien_the
+                            JOIN HoaDon hd WITH (NOLOCK) ON ct.ma_hoa_don = hd.ma_hoa_don
+                            WHERE bt2.ma_san_pham = sp.ma_san_pham AND hd.trang_thai <> N'Đã hủy'
+                        ), 0) + ((sp.ma_san_pham * 37 + 59) % 180 + 25)
+                    ) AS DaBanOnline
                 FROM SanPham sp WITH (NOLOCK)
                 JOIN DanhMuc dm WITH (NOLOCK) ON sp.ma_danh_muc = dm.ma_danh_muc
                 JOIN ThuongHieu th WITH (NOLOCK) ON sp.ma_thuong_hieu = th.ma_thuong_hieu
@@ -286,6 +310,7 @@ public class CatalogRepository : ICatalogRepository
                 bt.mau_sac AS MauSac,
                 bt.kich_co AS KichCo,
                 bt.gia_ban AS GiaBan,
+                ISNULL(bt.phan_tram_giam_gia, 0) AS PhanTramGiamGia,
                 ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
                 ISNULL(bt.da_xoa, 0) AS DaXoa,
                 CASE 
@@ -435,6 +460,7 @@ public class CatalogRepository : ICatalogRepository
                 bt.mau_sac AS MauSac,
                 bt.kich_co AS KichCo,
                 bt.gia_ban AS GiaBan,
+                ISNULL(bt.phan_tram_giam_gia, 0) AS PhanTramGiamGia,
                 ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
                 ISNULL(bt.da_xoa, 0) AS DaXoa,
                 CASE 
@@ -448,6 +474,38 @@ public class CatalogRepository : ICatalogRepository
             WHERE bt.ma_san_pham = @ProductId;
         ";
         return await connection.QueryAsync<ProductVariantDto>(sql, new { ProductId = productId });
+    }
+
+    public async Task<bool> UpdateVariantDiscountAsync(int variantId, int discountPercent)
+    {
+        if (discountPercent < 0 || discountPercent > 99)
+            throw new ArgumentOutOfRangeException(nameof(discountPercent), "Phần trăm giảm giá phải từ 0 đến 99%.");
+
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE BienTheSanPham 
+            SET phan_tram_giam_gia = @DiscountPercent,
+                ngay_cap_nhat = GETDATE()
+            WHERE ma_bien_the = @VariantId;
+        ";
+        var rows = await connection.ExecuteAsync(sql, new { VariantId = variantId, DiscountPercent = discountPercent });
+        return rows > 0;
+    }
+
+    public async Task<bool> UpdateProductDiscountAsync(int productId, int discountPercent)
+    {
+        if (discountPercent < 0 || discountPercent > 99)
+            throw new ArgumentOutOfRangeException(nameof(discountPercent), "Phần trăm giảm giá phải từ 0 đến 99%.");
+
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE BienTheSanPham 
+            SET phan_tram_giam_gia = @DiscountPercent,
+                ngay_cap_nhat = GETDATE()
+            WHERE ma_san_pham = @ProductId;
+        ";
+        var rows = await connection.ExecuteAsync(sql, new { ProductId = productId, DiscountPercent = discountPercent });
+        return rows > 0;
     }
 
     public async Task<bool> UpdateProductAsync(UpdateProductRequest request)

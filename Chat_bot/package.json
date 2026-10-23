@@ -1,0 +1,28 @@
+{
+  "name": "fashion-store-chatbot",
+  "version": "1.0.0",
+  "description": "AI Chatbot tư vấn sản phẩm, biến thể và kiểm tra tồn kho cho FashionStoreDB",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "chatbot",
+    "ai",
+    "gemini",
+    "sqlserver",
+    "ecommerce"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/identity": "^4.5.0",
+    "@google/generative-ai": "^0.24.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mssql": "^11.0.1"
+  }
+}

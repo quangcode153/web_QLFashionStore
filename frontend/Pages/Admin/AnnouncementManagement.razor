@@ -11,7 +11,6 @@
     <div class="page-header">
         <div>
             <h2 class="page-title">THÔNG BÁO NỘI BỘ & ĐIỀU HÀNH</h2>
-            <p class="page-subtitle">Soạn và phát tin tức điều hành từ Quản trị viên đến toàn thể nhân viên chi nhánh</p>
         </div>
         <div class="header-actions">
             <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadAnnouncements" disabled="@_isLoading" title="Tải lại danh sách">
@@ -34,23 +33,8 @@
                 </svg>
                 <h3 class="card-title">SOẠN VÀ PHÁT THÔNG BÁO ĐIỀU HÀNH MỚI</h3>
             </div>
-            <span class="header-note">Tự động truyền tin tức thời qua SignalR tới màn hình nhân viên</span>
         </div>
 
-        @if (_isBranchManager)
-        {
-            <div class="branch-scope-banner">
-                <div class="scope-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                </div>
-                <div class="scope-text">
-                    <div class="scope-title">Giới hạn quyền phát thông báo: Cửa hàng trưởng (@_branchName)</div>
-                    <div class="scope-desc">Theo quy định phân quyền, Quản lý chi nhánh chỉ có quyền phát thông báo tới các nhân viên trực thuộc cùng chi nhánh @_branchName. Quyền phát toàn hệ thống thuộc về Quản lý chuỗi (Admin).</div>
-                </div>
-            </div>
-        }
 
         <div class="form-body">
             <div class="form-row form-row-2">
@@ -511,6 +495,49 @@
     @@keyframes spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
+    }
+
+    @@media (max-width: 768px) {
+        .announcement-container {
+            gap: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.25rem;
+        }
+
+        .btn-refresh {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .form-row.form-row-2, .form-row-2 {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .form-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .btn-submit {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .announcement-top {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
     }
 </style>
 

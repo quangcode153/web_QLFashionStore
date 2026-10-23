@@ -11,7 +11,6 @@
         <div>
             <div class="header-breadcrumb">CATALOG CHUỖI CỬA HÀNG QF</div>
             <h2 class="page-title">QUẢN LÝ SẢN PHẨM & BIẾN THỂ</h2>
-            <p class="page-subtitle">Quản lý catalog thời trang QF Noir, bảng giá, phân loại kích cỡ và tồn kho chi nhánh</p>
         </div>
         <div class="header-actions">
             <!-- Nút Thêm biến thể nổi bật -->
@@ -116,6 +115,12 @@
                                         <a href="javascript:void(0)" class="prod-name-link" @onclick="() => OpenViewVariantsModal(prod)">
                                             @prod.TenSanPham
                                         </a>
+                                        @if (prod.PhanTramGiamGia > 0)
+                                        {
+                                            <span style="background: #FFE4E6; color: #E11D48; font-weight: 800; font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; border: 1px solid #FECDD3; margin-left: 6px;">
+                                                SALE -@prod.PhanTramGiamGia%
+                                            </span>
+                                        }
                                         @if (!string.IsNullOrWhiteSpace(prod.ChatLieu))
                                         {
                                             <span class="prod-material">@prod.ChatLieu</span>
@@ -256,7 +261,6 @@
                 <div>
                     <div class="modal-badge">QF NOIR CATALOG</div>
                     <h3 class="modal-title">THÊM BIẾN THỂ SẢN PHẨM</h3>
-                    <p class="modal-subtitle">Bổ sung 1 biến thể (Cặp Màu sắc & Kích cỡ) mới cho sản phẩm</p>
                 </div>
                 <button type="button" class="btn-close-modal" @onclick="CloseCreateVariantModal">✕</button>
             </div>
@@ -383,21 +387,6 @@
                     </div>
                 </div>
 
-                <!-- Cảnh báo nếu trùng lặp biến thể Màu + Size -->
-                @if (IsDuplicateVariant)
-                {
-                    <div class="alert-box alert-error" style="background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; margin-bottom: 1rem;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <span>
-                            <strong>Đã tồn tại biến thể này!</strong> Sản phẩm này đã có biến thể <strong>[Màu: @(string.IsNullOrWhiteSpace(_variantForm.MauSac) ? "Mặc định" : _variantForm.MauSac) - Size: @(string.IsNullOrWhiteSpace(_variantForm.KichCo) ? "Free" : _variantForm.KichCo)]</strong>. Hệ thống chặn trùng để bảo vệ dữ liệu tồn kho hiện có!
-                        </span>
-                    </div>
-                }
-
                 <!-- Mã SKU -->
                 <div class="form-group">
                     <div class="label-with-action">
@@ -423,12 +412,20 @@
                     </div>
                 </div>
 
-                <!-- Thông báo bảo toàn nguyên tắc kho: Tồn kho khởi tạo = 0 -->
-                <div class="stock-zero-notice">
-                    <div class="notice-icon">🔒</div>
-                    <div class="notice-content">
-                        <strong>Tồn kho khởi tạo: 0 cái</strong>
-                        <p>Theo nguyên tắc bảo toàn kho, biến thể mới tạo chưa có số lượng tồn. Để phân bổ hàng về kho chi nhánh cụ thể có chứng từ nhà cung cấp, vui lòng tạo <strong>Phiếu nhập kho</strong> tại Quản lý kho.</p>
+                <div class="form-group">
+                    <label class="form-label">
+                        % Giảm giá (SALE)
+                        <span class="text-muted" style="font-size: 0.72rem; font-weight: normal;">(0% = Không giảm giá, 1-99% = Khuyến mãi SALE)</span>
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" class="form-control tabular-nums" style="max-width: 120px;" min="0" max="99" @bind="_variantForm.PhanTramGiamGia" />
+                        <span style="font-weight: 700;">%</span>
+                        @if (_variantForm.PhanTramGiamGia > 0 && _variantForm.GiaBan > 0)
+                        {
+                            <span style="color: #E11D48; font-weight: 700; font-size: 0.88rem;">
+                                → Giá sau giảm: @(((decimal)Math.Round(_variantForm.GiaBan * (100 - _variantForm.PhanTramGiamGia) / 100m, 0)).ToString("N0")) đ
+                            </span>
+                        }
                     </div>
                 </div>
 
@@ -482,11 +479,21 @@
             </div>
 
             <div class="modal-body-p0">
-                <div class="variant-toolbar">
+                <div class="variant-toolbar" style="flex-wrap: wrap; gap: 10px;">
                     <span class="variant-count">Tổng cộng <strong>@(_productVariantsList?.Count ?? 0)</strong> biến thể cấu hình</span>
-                    <button type="button" class="btn-add-variant-quick" @onclick="() => SwitchToCreateVariantFromView(_viewingProduct)">
-                        + Thêm biến thể mới cho sản phẩm này
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <div class="batch-discount-bar" style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #FFF1F2; border: 1px dashed #FDA4AF; border-radius: 6px;">
+                            <span style="font-size: 0.78rem; font-weight: 700; color: #BE123C;">🔥 Giảm giá toàn bộ SP:</span>
+                            <input type="number" min="0" max="99" style="width: 55px; padding: 2px 6px; border: 1px solid #FDA4AF; border-radius: 4px; font-size: 0.8rem; text-align: center;" placeholder="%" @bind="_batchDiscountPercent" />
+                            <span style="font-weight: 700; color: #BE123C; font-size: 0.8rem;">%</span>
+                            <button type="button" class="btn-action-primary" style="padding: 3px 8px; font-size: 0.75rem; background: #E11D48; border-color: #E11D48; color: #FFFFFF; border-radius: 4px; cursor: pointer;" @onclick="ApplyBatchDiscountToProduct" disabled="@_isUpdatingDiscount">
+                                @(_isUpdatingDiscount ? "..." : "Áp dụng")
+                            </button>
+                        </div>
+                        <button type="button" class="btn-add-variant-quick" @onclick="() => SwitchToCreateVariantFromView(_viewingProduct)">
+                            + Thêm biến thể mới
+                        </button>
+                    </div>
                 </div>
 
                 @if (_isLoadingVariants)
@@ -511,7 +518,9 @@
                                     <th>Mã SKU</th>
                                     <th>Màu sắc</th>
                                     <th>Kích cỡ</th>
-                                    <th class="text-right">Giá bán niêm yết</th>
+                                    <th class="text-right">Giá niêm yết</th>
+                                    <th class="text-center" style="width: 140px;">% Giảm (SALE)</th>
+                                    <th class="text-right">Giá sau giảm</th>
                                     <th class="text-center">Số lượng tồn</th>
                                     <th class="text-center">Tình trạng</th>
                                     <th class="text-center">Hiển thị</th>
@@ -534,7 +543,35 @@
                                             </div>
                                         </td>
                                         <td><span class="size-pill">@v.KichCo</span></td>
-                                        <td class="text-right tabular-nums font-weight-bold">@v.GiaBan.ToString("N0") đ</td>
+                                        <td class="text-right tabular-nums">@v.GiaBan.ToString("N0") đ</td>
+                                        <td class="text-center">
+                                            <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                                <input type="number" min="0" max="99" 
+                                                       style="width: 52px; text-align: center; padding: 2px 4px; border: 1px solid @(v.PhanTramGiamGia > 0 ? "#E11D48" : "#CBD5E1"); border-radius: 4px; font-weight: 700; font-size: 0.82rem; color: @(v.PhanTramGiamGia > 0 ? "#E11D48" : "#1E293B");"
+                                                       @bind="v.PhanTramGiamGia" />
+                                                <span style="font-size: 0.78rem; font-weight: 700; color: #64748B;">%</span>
+                                                <button type="button" 
+                                                        style="border: none; background: #0F172A; color: #FFFFFF; border-radius: 4px; padding: 2px 6px; font-size: 0.72rem; cursor: pointer;"
+                                                        title="Lưu % giảm giá cho biến thể này"
+                                                        @onclick="() => SaveVariantDiscount(v)"
+                                                        disabled="@_isUpdatingDiscount">
+                                                    Lưu
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="text-right tabular-nums">
+                                            @if (v.PhanTramGiamGia > 0)
+                                            {
+                                                <div>
+                                                    <strong style="color: #E11D48;">@(((decimal)Math.Round(v.GiaBan * (100 - v.PhanTramGiamGia) / 100m, 0)).ToString("N0")) đ</strong>
+                                                    <div style="font-size: 0.72rem; color: #94A3B8; text-decoration: line-through;">@v.GiaBan.ToString("N0") đ</div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">@v.GiaBan.ToString("N0") đ</span>
+                                            }
+                                        </td>
                                         <td class="text-center tabular-nums">
                                             <span class="stock-badge @(v.SoLuongTon <= 10 ? "stock-badge-low" : "")">
                                                 @v.SoLuongTon
@@ -717,7 +754,6 @@
                 <div class="form-group">
                     <label class="form-label">Đường dẫn hình ảnh chính (URL) <span class="required">*</span></label>
                     <input type="text" class="form-control" placeholder="https://images.unsplash.com/..." @bind="_productMainImageUrl" />
-                    <span class="form-hint">Quy tắc CSDL: Sản phẩm bắt buộc phải có ít nhất 1 hình ảnh đại diện hợp lệ.</span>
                 </div>
             </div>
 
@@ -1904,6 +1940,130 @@
     .btn-action-ghost.text-danger {
         color: #ef4444;
     }
+
+    /* RESPONSIVE DESIGN CHO PRODUCT MANAGEMENT (MOBILE & TABLET) */
+    @@media (max-width: 768px) {
+        .products-container {
+            gap: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .page-title {
+            font-size: 1.2rem;
+        }
+
+        .header-actions {
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .btn-action-primary,
+        .btn-action-secondary {
+            width: 100%;
+            justify-content: center;
+            font-size: 0.78rem;
+            padding: 8px 12px;
+        }
+
+        .catalog-filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .search-input-wrapper {
+            width: 100%;
+            max-width: none;
+        }
+
+        .search-catalog-input {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.8rem;
+        }
+
+        .status-filter-group {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding: 2px;
+        }
+
+        .status-filter-group::-webkit-scrollbar {
+            display: none;
+        }
+
+        .status-filter-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+            font-size: 0.72rem;
+            padding: 4px 8px;
+        }
+
+        .table-card {
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+        }
+
+        .admin-table,
+        .variant-table {
+            min-width: 650px;
+            font-size: 0.78rem;
+        }
+
+        .admin-table th,
+        .admin-table td,
+        .variant-table th,
+        .variant-table td {
+            padding: 8px 10px;
+        }
+
+        .pagination-bar {
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+        }
+
+        .modal-card {
+            width: 95vw;
+            max-width: 95vw;
+            margin: 10px auto;
+            max-height: 92vh;
+        }
+
+        .modal-header,
+        .modal-body,
+        .modal-footer {
+            padding: 12px 14px;
+        }
+
+        .form-row-2,
+        .form-row-3 {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .variant-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+            padding: 10px 14px;
+        }
+    }
 </style>
 
 @code {
@@ -2289,7 +2449,7 @@
 
         if (IsDuplicateVariant)
         {
-            _variantErrorMessage = $"Sản phẩm này đã có biến thể [Màu: {_variantForm.MauSac} - Size: {_variantForm.KichCo}]. Hệ thống chặn trùng để bảo vệ dữ liệu tồn kho hiện có!";
+            _variantErrorMessage = $"Biến thể [Màu: {_variantForm.MauSac} - Size: {_variantForm.KichCo}] đã tồn tại.";
             return;
         }
 
@@ -2376,6 +2536,77 @@
         _isViewVariantsModalOpen = false;
         _viewingProduct = null;
         _productVariantsList = null;
+        _batchDiscountPercent = 0;
+    }
+
+    private int _batchDiscountPercent = 0;
+    private bool _isUpdatingDiscount = false;
+
+    private async Task SaveVariantDiscount(ProductVariantDto variant)
+    {
+        if (variant == null) return;
+        if (variant.PhanTramGiamGia < 0 || variant.PhanTramGiamGia > 99)
+        {
+            Toast.ShowWarning("Phần trăm giảm giá phải từ 0% đến 99%.");
+            return;
+        }
+
+        _isUpdatingDiscount = true;
+        try
+        {
+            var res = await AdminApi.UpdateVariantDiscountAsync(variant.MaBienThe, variant.PhanTramGiamGia);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã cập nhật giảm giá {variant.PhanTramGiamGia}% cho biến thể {variant.MaSku}!");
+                await LoadProducts();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể cập nhật giảm giá biến thể.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isUpdatingDiscount = false;
+        }
+    }
+
+    private async Task ApplyBatchDiscountToProduct()
+    {
+        if (_viewingProduct == null) return;
+        if (_batchDiscountPercent < 0 || _batchDiscountPercent > 99)
+        {
+            Toast.ShowWarning("Phần trăm giảm giá phải từ 0% đến 99%.");
+            return;
+        }
+
+        _isUpdatingDiscount = true;
+        try
+        {
+            var res = await AdminApi.UpdateProductDiscountAsync(_viewingProduct.MaSanPham, _batchDiscountPercent);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã áp dụng giảm giá {_batchDiscountPercent}% cho toàn bộ biến thể của sản phẩm #{_viewingProduct.MaSanPham}!");
+                await LoadProductVariants(_viewingProduct.MaSanPham);
+                await LoadProducts();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể cập nhật giảm giá.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isUpdatingDiscount = false;
+        }
     }
 
     private async Task SwitchToCreateVariantFromView(ProductListItemDto prod)

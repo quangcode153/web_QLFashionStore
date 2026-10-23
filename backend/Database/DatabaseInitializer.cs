@@ -205,10 +205,31 @@ public static class DatabaseInitializer
         try
         {
             string sql = GetIncrementalMigrationsSql();
-            using var cmd = dbConn.CreateCommand();
-            cmd.CommandText = sql;
-            cmd.CommandTimeout = 60;
-            cmd.ExecuteNonQuery();
+            using (var cmd = dbConn.CreateCommand())
+            {
+                cmd.CommandText = sql;
+                cmd.CommandTimeout = 60;
+                cmd.ExecuteNonQuery();
+            }
+
+            try
+            {
+                var procBatches = Regex.Split(GetUpdateProcedureSql(), @"^\s*GO\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+                foreach (var batch in procBatches)
+                {
+                    var trimmed = batch.Trim();
+                    if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                    using var cmdSp = dbConn.CreateCommand();
+                    cmdSp.CommandText = trimmed;
+                    cmdSp.CommandTimeout = 60;
+                    cmdSp.ExecuteNonQuery();
+                }
+            }
+            catch (Exception exSp)
+            {
+                logger.LogWarning("Bỏ qua lỗi cập nhật procedure: {Msg}", exSp.Message);
+            }
+
             logger.LogInformation("Kiểm tra và áp dụng các migration gia tăng (Incremental Migrations) an toàn thành công.");
         }
         catch (Exception ex)
@@ -313,6 +334,255 @@ BEGIN
         ALTER TABLE BienTheSanPham ADD da_xoa BIT DEFAULT 0 NOT NULL;
     END;
 END;
+
+-- 8. Bổ sung cột phan_tram_giam_gia vào BienTheSanPham nếu thiếu
+IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'BienTheSanPham')
+BEGIN
+    IF COL_LENGTH('BienTheSanPham', 'phan_tram_giam_gia') IS NULL
+    BEGIN
+        ALTER TABLE BienTheSanPham ADD phan_tram_giam_gia INT DEFAULT 0 NOT NULL;
+    END;
+END;
 ";
+    }
+
+    private static string GetUpdateProcedureSql()
+    {
+        return @"
+CREATE OR ALTER PROCEDURE dbo.sp_ThemSanPhamVaoHoaDon
+    @MaHoaDon INT,
+    @MaBienThe INT,
+    @SoLuong INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @MaChiNhanh INT;
+        SELECT @MaChiNhanh = ma_chi_nhanh
+        FROM HoaDon 
+        WHERE ma_hoa_don = @MaHoaDon;
+
+        IF (@MaChiNhanh IS NULL OR @MaChiNhanh <= 0)
+        BEGIN
+            SELECT TOP 1 @MaChiNhanh = ma_chi_nhanh 
+            FROM ChiNhanh 
+            WHERE is_online_warehouse = 1 AND dang_hoat_dong = 1;
+        END;
+
+        DECLARE @DonGia DECIMAL(12,2);
+        SELECT @DonGia = CASE 
+            WHEN ISNULL(phan_tram_giam_gia, 0) > 0 
+            THEN ROUND(gia_ban * (100.0 - phan_tram_giam_gia) / 100.0, 0)
+            ELSE gia_ban 
+        END
+        FROM BienTheSanPham
+        WHERE ma_bien_the = @MaBienThe;
+
+        IF (@DonGia IS NULL)
+        BEGIN
+            RAISERROR(N'Biến thể sản phẩm không tồn tại!', 16, 1);
+        END;
+
+        DECLARE @TonChiNhanh INT = 0;
+        SELECT @TonChiNhanh = ISNULL(so_luong_ton, 0)
+        FROM TonKhoChiNhanh
+        WHERE ma_chi_nhanh = @MaChiNhanh AND ma_bien_the = @MaBienThe;
+
+        IF (@TonChiNhanh < @SoLuong)
+        BEGIN
+            DECLARE @TenCN NVARCHAR(200);
+            SELECT @TenCN = ten_chi_nhanh FROM ChiNhanh WHERE ma_chi_nhanh = @MaChiNhanh;
+            DECLARE @Msg NVARCHAR(500) = N'Số lượng tồn kho tại chi nhánh [' + ISNULL(@TenCN, N'Kho') + N'] không đủ để xuất bán cho mặt hàng này (Hiện còn: ' + CAST(@TonChiNhanh AS NVARCHAR(10)) + N')!';
+            RAISERROR(@Msg, 16, 1);
+        END;
+
+        IF EXISTS (SELECT 1 FROM ChiTietHoaDon WHERE ma_hoa_don = @MaHoaDon AND ma_bien_the = @MaBienThe)
+        BEGIN
+            UPDATE ChiTietHoaDon
+            SET so_luong = so_luong + @SoLuong
+            WHERE ma_hoa_don = @MaHoaDon AND ma_bien_the = @MaBienThe;
+
+            UPDATE TonKhoChiNhanh
+            SET so_luong_ton = so_luong_ton - @SoLuong,
+                ngay_cap_nhat = GETDATE()
+            WHERE ma_chi_nhanh = @MaChiNhanh AND ma_bien_the = @MaBienThe;
+
+            UPDATE BienTheSanPham
+            SET so_luong_ton = (
+                SELECT ISNULL(SUM(so_luong_ton), 0)
+                FROM TonKhoChiNhanh
+                WHERE ma_bien_the = @MaBienThe
+            )
+            WHERE ma_bien_the = @MaBienThe;
+
+            INSERT INTO NhatKyKho (ma_bien_the, so_luong_thay_doi, ly_do, nguoi_thay_doi, loai_nguoi_thay_doi, thoi_gian, ma_chi_nhanh)
+            VALUES (@MaBienThe, -@SoLuong, 'BAN_HANG', NULL, 'NHAN_VIEN', GETDATE(), @MaChiNhanh);
+        END
+        ELSE
+        BEGIN
+            INSERT INTO ChiTietHoaDon (ma_hoa_don, ma_bien_the, so_luong, don_gia)
+            VALUES (@MaHoaDon, @MaBienThe, @SoLuong, @DonGia);
+        END;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        DECLARE @ErrMsg NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrMsg, 16, 1);
+    END CATCH;
+END;
+GO
+CREATE OR ALTER PROCEDURE dbo.sp_TaoHoaDonMoi
+    @MaKhachHang INT = NULL,
+    @MaNhanVien INT = NULL,
+    @MaGiamGia VARCHAR(20) = NULL,
+    @MaChiNhanh INT = NULL,
+    @MaHoaDonMoi INT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @MaKhuyenMai INT = NULL;
+
+        -- Tìm mã khuyến mãi nếu có truyền vào
+        IF (@MaGiamGia IS NOT NULL AND @MaGiamGia <> '')
+        BEGIN
+            SELECT @MaKhuyenMai = ma_khuyen_mai
+            FROM ChuongTrinhKhuyenMai
+            WHERE ma_giam_gia = @MaGiamGia
+              AND CAST(GETDATE() AS DATE) BETWEEN ngay_bat_dau AND ngay_ket_thuc;
+
+            IF (@MaKhuyenMai IS NULL)
+            BEGIN
+                RAISERROR(N'Mã giảm giá không tồn tại hoặc đã hết hạn sử dụng!', 16, 1);
+            END;
+
+            -- 1. Kiểm tra số lượt dùng toàn hệ thống
+            IF EXISTS (SELECT 1 FROM ChuongTrinhKhuyenMai WHERE ma_khuyen_mai = @MaKhuyenMai AND so_luong_dung <= 0)
+            BEGIN
+                RAISERROR(N'Mã giảm giá đã hết lượt sử dụng!', 16, 1);
+            END;
+
+            -- 2. Ràng buộc: Mỗi mã chỉ có tác dụng với 1 tài khoản ở 1 đơn hàng (trừ đơn đã hủy)
+            IF (@MaKhachHang IS NOT NULL AND EXISTS (
+                SELECT 1 FROM HoaDon 
+                WHERE ma_khach_hang = @MaKhachHang 
+                  AND ma_khuyen_mai = @MaKhuyenMai 
+                  AND trang_thai <> N'Đã hủy'
+            ))
+            BEGIN
+                RAISERROR(N'Tài khoản này đã sử dụng mã giảm giá trên. Mỗi tài khoản chỉ được áp dụng 1 lần duy nhất!', 16, 1);
+            END;
+
+            -- 3. Trừ số lượt sử dụng
+            UPDATE ChuongTrinhKhuyenMai 
+            SET so_luong_dung = CASE WHEN so_luong_dung > 0 THEN so_luong_dung - 1 ELSE 0 END
+            WHERE ma_khuyen_mai = @MaKhuyenMai;
+        END;
+
+        -- Xác định chi nhánh: Nếu chưa có thì lấy từ nhân viên, nếu vẫn null thì mặc định Kho Tổng Online (9)
+        IF (@MaChiNhanh IS NULL OR @MaChiNhanh <= 0)
+        BEGIN
+            IF (@MaNhanVien IS NOT NULL AND @MaNhanVien > 0)
+            BEGIN
+                SELECT @MaChiNhanh = ma_chi_nhanh FROM NhanVien WHERE ma_nhan_vien = @MaNhanVien;
+            END;
+        END;
+
+        IF (@MaChiNhanh IS NULL OR @MaChiNhanh <= 0)
+        BEGIN
+            SET @MaChiNhanh = 9; -- Kho Tổng QF Tân Bình (Online Channel)
+        END;
+
+        INSERT INTO HoaDon (
+            ma_khach_hang,
+            ma_nhan_vien,
+            ma_chi_nhanh,
+            ma_khuyen_mai,
+            ngay_lap_hoa_don,
+            tien_hang,
+            tien_giam_gia,
+            tong_thanh_toan,
+            trang_thai
+        )
+        VALUES (
+            @MaKhachHang,
+            @MaNhanVien,
+            @MaChiNhanh,
+            @MaKhuyenMai,
+            GETDATE(),
+            0,
+            0,
+            0,
+            N'Chờ xử lý'
+        );
+
+        SET @MaHoaDonMoi = SCOPE_IDENTITY();
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH;
+END;
+GO
+CREATE OR ALTER TRIGGER trg_CapNhatTongTienHoaDon
+ON ChiTietHoaDon
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @HoaDonList TABLE (ma_hoa_don INT PRIMARY KEY);
+
+    INSERT INTO @HoaDonList (ma_hoa_don)
+    SELECT DISTINCT ma_hoa_don FROM inserted
+    UNION
+    SELECT DISTINCT ma_hoa_don FROM deleted;
+
+    -- Cập nhật lại tien_hang, tien_giam_gia và tong_thanh_toan
+    -- RÀNG BUỘC TOÁN HỌC: Tổng tiền giảm (Voucher + VIP) tối đa không được vượt quá tiền hàng (không giảm âm)
+    UPDATE hd
+    SET 
+        hd.tien_hang = ISNULL(ct.TongTienHang, 0),
+        hd.tien_giam_gia = CASE 
+            WHEN (dbo.fn_TinhTienGiamGiaVoucher(hd.ma_khuyen_mai, ISNULL(ct.TongTienHang, 0)) 
+                  + (ISNULL(ct.TongTienHang, 0) * ISNULL(cd.phan_tram_giam_gia, 0) / 100.0)) > ISNULL(ct.TongTienHang, 0)
+            THEN ISNULL(ct.TongTienHang, 0)
+            ELSE (dbo.fn_TinhTienGiamGiaVoucher(hd.ma_khuyen_mai, ISNULL(ct.TongTienHang, 0)) 
+                  + (ISNULL(ct.TongTienHang, 0) * ISNULL(cd.phan_tram_giam_gia, 0) / 100.0))
+        END,
+        hd.tong_thanh_toan = CASE 
+            WHEN ISNULL(ct.TongTienHang, 0) < (dbo.fn_TinhTienGiamGiaVoucher(hd.ma_khuyen_mai, ISNULL(ct.TongTienHang, 0)) 
+                                              + (ISNULL(ct.TongTienHang, 0) * ISNULL(cd.phan_tram_giam_gia, 0) / 100.0))
+            THEN 0
+            ELSE ISNULL(ct.TongTienHang, 0) - (dbo.fn_TinhTienGiamGiaVoucher(hd.ma_khuyen_mai, ISNULL(ct.TongTienHang, 0)) 
+                                              + (ISNULL(ct.TongTienHang, 0) * ISNULL(cd.phan_tram_giam_gia, 0) / 100.0))
+        END
+    FROM HoaDon hd
+    JOIN @HoaDonList hdl ON hd.ma_hoa_don = hdl.ma_hoa_don
+    LEFT JOIN KhachHang kh ON hd.ma_khach_hang = kh.ma_khach_hang
+    LEFT JOIN CapDoThanhVien cd ON kh.ma_cap_do = cd.ma_cap_do
+    OUTER APPLY (
+        SELECT SUM(so_luong * don_gia) AS TongTienHang
+        FROM ChiTietHoaDon
+        WHERE ma_hoa_don = hd.ma_hoa_don
+    ) ct;
+END;";
     }
 }

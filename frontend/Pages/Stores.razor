@@ -234,6 +234,69 @@
     .btn-store-call:hover {
         color: #0F172A !important;
     }
+
+    /* Mobile Responsive Styling */
+    @@media (max-width: 768px) {
+        .stores-page-container {
+            padding: 1rem 0 calc(35px + env(safe-area-inset-bottom, 0px)) 0;
+        }
+        .stores-breadcrumb {
+            font-size: 0.76rem;
+            margin-bottom: 1rem;
+        }
+        .stores-header {
+            margin-bottom: 1.25rem;
+        }
+        .stores-title {
+            font-size: 1.35rem;
+            margin-bottom: 0.35rem;
+        }
+        .stores-subtitle {
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+        .stores-filter-bar {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            flex-wrap: nowrap;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+        }
+        .stores-filter-bar::-webkit-scrollbar {
+            display: none;
+        }
+        .city-chip {
+            white-space: nowrap;
+            font-size: 0.84rem;
+            padding: 0.3rem 0;
+            flex-shrink: 0;
+        }
+        .stores-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem;
+        }
+        .store-item {
+            padding-bottom: 1.25rem;
+        }
+        .store-name {
+            font-size: 1.05rem;
+        }
+        .store-info-row {
+            font-size: 0.82rem;
+            margin-bottom: 0.45rem;
+        }
+        .store-actions {
+            gap: 1.25rem;
+            margin-top: 0.75rem;
+            padding-top: 0.5rem;
+        }
+        .btn-store-map, .btn-store-call {
+            font-size: 0.8rem;
+        }
+    }
 </style>
 
 @code {

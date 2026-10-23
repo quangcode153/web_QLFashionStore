@@ -9,7 +9,6 @@
     <div class="page-header">
         <div>
             <h2 class="page-title">QUẢN LÝ CHÍNH SÁCH BÁN HÀNG & DỊCH VỤ</h2>
-            <p class="page-subtitle">Tùy biến nội dung chính sách giao vận, đổi trả, bảo hành, thành viên VIP và điều khoản lưu trữ trong CSDL SQL Server (Dynamic CMS)</p>
         </div>
         <div class="header-actions">
             <button class="btn-add-policy" @onclick="OpenCreateModal" title="Thêm chính sách mới" aria-label="Thêm chính sách mới">
@@ -678,6 +677,53 @@
     }
     .btn-danger-confirm:hover:not(:disabled) {
         background: #dc2626;
+    }
+
+    @@media (max-width: 768px) {
+        .policies-admin-container {
+            padding: 12px;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 1.25rem;
+        }
+
+        .btn-add-policy {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .admin-table {
+            min-width: 750px;
+        }
+
+        .modal-dialog-custom {
+            width: 95vw;
+            max-width: 95vw;
+            margin: 10px;
+            max-height: 92vh;
+        }
+
+        .form-row-2 {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .modal-footer-custom {
+            flex-direction: column-reverse;
+            gap: 8px;
+        }
+
+        .modal-footer-custom button {
+            width: 100%;
+            justify-content: center;
+        }
     }
 </style>
 

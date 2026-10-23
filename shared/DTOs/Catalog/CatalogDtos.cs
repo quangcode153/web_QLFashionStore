@@ -9,9 +9,13 @@ public class ProductListItemDto
     public string? ChatLieu { get; set; }
     public decimal GiaThapNhat { get; set; }
     public decimal GiaCaoNhat { get; set; }
+    public decimal GiaGocNiNhat { get; set; }
+    public int PhanTramGiamGia { get; set; }
+    public bool CoGiamGia => PhanTramGiamGia > 0;
     public int TongTonKho { get; set; }
     public string? AnhDaiDien { get; set; }
     public bool DaXoa { get; set; }
+    public int DaBanOnline { get; set; }
 }
 
 public class ProductVariantDto
@@ -23,6 +27,8 @@ public class ProductVariantDto
     public string MauSac { get; set; } = string.Empty;
     public string KichCo { get; set; } = string.Empty;
     public decimal GiaBan { get; set; }
+    public int PhanTramGiamGia { get; set; }
+    public decimal GiaSauGiam => PhanTramGiamGia > 0 ? Math.Round(GiaBan * (100 - PhanTramGiamGia) / 100m, 0) : GiaBan;
     public int SoLuongTon { get; set; }
     public string TinhTrangHang { get; set; } = string.Empty;
     public string? HinhAnh { get; set; }
@@ -83,7 +89,20 @@ public class CreateProductVariantRequest
     public string KichCo { get; set; } = string.Empty;
     public decimal GiaNhap { get; set; }
     public decimal GiaBan { get; set; }
+    public int PhanTramGiamGia { get; set; } = 0;
     public int SoLuongTon { get; set; }
+}
+
+public class UpdateVariantDiscountRequest
+{
+    public int MaBienThe { get; set; }
+    public int PhanTramGiamGia { get; set; }
+}
+
+public class UpdateProductDiscountRequest
+{
+    public int MaSanPham { get; set; }
+    public int PhanTramGiamGia { get; set; }
 }
 
 public class ProductBranchStockDto
