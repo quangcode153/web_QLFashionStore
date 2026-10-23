@@ -41,7 +41,8 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
                 ["JWT_SECRET_KEY"] = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? TestJwtSecret,
                 ["PASSWORD_PEPPER"] = Environment.GetEnvironmentVariable("PASSWORD_PEPPER") ?? TestPepper,
                 ["JWT_ISSUER"] = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "FashionStoreBackend",
-                ["JWT_AUDIENCE"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "FashionStoreClients"
+                ["JWT_AUDIENCE"] = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "FashionStoreClients",
+                ["CONNECTION_STRING"] = Environment.GetEnvironmentVariable("CONNECTION_STRING") ?? "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;"
             };
 
             config.AddInMemoryCollection(testConfigs);

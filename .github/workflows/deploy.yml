@@ -25,6 +25,10 @@ jobs:
         run: dotnet restore FashionStore.sln
 
       - name: Run Full Regression Tests
+        env:
+          JWT_SECRET_KEY: "SuperSecretKeyForFashionStoreBTL2026VeryStrong!"
+          PASSWORD_PEPPER: "PepperSecretKeyFashionStore2026"
+          CONNECTION_STRING: "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;"
         run: dotnet test FashionStore.sln --no-restore --verbosity normal
 
   # ============================================================================

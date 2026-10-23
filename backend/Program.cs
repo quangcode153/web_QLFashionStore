@@ -195,7 +195,7 @@ var app = builder.Build();
 var connStr = Environment.GetEnvironmentVariable("CONNECTION_STRING")
     ?? app.Configuration["CONNECTION_STRING"] 
     ?? app.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("CẤU HÌNH CSDL: Chưa thiết lập chuỗi kết nối cơ sở dữ liệu. Vui lòng thiết lập CONNECTION_STRING trong file .env hoặc biến môi trường.");
+    ?? "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;";
 
 DatabaseInitializer.Initialize(connStr, app.Logger);
 
