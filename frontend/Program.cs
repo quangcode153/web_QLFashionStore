@@ -1,6 +1,16 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Frontend;
+
+// Cấu hình định dạng số và tiền tệ Việt Nam (vi-VN) chuẩn toàn hệ thống
+var viCulture = new CultureInfo("vi-VN");
+viCulture.NumberFormat.NumberGroupSeparator = ".";
+viCulture.NumberFormat.NumberDecimalSeparator = ",";
+viCulture.NumberFormat.CurrencyGroupSeparator = ".";
+viCulture.NumberFormat.CurrencyDecimalSeparator = ",";
+CultureInfo.DefaultThreadCurrentCulture = viCulture;
+CultureInfo.DefaultThreadCurrentUICulture = viCulture;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
