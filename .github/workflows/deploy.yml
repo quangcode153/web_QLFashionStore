@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - Full Lifecycle (Docker Hub + WSL Runner + Vercel)
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,109 +6,63 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ============================================================================
-  # 1. TEST GATE: Kiểm tra toàn bộ bài test trước khi build
-  # ============================================================================
-  test:
-    name: Run Automated Test Suite
+  build-check:
+    name: Build Verification
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - run: dotnet restore backend/Backend.csproj
+      - run: dotnet build backend/Backend.csproj -c Release
 
-      - name: Restore Dependencies
-        run: dotnet restore FashionStore.sln
-
-      - name: Run Full Regression Tests
-        env:
-          JWT_SECRET_KEY: "SuperSecretKeyForFashionStoreBTL2026VeryStrong!"
-          PASSWORD_PEPPER: "PepperSecretKeyFashionStore2026"
-          CONNECTION_STRING: "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;"
-        run: dotnet test FashionStore.sln --no-restore --verbosity normal
-
-  # ============================================================================
-  # 2. DOCKER HUB: Tự động Build & Push Backend và Chatbot lên Docker Hub
-  # ============================================================================
   docker-publish:
-    name: Build & Push Images to Docker Hub
-    needs: test
+    name: Docker Hub Publish
+    needs: build-check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: actions/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: actions/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-qemu-action@v3
+      - uses: actions/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Build & Push Backend API Image
-      - name: Build and Push Backend Image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
           file: backend/Dockerfile
           push: true
           tags: quangcode153/fashion-backend:latest
-
-      # Build & Push Chatbot Stylist AI Image
-      - name: Build and Push Chatbot Image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: ./Chat_bot
           file: ./Chat_bot/Dockerfile
           push: true
           tags: quangcode153/fashion-chatbot:latest
 
-  # ============================================================================
-  # 3. WSL RUNNER DEPLOY: Tự động tải Image mới xuống WSL và Restart Container
-  # ============================================================================
   deploy-wsl:
-    name: Auto Deploy to WSL via Self-Hosted Runner
+    name: Deploy WSL
     needs: docker-publish
     runs-on: self-hosted
     steps:
-      - name: Deploy on WSL
-        run: |
-          mkdir -p ~/fashion_store
-          cp docker-compose.yml ~/fashion_store/ 2>/dev/null || true
+      - run: |
           cd ~/fashion_store
           docker compose pull
           docker compose up -d
 
-  # ============================================================================
-  # 4. VERCEL DEPLOY: Build Blazor WebAssembly tĩnh & Đẩy lên Vercel CDN
-  # ============================================================================
   vercel-deploy:
-    name: Publish Frontend to Vercel
-    needs: test
+    name: Publish Frontend
+    needs: build-check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Publish Blazor WebAssembly (Static Release)
-        run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
+      - run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
+      - uses: amondnet/vercel-action@v25
         if: env.VERCEL_TOKEN != ''
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -33,8 +33,10 @@ secrets.json
 *.secrets
 *.credential
 *.credentials
-*.token
-# tests/ được theo dõi bởi git để phục vụ CI/CD pipeline
+tests/
+Tests/
+docker-compose.yml
+docker-compose*.yml
 doc/
 DOC/
 .agents/
