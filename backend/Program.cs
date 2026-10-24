@@ -69,7 +69,19 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(allowedCorsOrigins)
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrEmpty(origin)) return false;
+                  if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                  {
+                      return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || 
+                             uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) || 
+                             uri.Host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                             uri.Host.EndsWith("ngrok-free.dev", StringComparison.OrdinalIgnoreCase) ||
+                             uri.Host.EndsWith("ngrok-free.app", StringComparison.OrdinalIgnoreCase);
+                  }
+                  return false;
+              })
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();

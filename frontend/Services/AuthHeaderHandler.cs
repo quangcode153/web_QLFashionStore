@@ -37,6 +37,9 @@ public class AuthHeaderHandler : DelegatingHandler
             // Fail-safe khi JS interop chưa sẵn sàng trong môi trường prerender hoặc unit test
         }
 
+        // Tự động bỏ qua trang cảnh báo trình duyệt của ngrok free
+        request.Headers.TryAddWithoutValidation("ngrok-skip-browser-warning", "true");
+
         return await base.SendAsync(request, cancellationToken);
     }
 }

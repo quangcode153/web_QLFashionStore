@@ -2,17 +2,22 @@
   // Tránh nhúng 2 lần
   if (document.getElementById('qf-chat-widget-root')) return;
 
-  // Xác định URL của Chatbot API server (Hỗ trợ cấu hình window.QF_CHATBOT_URL)
-  let backendUrl = window.QF_CHATBOT_URL || 'http://localhost:3001';
-  const scriptTag = document.currentScript;
-  if (!window.QF_CHATBOT_URL && scriptTag && scriptTag.src) {
+  // Xác định URL của Chatbot API server (Tự động đồng bộ với BackendUrl của hệ thống)
+  let backendUrl = window.QF_CHATBOT_URL;
+  if (!backendUrl) {
     try {
-      const url = new URL(scriptTag.src);
-      if (url.port === '3001') {
-        backendUrl = `${url.protocol}//${url.host}`;
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'appsettings.json', false);
+      xhr.send();
+      if (xhr.status === 200) {
+        const cfg = JSON.parse(xhr.responseText);
+        if (cfg.BackendUrl) {
+          backendUrl = cfg.BackendUrl.replace(/\/+$/, '');
+        }
       }
     } catch (e) {}
   }
+  if (!backendUrl) backendUrl = 'http://localhost:5000';
 
   // Tự động nhúng widget.css nếu chưa có
   if (!document.getElementById('qf-widget-style')) {
@@ -190,7 +195,10 @@
     try {
       const res = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({
           message: msg,
           history: history

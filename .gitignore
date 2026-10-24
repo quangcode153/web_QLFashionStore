@@ -92,3 +92,6 @@ Chat_bot/.env.*
 pair_ai.py
 __pycache__/
 *.pyc
+publish/
+ngrok.exe
+.vercel/
