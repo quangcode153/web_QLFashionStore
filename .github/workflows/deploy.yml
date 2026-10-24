@@ -62,22 +62,51 @@ jobs:
           docker compose up -d
 
   vercel-deploy:
-    name: Publish Frontend
+    name: Publish Frontend to Vercel
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check Frontend Changes (Chỉ deploy khi bản mới có thay đổi)
+        id: check_changes
+        run: |
+          if [ $(git rev-list --count HEAD) -gt 1 ]; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^(frontend/|shared/)' || true)
+          else
+            CHANGED="initial"
+          fi
+
+          if [ -n "$CHANGED" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Phát hiện thay đổi trong mã nguồn frontend/shared:"
+            echo "$CHANGED"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Không có thay đổi trong frontend/shared. Bỏ qua bước build & deploy Vercel."
+          fi
+
+      - name: Setup .NET 8 SDK
+        if: steps.check_changes.outputs.has_changes == 'true'
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
-      - uses: amondnet/vercel-action@v25
-        if: env.VERCEL_TOKEN != ''
+
+      - name: Build & Publish Release Frontend
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
+
+      - name: Deploy to Vercel Production
+        if: steps.check_changes.outputs.has_changes == 'true' && env.VERCEL_TOKEN != ''
+        uses: amondnet/vercel-action@v25
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
           working-directory: ./release-frontend/wwwroot
-          vercel-args: '--prod'
+          vercel-args: '--prod --alias qf-fashion.vercel.app'
+

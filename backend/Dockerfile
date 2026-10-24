@@ -29,6 +29,9 @@ WORKDIR /app
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 ENV TZ=Asia/Ho_Chi_Minh
 
+# Cài đặt curl để hỗ trợ container healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Cấu hình cổng Kestrel chạy cố định tại port 5000
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_HTTP_PORTS=5000
