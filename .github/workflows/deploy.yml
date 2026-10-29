@@ -108,5 +108,5 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
           working-directory: ./release-frontend/wwwroot
-          vercel-args: '--prod --alias qf-fashion.vercel.app'
+          vercel-args: '--prod'
 
