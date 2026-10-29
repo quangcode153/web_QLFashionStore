@@ -9,6 +9,8 @@ public class DailyRevenueReportDto
 {
     public DateTime NgayBan { get; set; }
     public int TongSoDon { get; set; }
+    public int SoDonHoan { get; set; }
+    public int SoDonThanhCong => Math.Max(0, TongSoDon - SoDonHoan);
     public decimal TongTienHang { get; set; }
     public decimal TongTienGiam { get; set; }
     public decimal TongTienHoan { get; set; }

@@ -30,6 +30,20 @@ public class CustomerOrderHistoryItemDto
     public int TongSoLuongDaTra { get; set; }
     public string? DiaChiGiaoHang { get; set; }
     public string? LoaiDonHang { get; set; }
+    public string? HinhAnhDaiDien { get; set; }
+    public string? TenSanPhamDauTien { get; set; }
+
+    public bool DaThanhToan
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(DiaChiGiaoHang)) return false;
+            return DiaChiGiaoHang.Contains("ĐÃ THANH TOÁN", StringComparison.OrdinalIgnoreCase)
+                || DiaChiGiaoHang.Contains("ĐÃ CHUYỂN KHOẢN", StringComparison.OrdinalIgnoreCase)
+                || DiaChiGiaoHang.Contains("THU HỘ 0Đ", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(TrangThai, "Đã hoàn thành", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     public string PhuongThucThanhToan
     {
@@ -43,13 +57,19 @@ public class CustomerOrderHistoryItemDto
             {
                 return "COD (Thanh toán khi nhận hàng)";
             }
+            if (DiaChiGiaoHang.Contains("MOMO", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Ví MoMo";
+            }
             if (DiaChiGiaoHang.Contains("VIETQR", StringComparison.OrdinalIgnoreCase))
             {
                 return "Chuyển khoản VietQR";
             }
-            if (DiaChiGiaoHang.Contains("MOMO", StringComparison.OrdinalIgnoreCase))
+            if (DiaChiGiaoHang.Contains("CHUYỂN KHOẢN", StringComparison.OrdinalIgnoreCase)
+                || DiaChiGiaoHang.Contains("QR", StringComparison.OrdinalIgnoreCase)
+                || DiaChiGiaoHang.Contains("THU HỘ 0Đ", StringComparison.OrdinalIgnoreCase))
             {
-                return "Ví MoMo";
+                return "Chuyển khoản QR";
             }
             return "COD (Thanh toán khi nhận hàng)";
         }

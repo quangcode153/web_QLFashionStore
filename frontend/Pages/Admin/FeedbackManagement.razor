@@ -67,7 +67,7 @@
     </div>
 
     <!-- Danh sách Tickets Khiếu nại / Góp ý -->
-    <div class="feedback-list-container">
+    <div class="feedback-list-container feedback-scroll-container">
         @if (_isLoading)
         {
             <div class="loading-state">
@@ -318,6 +318,30 @@
     .filter-tab.active {
         background: #0f172a;
         color: #ffffff;
+    }
+
+    .feedback-list-container, .feedback-scroll-container {
+        max-height: calc(100vh - 290px);
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
+    .feedback-scroll-container::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .feedback-scroll-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    .feedback-scroll-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    .feedback-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
     }
 
     .tickets-grid {

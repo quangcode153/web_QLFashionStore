@@ -22,6 +22,24 @@ app.use(express.static(path.join(__dirname, '../public')));
 // Routes
 app.use('/api', chatRoutes);
 
+// Middleware xử lý lỗi tập trung (ngăn chặn crash khi nhận JSON lỗi hoặc request bất thường)
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Dữ liệu JSON không hợp lệ.' });
+  }
+  console.error('[Server Error]', err);
+  return res.status(500).json({ error: 'Lỗi máy chủ nội bộ.', details: err.message });
+});
+
+// Bảo vệ tiến trình chống crash do lỗi không mong muốn
+process.on('uncaughtException', (err) => {
+  console.error('[Uncaught Exception]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Unhandled Rejection]', reason);
+});
+
 // Khởi động server
 app.listen(PORT, async () => {
   console.log('====================================================');

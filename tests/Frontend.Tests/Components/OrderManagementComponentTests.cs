@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Shared.Constants;
 using Shared.DTOs.Order;
+using Shared.DTOs.Warehouse;
 using Xunit;
 using Frontend.Pages.Admin;
 using Frontend.Services;
@@ -192,6 +193,72 @@ public class OrderManagementComponentTests : BunitContext
         cut.Markup.Should().Contain("#PH-501");
         cut.Markup.Should().Contain("Yêu cầu hoàn trả hàng");
         cut.Find("button.btn-approve-return").Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "UI-ORD-08: Bộ lọc trạng thái đa chọn cho phép lọc các đơn hàng thỏa mãn 1 hoặc nhiều tiêu chí cùng lúc")]
+    public void OrderManagement_MultiSelectStatusFilter_FiltersOrdersMatchingAnySelectedStatus()
+    {
+        // Arrange: Tạo đơn gồm nhiều trạng thái
+        var customOrders = new List<OrderSummaryDto>
+        {
+            new() { MaHoaDon = 201, TenKhachHang = "A", TrangThai = "Chờ xử lý", TienHang = 100000, TongThanhToan = 100000 },
+            new() { MaHoaDon = 202, TenKhachHang = "B", TrangThai = "Đang giao hàng", TienHang = 200000, TongThanhToan = 200000 },
+            new() { MaHoaDon = 203, TenKhachHang = "C", TrangThai = "Đã hoàn thành", TienHang = 300000, TongThanhToan = 300000 },
+            new() { MaHoaDon = 204, TenKhachHang = "D", TrangThai = "Đã hủy", TienHang = 400000, TongThanhToan = 400000 }
+        };
+        _mockAdminApi.Setup(api => api.GetAllOrdersAsync(It.IsAny<int?>())).ReturnsAsync(customOrders);
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+
+        var cut = Render<OrderManagement>();
+
+        // Phải có bộ lọc trạng thái đa chọn (Dropdown / Multi-select)
+        var triggerBtn = cut.Find(".status-multiselect-trigger");
+        triggerBtn.Should().NotBeNull();
+        triggerBtn.Click();
+
+        // Chọn "Đã hoàn thành" và "Đã hủy"
+        var chkCompleted = cut.Find("input[data-status-checkbox='Đã hoàn thành']");
+        var chkCancelled = cut.Find("input[data-status-checkbox='Đã hủy']");
+        chkCompleted.Change(true);
+        chkCancelled.Change(true);
+
+        // Assert: Danh sách lọc phải chứa #203 và #204, không chứa #201, #202
+        cut.Markup.Should().Contain("#203");
+        cut.Markup.Should().Contain("#204");
+        cut.Markup.Should().NotContain("#201");
+        cut.Markup.Should().NotContain("#202");
+    }
+
+    [Fact(DisplayName = "UI-ORD-09: Bộ chọn chi nhánh có ô search gõ từ khóa lọc nhanh danh sách chi nhánh")]
+    public void OrderManagement_SearchableBranchSelector_FiltersBranchListBySearchTerm()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+        _mockAdminApi.Setup(api => api.GetBranchesAsync()).ReturnsAsync(new List<BranchDto>
+        {
+            new() { MaChiNhanh = 1, TenChiNhanh = "QF Sư Vạn Hạnh (Q.10, TP.HCM)" },
+            new() { MaChiNhanh = 2, TenChiNhanh = "QF Quang Trung (Q. Gò Vấp, TP.HCM)" },
+            new() { MaChiNhanh = 3, TenChiNhanh = "QF Cầu Giấy (Hà Nội)" }
+        });
+
+        var cut = Render<OrderManagement>();
+
+        // Phải có custom searchable dropdown chi nhánh
+        var branchCombobox = cut.Find(".branch-searchable-combobox");
+        branchCombobox.Should().NotBeNull();
+
+        // Mở popup
+        var btnOpen = cut.Find(".branch-combobox-trigger");
+        btnOpen.Click();
+
+        // Gõ từ khóa tìm kiếm "Hà Nội"
+        var searchInput = cut.Find(".branch-search-input");
+        searchInput.Input("Hà Nội");
+
+        // Assert: Trong danh sách popup chỉ còn gợi ý Cầu Giấy Hà Nội, không còn Quang Trung hay Sư Vạn Hạnh
+        var items = cut.FindAll(".branch-combobox-item");
+        items.Should().Contain(i => i.TextContent.Contains("Cầu Giấy"));
+        items.Should().NotContain(i => i.TextContent.Contains("Quang Trung"));
     }
 
     private List<FeedbackDto> CreateSampleFeedbacks()

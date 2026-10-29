@@ -77,7 +77,29 @@
                         <th>Danh mục</th>
                         <th>Thương hiệu</th>
                         <th class="text-right">Khoảng giá</th>
-                        <th class="text-center">Tổng tồn</th>
+                        <th class="text-center sortable-th sortable-total-stock" @onclick="ToggleStockSort" style="cursor: pointer; user-select: none;" title="Nhấn để sắp xếp theo Tổng tồn">
+                            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                                <span>Tổng tồn</span>
+                                @if (_sortStockOrder == "DESC")
+                                {
+                                    <span class="sort-badge" title="Đang xếp: Cao nhất đến bé nhất">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                                        <small>Cao &rarr; Thấp</small>
+                                    </span>
+                                }
+                                else if (_sortStockOrder == "ASC")
+                                {
+                                    <span class="sort-badge" title="Đang xếp: Bé nhất đến cao nhất">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                                        <small>Thấp &rarr; Cao</small>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>
+                                }
+                            </div>
+                        </th>
                         <th class="text-center">Tình trạng</th>
                         <th class="text-center">Hiển thị</th>
                         <th class="text-center" style="width: 170px;">Thao tác</th>
@@ -1056,6 +1078,24 @@
         text-align: left;
         font-size: 0.78rem;
         letter-spacing: 0.02em;
+    }
+
+    .sortable-th:hover {
+        background-color: #f1f5f9;
+        color: #2563eb;
+    }
+
+    .sort-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        background: #eff6ff;
+        color: #2563eb;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        border: 1px solid #bfdbfe;
     }
 
     .admin-table td {
@@ -2150,18 +2190,50 @@
     private readonly string[] _popularColors = new[] { "Đen", "Trắng", "Xám Ghi", "Be Sáng", "Xanh Navy", "Xanh Rêu", "Nâu Cafe" };
     private readonly string[] _popularSizes = new[] { "Free", "S", "M", "L", "XL", "XXL", "29", "30", "31", "32" };
 
+    private string _sortStockOrder = "NONE"; // NONE, DESC, ASC
+
+    private void ToggleStockSort()
+    {
+        if (_sortStockOrder == "NONE")
+        {
+            _sortStockOrder = "DESC";
+        }
+        else if (_sortStockOrder == "DESC")
+        {
+            _sortStockOrder = "ASC";
+        }
+        else
+        {
+            _sortStockOrder = "NONE";
+        }
+    }
+
     private IEnumerable<ProductListItemDto>? FilteredProducts
     {
         get
         {
             if (_pagedResult?.Items == null) return null;
-            if (string.IsNullOrWhiteSpace(_searchTerm)) return _pagedResult.Items;
-            
-            var term = _searchTerm.Trim().ToLowerInvariant();
-            return _pagedResult.Items.Where(p => 
-                p.TenSanPham.ToLowerInvariant().Contains(term) ||
-                p.MaSanPham.ToString().Contains(term) ||
-                p.TenDanhMuc.ToLowerInvariant().Contains(term));
+            IEnumerable<ProductListItemDto> query = _pagedResult.Items;
+
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant();
+                query = query.Where(p => 
+                    p.TenSanPham.ToLowerInvariant().Contains(term) ||
+                    p.MaSanPham.ToString().Contains(term) ||
+                    p.TenDanhMuc.ToLowerInvariant().Contains(term));
+            }
+
+            if (_sortStockOrder == "DESC")
+            {
+                query = query.OrderByDescending(p => p.TongTonKho);
+            }
+            else if (_sortStockOrder == "ASC")
+            {
+                query = query.OrderBy(p => p.TongTonKho);
+            }
+
+            return query;
         }
     }
 

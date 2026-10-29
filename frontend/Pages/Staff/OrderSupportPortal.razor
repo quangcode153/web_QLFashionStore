@@ -62,13 +62,70 @@
                     </label>
                     <select class="admin-branch-select" 
                             value="@_adminSelectedBranchId" 
-                            @onchange="OnAdminBranchFilterChanged">
+                            @onchange="OnAdminBranchFilterChanged"
+                            style="display: none;">
                         <option value="0">🌐 Toàn bộ chuỗi (Tất cả chi nhánh)</option>
                         @foreach (var br in _branches)
                         {
                             <option value="@br.MaChiNhanh">@br.TenChiNhanh @(br.IsOnlineWarehouse || br.MaChiNhanh == 9 ? "🌐 (Kho Tổng Online)" : "")</option>
                         }
                     </select>
+
+                    <!-- Searchable Combobox hỗ trợ tìm kiếm nhanh theo tên & địa chỉ -->
+                    <div class="branch-searchable-combobox">
+                        <button type="button" class="branch-combobox-trigger" @onclick="ToggleBranchDropdown">
+                            <span class="branch-current-name">@SelectedBranchDisplayName</span>
+                            <span class="branch-arrow">@(_isBranchDropdownOpen ? "▲" : "▼")</span>
+                        </button>
+
+                        @if (_isBranchDropdownOpen)
+                        {
+                            <div class="branch-combobox-popover">
+                                <div class="branch-search-box">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                    </svg>
+                                    <input type="text" class="branch-search-input" placeholder="Tìm nhanh tên chi nhánh, địa chỉ..."
+                                           @bind="_branchSearchText" @bind:event="oninput" autofocus />
+                                    @if (!string.IsNullOrWhiteSpace(_branchSearchText))
+                                    {
+                                        <button type="button" class="branch-clear-btn" @onclick="() => _branchSearchText = string.Empty">×</button>
+                                    }
+                                </div>
+                                <div class="branch-combobox-list">
+                                    <div class="branch-combobox-item @(_adminSelectedBranchId == 0 ? "active" : "")" @onclick="() => SelectBranch(0)">
+                                        <div class="branch-item-info">
+                                            <span class="branch-item-title">🌐 Toàn bộ chuỗi (Tất cả chi nhánh)</span>
+                                            <span class="branch-item-address">Phạm vi chuỗi toàn quốc</span>
+                                        </div>
+                                        <span class="branch-item-badge badge-all">Toàn chuỗi</span>
+                                    </div>
+                                    @foreach (var b in DisplayedBranches)
+                                    {
+                                        <div class="branch-combobox-item @(_adminSelectedBranchId == b.MaChiNhanh ? "active" : "")" @onclick="() => SelectBranch(b.MaChiNhanh)">
+                                            <div class="branch-item-info">
+                                                <span class="branch-item-title">@b.TenChiNhanh</span>
+                                                <span class="branch-item-address">@b.DiaChi</span>
+                                            </div>
+                                            @if (b.IsOnlineWarehouse || b.MaChiNhanh == 9)
+                                            {
+                                                <span class="branch-item-badge badge-online">Kho Online</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="branch-item-badge badge-store">Cửa hàng</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (DisplayedBranches.Count == 0 && !string.IsNullOrWhiteSpace(_branchSearchText))
+                                    {
+                                        <div class="branch-empty-text">Không tìm thấy chi nhánh nào khớp với "@_branchSearchText"</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
             }
             <button class="btn btn-refresh" @onclick="LoadDataAsync" disabled="@_isLoading" title="Tải lại dữ liệu">
@@ -657,6 +714,52 @@
     private bool _isBranchManager = false;
     private bool _isOrderCoordinator = false;
     private int _adminSelectedBranchId = 0;
+    private bool _isBranchDropdownOpen = false;
+    private string _branchSearchText = string.Empty;
+
+    private string SelectedBranchDisplayName
+    {
+        get
+        {
+            if (_adminSelectedBranchId == 0) return "🌐 Toàn bộ chuỗi (Tất cả chi nhánh)";
+            var branch = _branches.FirstOrDefault(b => b.MaChiNhanh == _adminSelectedBranchId);
+            if (branch == null) return $"Chi nhánh #{_adminSelectedBranchId}";
+            return branch.TenChiNhanh + (branch.IsOnlineWarehouse || branch.MaChiNhanh == 9 ? " 🌐 (Kho Tổng Online)" : "");
+        }
+    }
+
+    private List<global::Shared.DTOs.Warehouse.BranchDto> DisplayedBranches
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_branchSearchText))
+                return _branches;
+
+            var term = _branchSearchText.Trim().ToLowerInvariant();
+            return _branches.Where(b =>
+                (!string.IsNullOrEmpty(b.TenChiNhanh) && b.TenChiNhanh.ToLowerInvariant().Contains(term)) ||
+                (!string.IsNullOrEmpty(b.DiaChi) && b.DiaChi.ToLowerInvariant().Contains(term)) ||
+                b.MaChiNhanh.ToString().Contains(term)).ToList();
+        }
+    }
+
+    private void ToggleBranchDropdown()
+    {
+        _isBranchDropdownOpen = !_isBranchDropdownOpen;
+        if (_isBranchDropdownOpen)
+        {
+            _branchSearchText = string.Empty;
+        }
+    }
+
+    private void SelectBranch(int branchId)
+    {
+        _adminSelectedBranchId = branchId;
+        _isBranchDropdownOpen = false;
+        _branchSearchText = string.Empty;
+        ResetReturnPage();
+        CalculateKpi();
+    }
 
     // KPI Counters cho Đổi Trả & Hoàn Kho
     private int _pendingReturnCount = 0;

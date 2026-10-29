@@ -20,9 +20,9 @@
 
     <!-- Danh sách Chính Sách -->
     <div class="card">
-        <div class="table-responsive">
-            <table class="admin-table">
-                <thead>
+        <div class="table-responsive table-scroll-container">
+            <table class="admin-table sticky-header-table">
+                <thead class="sticky-thead">
                     <tr>
                         <th style="width: 70px;" class="text-center">Thứ tự</th>
                         <th style="width: 220px;">Đường dẫn (Slug)</th>
@@ -304,6 +304,33 @@
         border: 1px solid #e2e8f0;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         overflow: hidden;
+    }
+    .table-scroll-container {
+        max-height: calc(100vh - 260px);
+        overflow-y: auto;
+    }
+    .table-scroll-container::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .table-scroll-container::-webkit-scrollbar-track {
+        background: #f1f5f9;
+    }
+    .table-scroll-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .sticky-header-table thead, .sticky-thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .sticky-header-table thead th, .sticky-thead th {
+        background: #f8fafc;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
     .admin-table {
         width: 100%;

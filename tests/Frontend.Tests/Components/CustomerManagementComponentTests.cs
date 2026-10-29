@@ -250,5 +250,88 @@ public class CustomerManagementComponentTests : BunitContext
             sizeSelector.Should().NotBeNull();
         });
     }
+
+    [Fact]
+    public async Task CustomerManagement_ToggleSpendingSort_SortsCustomersCorrectly()
+    {
+        // Arrange
+        var cut = Render<CustomerManagement>();
+        cut.WaitForElement("th.sortable-spending");
+
+        var sortHeader = cut.Find("th.sortable-spending");
+
+        // Act 1: Click once -> DESC (Cao nhat len dau)
+        await cut.InvokeAsync(() => sortHeader.Click());
+
+        // Assert 1: Row 1 should be #KH-1 (15,000,000)
+        cut.WaitForAssertion(() =>
+        {
+            var firstRow = cut.Find("tbody tr:first-child");
+            firstRow.InnerHtml.Should().Contain("#KH-1");
+            var iconBox = cut.Find("th.sortable-spending .sort-icon-box");
+            iconBox.InnerHtml.Should().Contain("Cao");
+        });
+
+        // Act 2: Click twice -> ASC (Thap nhat len dau)
+        await cut.InvokeAsync(() => sortHeader.Click());
+
+        // Assert 2: Row 1 should be #KH-2 (1,200,000)
+        cut.WaitForAssertion(() =>
+        {
+            var firstRow = cut.Find("tbody tr:first-child");
+            firstRow.InnerHtml.Should().Contain("#KH-2");
+            var iconBox = cut.Find("th.sortable-spending .sort-icon-box");
+            iconBox.InnerHtml.Should().Contain("Thấp");
+        });
+
+        // Act 3: Click third time -> NONE (Reset)
+        await cut.InvokeAsync(() => sortHeader.Click());
+        cut.WaitForAssertion(() =>
+        {
+            var iconBox = cut.Find("th.sortable-spending .sort-icon-box");
+            iconBox.InnerHtml.Should().Contain("↕");
+        });
+    }
+
+    [Fact]
+    public async Task CustomerManagement_FunnelFilter_FiltersByRankAndStatusCorrectly()
+    {
+        // Arrange
+        var cut = Render<CustomerManagement>();
+        cut.WaitForElement("button.funnel-trigger-btn");
+
+        var funnelBtn = cut.Find("button.funnel-trigger-btn");
+
+        // Act 1: Click open funnel
+        await cut.InvokeAsync(() => funnelBtn.Click());
+
+        // Assert 1: Funnel menu is open
+        cut.WaitForElement(".funnel-dropdown-menu");
+        cut.Markup.Should().Contain("BỘ LỌC KHÁCH HÀNG");
+
+        // Act 2: Select rank "Vàng" (MaCapDo = 3)
+        var goldOption = cut.Find("input[data-rank-id='3']");
+        await cut.InvokeAsync(() => goldOption.Change(true));
+
+        // Assert 2: Only 1 customer (#KH-1) shown
+        cut.WaitForAssertion(() =>
+        {
+            var rows = cut.FindAll("tbody tr");
+            rows.Count.Should().Be(1);
+            cut.Markup.Should().Contain("#KH-1");
+            cut.Markup.Should().NotContain("#KH-2");
+        });
+
+        // Act 3: Click reset all
+        var resetBtn = cut.Find("button.btn-link-action");
+        await cut.InvokeAsync(() => resetBtn.Click());
+
+        // Assert 3: Both customers restored
+        cut.WaitForAssertion(() =>
+        {
+            var rows = cut.FindAll("tbody tr");
+            rows.Count.Should().Be(2);
+        });
+    }
 }
 

@@ -61,7 +61,7 @@ namespace Backend.Controllers
         /// </summary>
         [HttpPost("confirm-paid/{orderId:int}")]
         [AllowAnonymous]
-        public async Task<IActionResult> ConfirmPaid(int orderId, [FromQuery] string? transactionRef)
+        public async Task<IActionResult> ConfirmPaid(int orderId, [FromQuery] string? method = "MOMO", [FromQuery] string? transactionRef = null)
         {
             var ownership = await _orderService.GetOrderOwnershipAsync(orderId);
             if (!ownership.Exists)
@@ -69,24 +69,46 @@ namespace Backend.Controllers
                 return NotFound(ApiResponse<bool>.Fail($"Không tìm thấy đơn hàng #{orderId}"));
             }
 
-            // Ghi nhận thanh toán: Đơn hàng vẫn bảo toàn trạng thái chuẩn "Chờ xử lý" trong CSDL
-            // để Điều phối viên và Thủ kho tiếp nhận duyệt, đóng gói và chuyển sang "Đang giao hàng"
-            var currentAddress = await _orderRepository.GetOrderShippingAddressAsync(orderId) ?? "";
-            if (!currentAddress.Contains("ĐÃ THANH TOÁN") && !currentAddress.Contains("ĐÃ CHUYỂN KHOẢN"))
+            // Ghi nhận thanh toán: Cập nhật tag PTTT sang MoMo hoặc VietQR tương ứng
+            string normalizedMethod = (method ?? "MOMO").ToUpperInvariant();
+            string newTag;
+            string methodLabel;
+
+            if (normalizedMethod == "VIETQR" || normalizedMethod == "CHUYEN_KHOAN")
             {
-                string updatedAddress;
-                if (currentAddress.Contains("[PTTT: COD"))
+                newTag = "[PTTT: VIETQR MBBANK - ĐÃ CHUYỂN KHOẢN (THU HỘ 0Đ)]";
+                methodLabel = "VietQR MBBank";
+            }
+            else
+            {
+                newTag = "[PTTT: VÍ MOMO - ĐÃ THANH TOÁN QR (THU HỘ 0Đ)]";
+                methodLabel = "Ví MoMo";
+            }
+
+            var currentAddress = await _orderRepository.GetOrderShippingAddressAsync(orderId) ?? "";
+            string updatedAddress;
+
+            if (currentAddress.Contains("[PTTT:"))
+            {
+                var closeBracket = currentAddress.IndexOf(']');
+                if (closeBracket >= 0)
                 {
-                    updatedAddress = currentAddress.Replace("[PTTT: COD - THU TIỀN KHI GIAO HÀNG]", "[PTTT: ĐÃ XÁC NHẬN CHUYỂN KHOẢN QR (THU HỘ 0Đ)]");
+                    var remaining = currentAddress.Substring(closeBracket + 1).Trim();
+                    updatedAddress = $"{newTag} {remaining}".Trim();
                 }
                 else
                 {
-                    updatedAddress = $"[PTTT: ĐÃ XÁC NHẬN CHUYỂN KHOẢN QR (THU HỘ 0Đ)] {currentAddress}".Trim();
+                    updatedAddress = $"{newTag} {currentAddress}".Trim();
                 }
-                await _orderRepository.UpdateOrderShippingAddressAsync(orderId, updatedAddress);
+            }
+            else
+            {
+                updatedAddress = $"{newTag} {currentAddress}".Trim();
             }
 
-            return Ok(ApiResponse<bool>.Ok(true, $"Đã ghi nhận chuyển khoản cho đơn hàng #{orderId} thành công! Đơn hàng đang được bộ phận giao vận chuẩn bị."));
+            await _orderRepository.UpdateOrderShippingAddressAsync(orderId, updatedAddress);
+
+            return Ok(ApiResponse<bool>.Ok(true, $"Đã ghi nhận thanh toán {methodLabel} cho đơn hàng #{orderId} thành công! Đơn hàng đang được bộ phận giao vận chuẩn bị."));
         }
     }
 }

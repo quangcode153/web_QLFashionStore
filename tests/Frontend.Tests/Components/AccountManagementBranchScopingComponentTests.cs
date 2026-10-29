@@ -262,5 +262,73 @@ public class AccountManagementBranchScopingComponentTests : BunitContext
         var branchOptions = branchSelect.QuerySelectorAll("option");
         branchOptions.Should().Contain(o => o.GetAttribute("value") == "9");
     }
+
+    [Fact(DisplayName = "VÒNG 1 & 2: Phễu lọc vai trò (Multi-select) và ô tìm kiếm tài khoản theo tên/chi nhánh")]
+    public async Task AccountManagement_FunnelFilterAndSearch_FiltersAccountsCorrectly()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchId").SetResult(null);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchName").SetResult(null);
+
+        var cut = Render<AccountManagement>();
+
+        // Act 1: Mở menu phễu lọc
+        var trigger = cut.Find(".role-multiselect-trigger");
+        trigger.Click();
+
+        // Menu phễu xuất hiện
+        var menu = cut.Find(".role-multiselect-menu");
+        menu.Should().NotBeNull();
+
+        // Act 2: Chọn checkbox "Thủ kho" và "Order Coordinator"
+        var thuKhoCheckbox = cut.Find($"input[data-role-checkbox='{RoleConstants.ThuKho}']");
+        await cut.InvokeAsync(() => thuKhoCheckbox.Change(true));
+
+        var coordinatorCheckbox = cut.Find($"input[data-role-checkbox='{RoleConstants.OrderCoordinator}']");
+        await cut.InvokeAsync(() => coordinatorCheckbox.Change(true));
+
+        // Assert 2: Bảng hiển thị cả thukho_online, thukho_q10, coordinator01; không hiển thị admin
+        cut.Markup.Should().Contain("thukho_online");
+        cut.Markup.Should().Contain("thukho_q10");
+        cut.Markup.Should().Contain("coordinator01");
+        cut.Find("tbody").InnerHtml.Should().NotContain("Nguyễn Quản Trị");
+
+        // Act 3: Nhập từ khóa tìm kiếm "Tân Bình" vào ô search
+        var searchInput = cut.Find(".account-search-input");
+        await cut.InvokeAsync(() => searchInput.Input("Tân Bình"));
+
+        // Assert 3: Chỉ còn tài khoản ở Tân Bình (thukho_online), không còn thukho_q10 hay coordinator01
+        cut.Markup.Should().Contain("thukho_online");
+        cut.Find("tbody").InnerHtml.Should().NotContain("thukho_q10");
+        cut.Find("tbody").InnerHtml.Should().NotContain("coordinator01");
+    }
+
+    [Fact(DisplayName = "VÒNG 1 & 2: Tài khoản Quản trị hệ thống không thể bị khóa và lọc chính xác trong phễu")]
+    public async Task AccountManagement_SystemAdminRole_CannotBeLocked_AndCanBeFilteredInFunnel()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchId").SetResult(null);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchName").SetResult(null);
+
+        var cut = Render<AccountManagement>();
+
+        // Assert 1: Tài khoản admin (#TK-1) có nhãn "Bảo vệ"
+        cut.Markup.Should().Contain("Bảo vệ");
+
+        // Act 2: Mở menu phễu lọc
+        var trigger = cut.Find(".role-multiselect-trigger");
+        trigger.Click();
+
+        // Checkbox Quản trị viên hệ thống có data-role-checkbox='ADMIN_SYSTEM'
+        var adminCheckbox = cut.Find("input[data-role-checkbox='ADMIN_SYSTEM']");
+        await cut.InvokeAsync(() => adminCheckbox.Change(true));
+
+        // Assert 2: Bảng hiển thị Nguyễn Quản Trị, không hiển thị các tài khoản khác
+        cut.Markup.Should().Contain("Nguyễn Quản Trị");
+        cut.Find("tbody").InnerHtml.Should().NotContain("thukho_online");
+        cut.Find("tbody").InnerHtml.Should().NotContain("coordinator01");
+    }
 }
 

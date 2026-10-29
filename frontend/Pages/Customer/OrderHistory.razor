@@ -228,16 +228,23 @@
                         <!-- 3. TikTok Order Item Preview -->
                         <div class="tiktok-item-preview" @onclick="() => OpenOrderDetailsModalAsync(order)">
                             <div class="tiktok-item-thumb-wrapper">
-                                <div class="tiktok-item-thumb">
-                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
-                                    </svg>
-                                </div>
+                                @if (!string.IsNullOrEmpty(order.HinhAnhDaiDien))
+                                {
+                                    <img src="@order.HinhAnhDaiDien" alt="@(order.TenSanPhamDauTien ?? "Sản phẩm")" class="tiktok-item-img" />
+                                }
+                                else
+                                {
+                                    <div class="tiktok-item-thumb">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                                        </svg>
+                                    </div>
+                                }
                             </div>
                             <div class="tiktok-item-details">
                                 <div class="tiktok-item-header-line">
                                     <span class="cell-id tiktok-order-code">#DH-@order.MaHoaDon</span>
-                                    <span class="tiktok-order-title">Thời trang cao cấp QF NOIR Official</span>
+                                    <span class="tiktok-order-title">@(string.IsNullOrEmpty(order.TenSanPhamDauTien) ? "Thời trang cao cấp QF NOIR Official" : order.TenSanPhamDauTien)</span>
                                 </div>
                                 <div class="tiktok-item-meta-line">
                                     <span class="cell-date">@order.NgayLapHoaDon.ToString("dd/MM/yyyy HH:mm")</span>
@@ -250,14 +257,25 @@
                                     }
                                 </div>
                                 <div class="tiktok-pttt-box">
-                                    <span class="order-pttt-pill @(order.PhuongThucThanhToan.Contains("VietQR") ? "pill-vietqr" : order.PhuongThucThanhToan.Contains("MoMo") ? "pill-momo" : "pill-cod")">
-                                        @(order.PhuongThucThanhToan.Contains("VietQR") ? "🔷 VietQR" : order.PhuongThucThanhToan.Contains("MoMo") ? "🟣 MoMo" : "💵 COD")
+                                    <span class="order-pttt-pill @(order.PhuongThucThanhToan.Contains("VietQR") || order.PhuongThucThanhToan.Contains("QR") ? "pill-vietqr" : order.PhuongThucThanhToan.Contains("MoMo") ? "pill-momo" : "pill-cod")">
+                                        @if (order.PhuongThucThanhToan.Contains("MoMo"))
+                                        {
+                                            <span>🟣 MoMo @(order.DaThanhToan ? "• Đã TT" : "")</span>
+                                        }
+                                        else if (order.PhuongThucThanhToan.Contains("VietQR") || order.PhuongThucThanhToan.Contains("QR"))
+                                        {
+                                            <span>🔷 VietQR @(order.DaThanhToan ? "• Đã TT" : "")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>💵 COD</span>
+                                        }
                                     </span>
                                 </div>
                             </div>
                             <div class="tiktok-item-price-col cell-total">
                                 <div class="tiktok-unit-price">@order.TongThanhToan.ToString("N0") ₫</div>
-                                <div class="tiktok-qty-tag">x@order.SoMatHang</div>
+                                <div class="tiktok-qty-tag">x@(order.SoMatHang)</div>
                             </div>
                         </div>
 
@@ -297,9 +315,9 @@
                                     Chi tiết
                                 </button>
 
-                                @if (order.TrangThai == "Chờ xử lý" || order.TrangThai == "Chờ thanh toán")
+                                @if ((order.TrangThai == "Chờ xử lý" || order.TrangThai == "Chờ thanh toán") && !order.DaThanhToan)
                                 {
-                                    <a href="/order-success/@order.MaHoaDon?payment=MOMO" 
+                                    <a href="/order-success/@order.MaHoaDon?payment=@(order.PhuongThucThanhToan.Contains("VietQR") ? "VIETQR" : "MOMO")" 
                                        class="btn-pay-qr" 
                                        title="Quét mã MoMo hoặc VietQR thanh toán">
                                         💳 Thanh toán QR
@@ -1017,6 +1035,19 @@
         align-items: center;
         justify-content: center;
         transition: transform 0.15s;
+    }
+    .tiktok-item-img {
+        width: 72px;
+        height: 72px;
+        border-radius: 8px;
+        object-fit: cover;
+        border: 1px solid #E2E8F0;
+        background: #F8FAFC;
+        display: block;
+        transition: transform 0.15s ease;
+    }
+    .tiktok-item-preview:hover .tiktok-item-img {
+        transform: scale(1.02);
     }
     .tiktok-item-preview:hover .tiktok-item-thumb {
         transform: scale(1.02);

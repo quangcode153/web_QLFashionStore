@@ -12,5 +12,5 @@ public interface IOrderApiClient
     Task<OrderSummaryDto?> CreateOrderAsync(CreateOrderRequestDto request);
     Task<CustomerProfileDto?> GetMyProfileAsync();
     Task<QrPaymentResponseDto?> GetOrderPaymentQrAsync(int orderId, string method = "MOMO");
-    Task<bool> ConfirmPaymentPaidAsync(int orderId);
+    Task<bool> ConfirmPaymentPaidAsync(int orderId, string method = "MOMO");
 }

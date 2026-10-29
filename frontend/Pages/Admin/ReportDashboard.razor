@@ -48,6 +48,297 @@
         </div>
     </div>
 
+    <!-- SƠ ĐỒ DOANH THU KẾT HỢP CỘT & ĐƯỜNG (COMBO BAR + LINE CHART) -->
+    <div class="revenue-chart-card">
+        <div class="chart-header-row">
+            <div class="chart-title-group">
+                <div class="chart-title-wrapper">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="chart-header-icon">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <h3 class="chart-card-title">Sơ Đồ Tăng Trưởng Doanh Thu & Đơn Hàng</h3>
+                </div>
+                <span class="chart-card-subtitle">Phân tích trực quan tương quan giữa Doanh thu thuần (Cột) và Lượng đơn hoàn thành (Đường)</span>
+            </div>
+
+            <div class="chart-toolbar">
+                <!-- Chế độ xem: Theo Ngày / Theo Tuần / Theo Tháng -->
+                <div class="chart-mode-pill-group">
+                    <button type="button" class="chart-mode-btn @(_chartMode == "daily" ? "active" : "")" data-mode="daily" @onclick='() => SetChartMode("daily")'>
+                        Theo ngày
+                    </button>
+                    <button type="button" class="chart-mode-btn @(_chartMode == "weekly" ? "active" : "")" data-mode="weekly" @onclick='() => SetChartMode("weekly")'>
+                        Theo tuần
+                    </button>
+                    <button type="button" class="chart-mode-btn @(_chartMode == "monthly" ? "active" : "")" data-mode="monthly" @onclick='() => SetChartMode("monthly")'>
+                        Theo tháng
+                    </button>
+                </div>
+
+                @if (_chartMode == "daily")
+                {
+                    <!-- Lọc khoảng ngày nhanh cho chế độ ngày: Giới hạn tối ưu 7 ngày và 14 ngày tránh tràn nhãn -->
+                    <div class="chart-sub-range-group">
+                        <button type="button" class="chart-sub-btn @(_chartDaysRange == 7 ? "active" : "")" @onclick="() => SetChartDaysRange(7)">7 ngày</button>
+                        <button type="button" class="chart-sub-btn @(_chartDaysRange == 14 ? "active" : "")" @onclick="() => SetChartDaysRange(14)">14 ngày</button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Thanh thống kê chỉ số nhanh (Quick Metrics Strip) -->
+        <div class="chart-metrics-strip">
+            <div class="metric-item">
+                <span class="metric-label">Tổng doanh thu kỳ:</span>
+                <span class="metric-value text-success">@ChartTotalRevenue.ToString("N0") đ</span>
+            </div>
+            @if (ChartTotalRefund > 0)
+            {
+                <div class="metric-divider"></div>
+                <div class="metric-item">
+                    <span class="metric-label">Khấu trừ hoàn trả:</span>
+                    <span class="metric-value" style="color: #ea580c; font-weight: 700;">-@ChartTotalRefund.ToString("N0") đ</span>
+                </div>
+            }
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <span class="metric-label">Tổng đơn hoàn thành:</span>
+                <span class="metric-value">
+                    @ChartNetOrders.ToString("N0") đơn
+                    @if (ChartRefundOrders > 0)
+                    {
+                        <span style="font-size: 0.8rem; font-weight: 500; color: #ea580c; margin-left: 4px;">(@ChartRefundOrders đơn hoàn)</span>
+                    }
+                </span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <span class="metric-label">Giá trị TB/đơn (AOV):</span>
+                <span class="metric-value" style="color: #6366f1;">@ChartAvgOrderValue.ToString("N0") đ</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+                <span class="metric-label">Đỉnh doanh thu (@(ChartPeakPoint?.Label ?? "--")):</span>
+                <span class="metric-value" style="color: #f59e0b;">@((ChartPeakPoint?.Revenue ?? 0).ToString("N0")) đ</span>
+            </div>
+        </div>
+
+        <!-- Chú giải sơ đồ (Legend) -->
+        <div class="chart-legend-row">
+            <div class="legend-item">
+                <span class="legend-color-box legend-bar"></span>
+                <span class="legend-text">Doanh thu thuần (Trục trái - VNĐ)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color-box legend-refund"></span>
+                <span class="legend-text">Tiền hoàn trả (Khấu trừ hoàn kho - VNĐ)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color-line legend-line"></span>
+                <span class="legend-color-dot"></span>
+                <span class="legend-text">Số lượng đơn hoàn tất (Trục phải - Đơn)</span>
+            </div>
+        </div>
+
+        <!-- Khung vẽ biểu đồ SVG thuần túy -->
+        <div class="svg-chart-container">
+            @{
+                var points = ChartPoints;
+            }
+            @if (points.Count == 0)
+            {
+                <div class="chart-empty-state">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Không có dữ liệu doanh số trong khoảng thời gian đã chọn</span>
+                </div>
+            }
+            else
+            {
+                var maxRevRaw = points.Max(p => p.Revenue);
+                var maxRev = maxRevRaw > 0 ? maxRevRaw * 1.15m : 1000000m;
+                var maxOrdersRaw = points.Max(p => p.OrderCount);
+                // Chuẩn hóa maxOrders thành bội số của 4 để 4 vạch hiển thị luôn chia đều thành các số nguyên chính xác
+                var maxOrders = Math.Max(4, ((maxOrdersRaw + 3) / 4) * 4);
+
+                const double svgW = 1000;
+                const double svgH = 340;
+                const double leftM = 75;
+                const double rightM = 60;
+                const double topM = 30;
+                const double botM = 55;
+                var chartW = svgW - leftM - rightM;
+                var chartH = svgH - topM - botM;
+                var step = chartW / points.Count;
+                var barW = Math.Clamp(step * 0.45, 12, 42);
+
+                // Tính tọa độ đường line (vẽ theo số đơn hoàn thành ban đầu)
+                var linePoints = new System.Text.StringBuilder();
+                for (int i = 0; i < points.Count; i++)
+                {
+                    var p = points[i];
+                    var cx = leftM + i * step + step / 2;
+                    var cy = topM + chartH - ((double)p.OrderCount / maxOrders) * chartH;
+                    linePoints.Append(System.FormattableString.Invariant($"{cx:0.#},{cy:0.#} "));
+                }
+
+                <svg class="revenue-combo-chart" viewBox="0 0 1000 340" preserveAspectRatio="none">
+                    <defs>
+                        <!-- Gradient màu cột Doanh thu thuần -->
+                        <linearGradient id="barGradientPrimary" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.95" />
+                            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.45" />
+                        </linearGradient>
+                        <linearGradient id="barGradientHover" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#1d4ed8" stop-opacity="1" />
+                            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.75" />
+                        </linearGradient>
+                    </defs>
+
+                    <!-- Lưới ngang và nhãn trục Y -->
+                    @for (int stepIdx = 0; stepIdx <= 4; stepIdx++)
+                    {
+                        var ratio = (double)stepIdx / 4;
+                        var yPos = topM + chartH - ratio * chartH;
+                        var valRev = maxRev * (decimal)ratio;
+                        var valOrd = (int)Math.Round(maxOrders * ratio);
+
+                        <g class="axis-grid-row">
+                            <!-- Đường lưới ngang nét đứt -->
+                            <line x1="@leftM" y1="@yPos.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)" 
+                                  x2="@((leftM + chartW).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))" 
+                                  y2="@yPos.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)" 
+                                  stroke="#e2e8f0" stroke-width="1" stroke-dasharray="@(stepIdx == 0 ? "none" : "3,4")" />
+
+                            <!-- Nhãn trục Y trái (Doanh thu VNĐ) -->
+                            <text x="@((leftM - 10).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))" 
+                                  y="@((yPos + 4).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))" 
+                                  text-anchor="end" font-size="11" fill="#64748b" font-weight="600" font-family="inherit">
+                                @FormatCompactCurrency(valRev)
+                            </text>
+
+                            <!-- Nhãn trục Y phải (Số đơn) -->
+                            <text x="@((leftM + chartW + 12).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))" 
+                                  y="@((yPos + 4).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))" 
+                                  text-anchor="start" font-size="11" fill="#f59e0b" font-weight="700" font-family="inherit">
+                                @valOrd
+                            </text>
+                        </g>
+                    }
+
+                    <!-- 1. VẼ CÁC CỘT DOANH THU THỰC TẾ (LỢI NHUẬN THỰC THU) -->
+                    @for (int i = 0; i < points.Count; i++)
+                    {
+                        var pt = points[i];
+                        var idx = i;
+                        var netH = maxRev > 0 ? (double)(pt.Revenue / maxRev) * chartH : 0;
+                        if (netH < 3 && pt.Revenue > 0) netH = 3;
+
+                        var bx = leftM + i * step + (step - barW) / 2;
+                        var byNet = topM + chartH - netH;
+                        var isHovered = _hoveredChartIndex == idx;
+
+                        <g class="chart-bar-group" style="cursor: pointer;" @onclick="() => OpenDateDetailModal(pt.Date)" @onmouseover="() => _hoveredChartIndex = idx" @onmouseout="() => _hoveredChartIndex = null">
+                            <!-- Hitbox trong suốt bắt trọn toàn bộ chiều cao dải cột từ đỉnh xuống đáy -->
+                            <rect x="@bx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                  y="@topM.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                  width="@barW.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                  height="@chartH.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                  fill="rgba(0,0,0,0.001)" />
+
+                            <!-- Cột Doanh Thu Thuần Thực Tế (Phần màu xanh dương) -->
+                            @if (pt.Revenue > 0)
+                            {
+                                <rect class="chart-bar @(isHovered ? "hovered" : "")"
+                                      x="@bx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      y="@byNet.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      width="@barW.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      height="@netH.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      rx="4" ry="4"
+                                      fill="@(isHovered ? "url(#barGradientHover)" : "url(#barGradientPrimary)")" />
+                            }
+
+                            <!-- Nhãn trục X dưới chân mỗi cột -->
+                            <text x="@((bx + barW / 2).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))"
+                                  y="@((topM + chartH + 20).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))"
+                                  text-anchor="middle" font-size="11" fill="@(isHovered ? "#0f172a" : "#64748b")" font-weight="@(isHovered ? "700" : "500")" font-family="inherit">
+                                @pt.Label
+                            </text>
+                        </g>
+                    }
+
+                    <!-- 2. VẼ ĐƯỜNG POLYLINE SỐ LƯỢNG ĐƠN HÀNG HOÀN TẤT (LINE) -->
+                    <polyline class="chart-line"
+                              fill="none"
+                              stroke="#f59e0b"
+                              stroke-width="2.8"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              points="@linePoints.ToString().Trim()" />
+
+                    <!-- 3. CÁC NÚT ĐIỂM (NODES) TRÊN ĐƯỜNG ĐƠN HÀNG -->
+                    @for (int i = 0; i < points.Count; i++)
+                    {
+                        var pt = points[i];
+                        var idx = i;
+                        var cx = leftM + i * step + step / 2;
+                        var cy = topM + chartH - ((double)pt.OrderCount / maxOrders) * chartH;
+                        var isHovered = _hoveredChartIndex == idx;
+
+                        <!-- Hitbox trong suốt mở rộng cho nút điểm tròn để dễ click trúng -->
+                        <circle cx="@cx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                cy="@cy.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                r="16"
+                                fill="rgba(0,0,0,0.001)"
+                                style="cursor: pointer;"
+                                @onclick="() => OpenDateDetailModal(pt.Date)"
+                                @onmouseover="() => _hoveredChartIndex = idx"
+                                @onmouseout="() => _hoveredChartIndex = null" />
+
+                        <circle class="chart-node @(isHovered ? "hovered" : "")"
+                                style="cursor: pointer; pointer-events: none;"
+                                cx="@cx.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                cy="@cy.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                r="@(isHovered ? "6" : "4")"
+                                fill="#ffffff"
+                                stroke="#f59e0b"
+                                stroke-width="@(isHovered ? "3.2" : "2.2")" />
+
+                        @if (isHovered)
+                        {
+                            <!-- Tooltip nhãn giá trị tức thời khi hover: Gọn gàng, chỉ hiện đúng 2 dòng: Ngày & Lợi nhuận -->
+                            var tooltipW = 185;
+                            var tooltipH = 44;
+                            var tooltipX = Math.Clamp(cx, tooltipW / 2 + 10, svgW - tooltipW / 2 - 10);
+                            var tooltipY = Math.Max(cy - tooltipH - 12, 10);
+
+                            <g class="chart-tooltip-badge" style="pointer-events: none;">
+                                <rect x="@((tooltipX - tooltipW / 2).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))"
+                                      y="@tooltipY.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      width="@tooltipW" height="@tooltipH" rx="6" ry="6" fill="#0f172a" opacity="0.96" />
+                                <text x="@tooltipX.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      y="@((tooltipY + 16).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))"
+                                      text-anchor="middle" font-size="10.5" fill="#e2e8f0" font-weight="600" font-family="inherit">
+                                    @pt.FullTitle
+                                </text>
+                                <text x="@tooltipX.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)"
+                                      y="@((tooltipY + 33).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))"
+                                      text-anchor="middle" font-size="11" fill="#38bdf8" font-weight="700" font-family="inherit">
+                                    @($"Lợi nhuận: {pt.Revenue:N0} đ ({pt.OrderCount} đơn)")
+                                </text>
+                            </g>
+                        }
+                    }
+                </svg>
+            }
+        </div>
+    </div>
+
     <!-- KHU VỰC TRA CỨU: TRA CỨU 1 NGÀY & KHOẢNG THỜI GIAN -->
     <div class="search-section-grid">
         <!-- 1. TRA CỨU DỮ LIỆU CỦA 1 NGÀY CỤ THỂ -->
@@ -244,13 +535,14 @@
                             <th class="text-right">Giảm giá</th>
                             <th class="text-right">Tiền hoàn</th>
                             <th class="text-right">Doanh thu thuần</th>
+                            <th class="text-center" style="width: 110px; min-width: 110px; white-space: nowrap;">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (DisplayedDailyRevenues.Count == 0)
                         {
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     Không tìm thấy dữ liệu ngày phù hợp
                                 </td>
                             </tr>
@@ -259,7 +551,7 @@
                         {
                             @foreach (var r in DisplayedDailyRevenues)
                             {
-                                <tr>
+                                <tr style="cursor: pointer;" @onclick="() => OpenDateDetailModal(r.NgayBan)">
                                     <td>
                                         <div class="date-cell">
                                             <span class="date-main">@r.NgayBan.ToString("dd/MM/yyyy")</span>
@@ -268,11 +560,20 @@
                                     </td>
                                     <td class="text-center">
                                         <span class="order-count-badge">@r.TongSoDon</span>
+                                        @if (r.SoDonHoan > 0)
+                                        {
+                                            <span style="display: block; font-size: 0.72rem; color: #ea580c; font-weight: 600; margin-top: 2px;">(-@r.SoDonHoan hoàn)</span>
+                                        }
                                     </td>
                                     <td class="text-right">@r.TongTienHang.ToString("N0")</td>
                                     <td class="text-right text-danger">@(r.TongTienGiam > 0 ? $"-{r.TongTienGiam:N0}" : "0")</td>
                                     <td class="text-right" style="color: #ea580c; font-weight: 600;">@(r.TongTienHoan > 0 ? $"-{r.TongTienHoan:N0}" : "0")</td>
                                     <td class="text-right font-weight-bold text-success">@r.DoanhThuThucTe.ToString("N0") đ</td>
+                                    <td class="text-center" style="width: 110px; min-width: 110px; white-space: nowrap;">
+                                        <button type="button" class="btn-detail-sm" data-date-detail="@r.NgayBan.ToString("yyyy-MM-dd")" @onclick="() => OpenDateDetailModal(r.NgayBan)" @onclick:stopPropagation="true" title="Xem danh sách đơn hàng chi tiết của ngày này">
+                                            Chi tiết
+                                        </button>
+                                    </td>
                                 </tr>
                             }
                         }
@@ -484,9 +785,342 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL CHI TIẾT ĐƠN HÀNG & GIAO DỊCH THEO NGÀY (THỰC TẾ MINH BẠCH) -->
+    @if (_selectedDateDetail.HasValue)
+    {
+        <div class="date-detail-modal-overlay" style="position: fixed; inset: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;" @onclick="CloseDateDetailModal">
+            <div class="date-detail-modal-box date-detail-modal" style="background: #ffffff; border-radius: 16px; box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.45); width: 100%; max-width: 940px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 1000000;" @onclick:stopPropagation="true" role="dialog" aria-modal="true">
+                <div class="modal-header-custom">
+                    <div class="modal-title-box">
+                        <h3 class="modal-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            Chi tiết giao dịch & đơn hàng ngày @_selectedDateDetail.Value.ToString("dd/MM/yyyy")
+                        </h3>
+                        <span class="modal-sub">@GetVietnameseDayOfWeek(_selectedDateDetail.Value.DayOfWeek) • Danh sách đơn bán, đơn hủy và hoàn trả</span>
+                    </div>
+                    <button type="button" class="btn-close-date-modal" @onclick="CloseDateDetailModal" title="Đóng cửa sổ">×</button>
+                </div>
+
+                <!-- Tóm tắt số liệu thu nhập thực tế trong ngày -->
+                <div class="modal-metrics-strip">
+                    <div class="modal-metric-card">
+                        <span class="m-lbl">Đơn chốt bán</span>
+                        <span class="m-val">@_modalOrders.Count(o => o.TrangThai == "Đã hoàn thành") đơn</span>
+                    </div>
+                    <div class="modal-metric-card">
+                        <span class="m-lbl">Doanh số bán ra (Gộp)</span>
+                        <span class="m-val">@_modalOrders.Where(o => o.TrangThai == "Đã hoàn thành").Sum(o => o.TongThanhToan).ToString("N0") đ</span>
+                    </div>
+                    <div class="modal-metric-card">
+                        <span class="m-lbl">Khấu trừ tiền hoàn</span>
+                        <span class="m-val text-warning">-@_modalOrders.Sum(o => o.SoTienDaHoan).ToString("N0") đ</span>
+                    </div>
+                    <div class="modal-metric-card highlight">
+                        <span class="m-lbl">Thu nhập thực tế (Lợi nhuận)</span>
+                        <span class="m-val text-success">@((_modalOrders.Where(o => o.TrangThai == "Đã hoàn thành").Sum(o => o.TongThanhToan - o.SoTienDaHoan)).ToString("N0")) đ</span>
+                    </div>
+                </div>
+
+                <!-- Filter Tabs trong Modal -->
+                <div class="modal-filter-tabs">
+                    <button type="button" class="m-tab @(_modalFilter == "ALL" ? "active" : "")" @onclick='() => _modalFilter = "ALL"'>
+                        Tất cả đơn (@_modalOrders.Count)
+                    </button>
+                    <button type="button" class="m-tab @(_modalFilter == "COMPLETED" ? "active" : "")" @onclick='() => _modalFilter = "COMPLETED"'>
+                        Đã hoàn thành (@_modalOrders.Count(o => o.TrangThai == "Đã hoàn thành"))
+                    </button>
+                    <button type="button" class="m-tab @(_modalFilter == "REFUND_CANCEL" ? "active" : "")" @onclick='() => _modalFilter = "REFUND_CANCEL"'>
+                        Có hoàn / Đã hủy (@_modalOrders.Count(o => o.TrangThai == "Đã hủy" || o.CoHoanTra || o.SoTienDaHoan > 0))
+                    </button>
+                </div>
+
+                <!-- Bảng danh sách đơn hàng -->
+                <div class="modal-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 85px;">Mã đơn</th>
+                                <th style="width: 80px;">Thời gian</th>
+                                <th>Khách hàng</th>
+                                <th class="text-right">Tiền hàng</th>
+                                <th class="text-right">Giảm giá</th>
+                                <th class="text-right">Tiền hoàn</th>
+                                <th class="text-right">Thực thu</th>
+                                <th class="text-center" style="width: 140px;">Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_isLoadingDateOrders)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        Đang nạp chi tiết các đơn hàng...
+                                    </td>
+                                </tr>
+                            }
+                            else if (FilteredModalOrders.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        Không có đơn hàng nào thỏa mãn tiêu chí lọc.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var o in FilteredModalOrders)
+                                {
+                                    var netOrderMoney = o.TrangThai == "Đã hoàn thành" ? Math.Max(0, o.TongThanhToan - o.SoTienDaHoan) : 0;
+                                    <tr>
+                                        <td><strong class="text-primary">#@o.MaHoaDon</strong></td>
+                                        <td class="tabular-nums">@o.NgayLapHoaDon.ToString("HH:mm")</td>
+                                        <td>
+                                            <div class="font-weight-600">@o.TenKhachHang</div>
+                                            @if (!string.IsNullOrEmpty(o.SdtKhachHang))
+                                            {
+                                                <small class="text-muted tabular-nums">@o.SdtKhachHang</small>
+                                            }
+                                        </td>
+                                        <td class="text-right tabular-nums">@o.TienHang.ToString("N0") đ</td>
+                                        <td class="text-right text-danger tabular-nums">@(o.TienGiamGia > 0 ? $"-{o.TienGiamGia:N0} đ" : "0")</td>
+                                        <td class="text-right tabular-nums" style="color: #ea580c; font-weight: 600;">
+                                            @(o.SoTienDaHoan > 0 ? $"-{o.SoTienDaHoan:N0} đ" : "0")
+                                        </td>
+                                        <td class="text-right font-weight-bold text-success tabular-nums">
+                                            @netOrderMoney.ToString("N0") đ
+                                        </td>
+                                        <td class="text-center">
+                                            @if (o.TrangThai == "Đã hoàn thành")
+                                            {
+                                                <span class="badge-status-completed">Đã hoàn thành</span>
+                                                @if (o.CoHoanTra || o.SoTienDaHoan > 0)
+                                                {
+                                                    <span class="badge-status-refund-tag" style="display: block; font-size: 0.72rem; color: #ea580c; font-weight: 600; margin-top: 2px;">
+                                                        Hoàn: -@o.SoTienDaHoan.ToString("N0") đ
+                                                    </span>
+                                                }
+                                            }
+                                            else if (o.TrangThai == "Đã hủy")
+                                            {
+                                                <span class="badge-status-cancelled">Đã hủy</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge-status-pending">@o.TrangThai</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <style>
+    /* ========================================== */
+    /* NÚT CHI TIẾT TRONG BẢNG DOANH THU HÀNG NGÀY */
+    /* ========================================== */
+    .btn-detail-sm {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 5px 14px !important;
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #2563eb !important;
+        background-color: #eff6ff !important;
+        border: 1px solid #bfdbfe !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+        text-decoration: none !important;
+        transition: all 0.15s ease !important;
+        line-height: 1.2 !important;
+    }
+
+    .btn-detail-sm:hover {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3) !important;
+    }
+
+    /* ========================================== */
+    /* MODAL CHI TIẾT NGÀY - PHÂN KHU CHUYÊN BIỆT */
+    /* ========================================== */
+    .date-detail-modal-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(15, 23, 42, 0.72) !important;
+        backdrop-filter: blur(4px) !important;
+        z-index: 999999 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
+    }
+
+    .date-detail-modal-box {
+        background: #ffffff !important;
+        border-radius: 16px !important;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4) !important;
+        width: 100% !important;
+        max-width: 960px !important;
+        max-height: 90vh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        position: relative !important;
+        z-index: 1000000 !important;
+        animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    @@keyframes modalFadeIn {
+        from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-header-custom {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 18px 24px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        background: #f8fafc !important;
+    }
+
+    .modal-title-box .modal-title {
+        margin: 0 !important;
+        font-size: 1.18rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .modal-sub {
+        font-size: 0.82rem !important;
+        color: #64748b !important;
+        margin-top: 4px !important;
+        display: block !important;
+    }
+
+    .btn-close-date-modal {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: #f1f5f9 !important;
+        border: 1px solid #e2e8f0 !important;
+        font-size: 1.25rem !important;
+        color: #64748b !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+        line-height: 1 !important;
+        padding: 0 !important;
+    }
+
+    .btn-close-date-modal:hover {
+        background: #fee2e2 !important;
+        color: #ef4444 !important;
+        border-color: #fecaca !important;
+    }
+
+    .modal-metrics-strip {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 12px !important;
+        padding: 16px 24px !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+
+    .modal-metric-card {
+        background: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 12px 14px !important;
+    }
+
+    .modal-metric-card.highlight {
+        background: #ecfdf5 !important;
+        border-color: #a7f3d0 !important;
+    }
+
+    .modal-metric-card .m-lbl {
+        font-size: 0.72rem !important;
+        color: #64748b !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        display: block !important;
+    }
+
+    .modal-metric-card .m-val {
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        margin-top: 4px !important;
+        display: block !important;
+    }
+
+    .modal-filter-tabs {
+        display: flex !important;
+        gap: 8px !important;
+        padding: 12px 24px !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
+
+    .m-tab {
+        padding: 6px 14px !important;
+        border-radius: 20px !important;
+        border: 1px solid #cbd5e1 !important;
+        background: #ffffff !important;
+        font-size: 0.82rem !important;
+        font-weight: 600 !important;
+        color: #475569 !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+    }
+
+    .m-tab:hover {
+        border-color: #94a3b8 !important;
+        color: #0f172a !important;
+        background: #f8fafc !important;
+    }
+
+    .m-tab.active {
+        background: #2563eb !important;
+        color: #ffffff !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25) !important;
+    }
+
+    .modal-table-container {
+        padding: 12px 24px 20px !important;
+        overflow-y: auto !important;
+        flex: 1 !important;
+    }
+
     .report-dashboard-container {
         display: flex;
         flex-direction: column;
@@ -599,6 +1233,267 @@
     .kpi-sub {
         font-size: 0.75rem;
         color: #94a3b8;
+    }
+
+    /* ==========================================================================
+       SƠ ĐỒ DOANH THU KẾT HỢP (COMBO BAR + LINE CHART)
+       ========================================================================== */
+    .revenue-chart-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 20px 22px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        margin-bottom: 20px;
+    }
+
+    .chart-header-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+
+    .chart-title-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .chart-title-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chart-header-icon {
+        flex-shrink: 0;
+    }
+
+    .chart-card-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .chart-card-subtitle {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin: 0;
+    }
+
+    .chart-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .chart-mode-pill-group {
+        display: inline-flex;
+        background: #f1f5f9;
+        padding: 3px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .chart-mode-btn {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #475569;
+        transition: all 0.2s ease;
+    }
+
+    .chart-mode-btn:hover:not(.active) {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.6);
+    }
+
+    .chart-mode-btn.active {
+        background: #0f172a;
+        color: #ffffff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+    }
+
+    .chart-sub-range-group {
+        display: inline-flex;
+        gap: 4px;
+    }
+
+    .chart-sub-btn {
+        padding: 5px 10px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #475569;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .chart-sub-btn:hover:not(.active) {
+        background: #f8fafc;
+        border-color: #94a3b8;
+    }
+
+    .chart-sub-btn.active {
+        background: #2563eb;
+        color: #ffffff;
+        border-color: #2563eb;
+        box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25);
+    }
+
+    .chart-metrics-strip {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 18px;
+        margin-bottom: 14px;
+    }
+
+    .metric-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+    }
+
+    .metric-label {
+        color: #64748b;
+        font-weight: 500;
+    }
+
+    .metric-value {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .metric-divider {
+        width: 1px;
+        height: 16px;
+        background: #cbd5e1;
+    }
+
+    @@media (max-width: 768px) {
+        .metric-divider {
+            display: none;
+        }
+        .chart-metrics-strip {
+            gap: 10px 14px;
+        }
+    }
+
+    .chart-legend-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin-bottom: 12px;
+        font-size: 0.78rem;
+        color: #475569;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .legend-bar {
+        width: 14px;
+        height: 12px;
+        background: linear-gradient(180deg, #2563eb, #3b82f6);
+        border-radius: 2px;
+        display: inline-block;
+    }
+
+    .legend-refund {
+        width: 14px;
+        height: 12px;
+        background: linear-gradient(180deg, #ea580c, #fb923c);
+        border: 1px dashed #c2410c;
+        border-radius: 2px;
+        display: inline-block;
+    }
+
+    .legend-line {
+        width: 20px;
+        height: 3px;
+        background: #f59e0b;
+        border-radius: 2px;
+        display: inline-block;
+    }
+
+    .legend-color-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #f59e0b;
+        margin-left: -14px;
+        display: inline-block;
+    }
+
+    .svg-chart-container {
+        width: 100%;
+        height: 340px;
+        position: relative;
+        background: #ffffff;
+        border-radius: 6px;
+    }
+
+    svg.revenue-combo-chart {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        display: block;
+    }
+
+    .chart-bar {
+        transition: fill 0.2s ease, opacity 0.2s ease;
+        cursor: pointer;
+    }
+
+    .chart-bar-refund {
+        transition: fill 0.2s ease, opacity 0.2s ease;
+        cursor: pointer;
+    }
+
+    .chart-bar.hovered {
+        filter: drop-shadow(0 4px 6px rgba(37, 99, 235, 0.35));
+        opacity: 1;
+    }
+
+    .chart-node {
+        cursor: pointer;
+        transition: r 0.15s ease, stroke-width 0.15s ease;
+    }
+
+    .chart-node.hovered {
+        filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.7));
+    }
+
+    .chart-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 260px;
+        color: #94a3b8;
+        gap: 10px;
+        font-size: 0.88rem;
     }
 
     /* SEARCH SECTION GRID: 2 CỘT */
@@ -1331,6 +2226,186 @@
     private DateTime _fromDate = DateTime.Today.AddDays(-30);
     private DateTime _toDate = DateTime.Today;
 
+    // ==========================================
+    // CHẾ ĐỘ & DỮ LIỆU BIỂU ĐỒ DOANH THU KẾT HỢP
+    // ==========================================
+    private string _chartMode = "daily"; // "daily", "weekly", "monthly"
+    private int _chartDaysRange = 14;    // 7, 14, 30 ngày (cho daily, 0 là tất cả)
+    private int? _hoveredChartIndex = null;
+
+    // ==========================================
+    // MODAL CHI TIẾT ĐƠN HÀNG & HỦY/HOÀN THEO NGÀY
+    // ==========================================
+    private DateTime? _selectedDateDetail = null;
+    private List<OrderSummaryDto> _allOrdersCache = new();
+    private List<OrderSummaryDto> _modalOrders = new();
+    private string _modalFilter = "ALL"; // "ALL", "COMPLETED", "REFUND_CANCEL"
+    private bool _isLoadingDateOrders = false;
+
+    private async Task OpenDateDetailModal(DateTime date)
+    {
+        _selectedDateDetail = date.Date;
+        _modalFilter = "ALL";
+        _isLoadingDateOrders = true;
+        StateHasChanged();
+        try
+        {
+            if (_allOrdersCache.Count == 0)
+            {
+                _allOrdersCache = await AdminApi.GetAllOrdersAsync() ?? new();
+            }
+            _modalOrders = _allOrdersCache.Where(o => o.NgayLapHoaDon.Date == date.Date).ToList();
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tải danh sách đơn ngày: {ex.Message}");
+        }
+        finally
+        {
+            _isLoadingDateOrders = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseDateDetailModal()
+    {
+        _selectedDateDetail = null;
+        _modalOrders.Clear();
+        StateHasChanged();
+    }
+
+    private List<OrderSummaryDto> FilteredModalOrders => _modalFilter switch
+    {
+        "COMPLETED" => _modalOrders.Where(o => o.TrangThai == "Đã hoàn thành").ToList(),
+        "REFUND_CANCEL" => _modalOrders.Where(o => o.TrangThai == "Đã hủy" || o.CoHoanTra || o.SoTienDaHoan > 0).ToList(),
+        _ => _modalOrders
+    };
+
+    private class ChartDataPoint
+    {
+        public DateTime Date { get; set; }
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string FullTitle { get; set; } = string.Empty;
+        public decimal Revenue { get; set; }        // Doanh thu thuần thực tế (Net)
+        public decimal TotalRefund { get; set; }     // Tiền hoàn trả đã khấu trừ
+        public decimal GrossRevenue => Revenue + TotalRefund; // Doanh thu gộp trước hoàn
+        public int OrderCount { get; set; }          // Tổng đơn phát sinh ban đầu
+        public int RefundCount { get; set; }         // Số đơn có hoàn hàng
+        public int NetOrderCount => Math.Max(0, OrderCount - RefundCount); // Số đơn hoàn tất thực tế
+        public decimal TotalGoods { get; set; }
+        public decimal TotalDiscount { get; set; }
+    }
+
+    private List<ChartDataPoint> ChartPoints
+    {
+        get
+        {
+            if (_dailyRevenues.Count == 0) return new();
+
+            if (_chartMode == "weekly")
+            {
+                var cal = System.Globalization.CultureInfo.CurrentCulture.Calendar;
+                return _dailyRevenues
+                    .OrderBy(x => x.NgayBan)
+                    .GroupBy(x => {
+                        var week = cal.GetWeekOfYear(x.NgayBan, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+                        return $"{x.NgayBan.Year}-W{week:D2}";
+                    })
+                    .Select(g => {
+                        var first = g.Min(x => x.NgayBan);
+                        var last = g.Max(x => x.NgayBan);
+                        var weekNum = g.Key.Split("-W")[1];
+                        return new ChartDataPoint
+                        {
+                            Date = first,
+                            Key = g.Key,
+                            Label = $"T{weekNum}",
+                            FullTitle = $"Tuần {weekNum} ({first:dd/MM} - {last:dd/MM/yyyy})",
+                            Revenue = g.Sum(x => x.DoanhThuThucTe),
+                            TotalRefund = g.Sum(x => x.TongTienHoan),
+                            OrderCount = g.Sum(x => x.TongSoDon),
+                            RefundCount = g.Sum(x => x.SoDonHoan),
+                            TotalGoods = g.Sum(x => x.TongTienHang),
+                            TotalDiscount = g.Sum(x => x.TongTienGiam)
+                        };
+                    })
+                    .TakeLast(12)
+                    .ToList();
+            }
+            else if (_chartMode == "monthly")
+            {
+                return _dailyRevenues
+                    .OrderBy(x => x.NgayBan)
+                    .GroupBy(x => x.NgayBan.ToString("MM/yyyy"))
+                    .Select(g => new ChartDataPoint
+                    {
+                        Date = g.First().NgayBan,
+                        Key = g.Key,
+                        Label = g.Key,
+                        FullTitle = $"Tháng {g.Key}",
+                        Revenue = g.Sum(x => x.DoanhThuThucTe),
+                        TotalRefund = g.Sum(x => x.TongTienHoan),
+                        OrderCount = g.Sum(x => x.TongSoDon),
+                        RefundCount = g.Sum(x => x.SoDonHoan),
+                        TotalGoods = g.Sum(x => x.TongTienHang),
+                        TotalDiscount = g.Sum(x => x.TongTienGiam)
+                    })
+                    .TakeLast(12)
+                    .ToList();
+            }
+            else // daily (chỉ lấy 7 hoặc 14 ngày gần nhất để đảm bảo độ rộng cột và thẩm mỹ)
+            {
+                var days = _chartDaysRange == 7 ? 7 : 14;
+                var query = _dailyRevenues.OrderBy(x => x.NgayBan).TakeLast(days);
+                return query.Select(x => new ChartDataPoint
+                {
+                    Date = x.NgayBan,
+                    Key = x.NgayBan.ToString("yyyy-MM-dd"),
+                    Label = x.NgayBan.ToString("dd/MM"),
+                    FullTitle = $"{GetVietnameseDayOfWeek(x.NgayBan.DayOfWeek)}, {x.NgayBan:dd/MM/yyyy}",
+                    Revenue = x.DoanhThuThucTe,
+                    TotalRefund = x.TongTienHoan,
+                    OrderCount = x.TongSoDon,
+                    RefundCount = x.SoDonHoan,
+                    TotalGoods = x.TongTienHang,
+                    TotalDiscount = x.TongTienGiam
+                }).ToList();
+            }
+        }
+    }
+
+    private decimal ChartTotalRevenue => ChartPoints.Sum(p => p.Revenue);
+    private decimal ChartTotalRefund => ChartPoints.Sum(p => p.TotalRefund);
+    private int ChartTotalOrders => ChartPoints.Sum(p => p.OrderCount);
+    private int ChartNetOrders => ChartPoints.Sum(p => p.NetOrderCount);
+    private int ChartRefundOrders => ChartPoints.Sum(p => p.RefundCount);
+    private decimal ChartAvgOrderValue => ChartNetOrders > 0 ? ChartTotalRevenue / ChartNetOrders : (ChartTotalOrders > 0 ? ChartTotalRevenue / ChartTotalOrders : 0);
+    private ChartDataPoint? ChartPeakPoint => ChartPoints.OrderByDescending(p => p.Revenue).FirstOrDefault();
+
+    private void SetChartMode(string mode)
+    {
+        _chartMode = mode;
+        _hoveredChartIndex = null;
+    }
+
+    private void SetChartDaysRange(int days)
+    {
+        _chartDaysRange = days == 7 ? 7 : 14;
+        _hoveredChartIndex = null;
+    }
+
+    private static string FormatCompactCurrency(decimal val)
+    {
+        if (val >= 1_000_000_000m)
+            return $"{(val / 1_000_000_000m):0.#} tỷ";
+        if (val >= 1_000_000m)
+            return $"{(val / 1_000_000m):0.#} tr";
+        if (val >= 1_000m)
+            return $"{(val / 1_000m):0.#} k";
+        return val.ToString("N0");
+    }
+
     // Tra cứu 1 ngày cụ thể
     private DateTime _singleDate = DateTime.Today;
     private FinancialRangeReportDto? _singleDateReport;
@@ -1416,13 +2491,15 @@
             var topTask = AdminApi.GetTopSellingProductsAsync(20);
             var boardTask = AdminApi.GetBranchSalesLeaderboardAsync();
             var invTask = AdminApi.GetBranchInventorySummaryAsync();
+            var ordersTask = AdminApi.GetAllOrdersAsync();
 
-            await Task.WhenAll(revTask, topTask, boardTask, invTask);
+            await Task.WhenAll(revTask, topTask, boardTask, invTask, ordersTask);
 
             _dailyRevenues = await revTask ?? new();
             _topSelling = await topTask ?? new();
             _branchLeaderboard = await boardTask ?? new();
             _branchInventorySummaries = await invTask ?? new();
+            _allOrdersCache = await ordersTask ?? new();
         }
         catch (Exception ex)
         {

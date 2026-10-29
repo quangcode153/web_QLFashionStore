@@ -353,5 +353,35 @@ public class OrderHistoryReturnComponentTests : BunitContext
         cut.Markup.Should().NotContain("#DH-2");
     }
 
+    [Fact(DisplayName = "VÒNG 5: Đơn hàng hiển thị hình ảnh đại diện sản phẩm thật và định dạng số lượng x{n}")]
+    public void OrderHistory_DisplaysProductThumbnailAndFormattedQuantity()
+    {
+        // Arrange
+        _mockCustomerApi.Setup(x => x.GetOrderHistoryAsync())
+            .ReturnsAsync(new List<CustomerOrderHistoryItemDto>
+            {
+                new() 
+                { 
+                    MaHoaDon = 1115, 
+                    TrangThai = "Chờ xử lý",
+                    SoMatHang = 2,
+                    TongThanhToan = 381510m,
+                    HinhAnhDaiDien = "https://images.example.com/products/polo-black.jpg",
+                    TenSanPhamDauTien = "Áo Polo Thể Thao Dry-Ex QF"
+                }
+            });
+
+        // Act
+        var cut = Render<OrderHistory>();
+
+        // Assert
+        var img = cut.Find("img.tiktok-item-img");
+        img.Should().NotBeNull();
+        img.Attributes["src"]?.Value.Should().Be("https://images.example.com/products/polo-black.jpg");
+        cut.Markup.Should().Contain("Áo Polo Thể Thao Dry-Ex QF");
+        cut.Markup.Should().Contain("x2");
+        cut.Markup.Should().NotContain("x@order.SoMatHang");
+    }
+
     #endregion
 }

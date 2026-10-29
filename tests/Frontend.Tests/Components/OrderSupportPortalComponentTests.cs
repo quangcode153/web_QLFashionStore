@@ -351,6 +351,49 @@ public class OrderSupportPortalComponentTests : BunitContext
         cut.Markup.Should().NotContain("#PH-501");
     }
 
+    [Fact(DisplayName = "VÒNG 1 & 2: Search chi nhánh nhanh tại Cổng Đổi trả & Hoàn kho lọc đúng chi nhánh và cập nhật đơn")]
+    public async Task OrderSupportPortal_BranchSearch_FiltersAndSelectsBranchCorrectly()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchId").SetResult("1");
+        _mockAdminApi.Setup(x => x.GetBranchesAsync()).ReturnsAsync(new List<BranchDto>
+        {
+            new() { MaChiNhanh = 2, TenChiNhanh = "QF Sư Vạn Hạnh", DiaChi = "Q.10, TP.HCM" },
+            new() { MaChiNhanh = 3, TenChiNhanh = "QF Quang Trung", DiaChi = "Q. Gò Vấp, TP.HCM" },
+            new() { MaChiNhanh = 9, TenChiNhanh = "Kho Tổng Tân Bình", DiaChi = "Tân Bình", IsOnlineWarehouse = true }
+        });
+
+        // Act 1: Render component
+        var cut = Render<OrderSupportPortal>();
+
+        // Trigger dropdown
+        var trigger = cut.Find(".branch-combobox-trigger");
+        await cut.InvokeAsync(() => trigger.Click());
+
+        // Assert 1: Popover mở ra và có ô search
+        var popover = cut.Find(".branch-combobox-popover");
+        popover.Should().NotBeNull();
+        var searchInput = cut.Find(".branch-search-input");
+        searchInput.Should().NotBeNull();
+
+        // Act 2: Nhập từ khóa tìm kiếm "Quang Trung"
+        await cut.InvokeAsync(() => searchInput.Input("Quang Trung"));
+
+        // Assert 2: Chỉ hiển thị QF Quang Trung, không hiển thị Sư Vạn Hạnh
+        var items = cut.FindAll(".branch-combobox-item");
+        items.Should().Contain(i => i.TextContent.Contains("QF Quang Trung"));
+        items.Should().NotContain(i => i.TextContent.Contains("QF Sư Vạn Hạnh"));
+
+        // Act 3: Click chọn "QF Quang Trung" (MaChiNhanh = 3)
+        var quangTrungItem = items.First(i => i.TextContent.Contains("QF Quang Trung"));
+        await cut.InvokeAsync(() => quangTrungItem.Click());
+
+        // Assert 3: Dropdown đóng lại và trigger hiển thị "QF Quang Trung"
+        cut.FindAll(".branch-combobox-popover").Should().BeEmpty();
+        cut.Find(".branch-current-name").TextContent.Should().Contain("QF Quang Trung");
+    }
+
     [Fact(DisplayName = "VÒNG 3: Cổng Đổi trả cô lập tuyệt đối - Đơn khiếu nại và góp ý không được phép lọt vào")]
     public void OrderSupportPortal_CustomerComplaintAndFeedback_AreStrictlyExcludedFromReturnPortal()
     {

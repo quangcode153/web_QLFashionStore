@@ -85,6 +85,22 @@ public class CustomerRepository : ICustomerRepository
                 actual_hd.dia_chi_giao_hang AS DiaChiGiaoHang,
                 actual_hd.loai_don_hang AS LoaiDonHang,
                 (
+                    SELECT TOP 1 ha.duong_dan_anh
+                    FROM ChiTietHoaDon ct
+                    JOIN BienTheSanPham bt ON ct.ma_bien_the = bt.ma_bien_the
+                    JOIN HinhAnhSanPham ha ON bt.ma_san_pham = ha.ma_san_pham
+                    WHERE ct.ma_hoa_don = hd.ma_hoa_don
+                    ORDER BY ha.la_anh_chinh DESC, ha.ma_hinh_anh ASC
+                ) AS HinhAnhDaiDien,
+                (
+                    SELECT TOP 1 sp.ten_san_pham
+                    FROM ChiTietHoaDon ct
+                    JOIN BienTheSanPham bt ON ct.ma_bien_the = bt.ma_bien_the
+                    JOIN SanPham sp ON bt.ma_san_pham = sp.ma_san_pham
+                    WHERE ct.ma_hoa_don = hd.ma_hoa_don
+                    ORDER BY ct.ma_chi_tiet_hoa_don ASC
+                ) AS TenSanPhamDauTien,
+                (
                     SELECT TOP 1 dt.trang_thai
                     FROM DonTraHang dt
                     WHERE dt.ma_hoa_don = hd.ma_hoa_don

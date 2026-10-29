@@ -99,11 +99,11 @@ public class OrderApiClient : IOrderApiClient
         }
     }
 
-    public async Task<bool> ConfirmPaymentPaidAsync(int orderId)
+    public async Task<bool> ConfirmPaymentPaidAsync(int orderId, string method = "MOMO")
     {
         try
         {
-            var res = await _httpClient.PostAsync($"api/payment/confirm-paid/{orderId}", null);
+            var res = await _httpClient.PostAsync($"api/payment/confirm-paid/{orderId}?method={method}", null);
             return res.IsSuccessStatusCode;
         }
         catch

@@ -95,3 +95,4 @@ __pycache__/
 publish/
 ngrok.exe
 .vercel/
+*.log

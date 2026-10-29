@@ -23,6 +23,7 @@ public class ReportRepository : IReportRepository
             SELECT 
                 ngay_ban AS NgayBan,
                 tong_so_don AS TongSoDon,
+                so_don_hoan AS SoDonHoan,
                 tong_tien_hang AS TongTienHang,
                 tong_tien_giam AS TongTienGiam,
                 tong_tien_hoan AS TongTienHoan,

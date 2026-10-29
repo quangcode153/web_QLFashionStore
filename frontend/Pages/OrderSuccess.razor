@@ -844,7 +844,7 @@
         _isConfirming = true;
         try
         {
-            var success = await OrderApiClient.ConfirmPaymentPaidAsync(OrderId.Value);
+            var success = await OrderApiClient.ConfirmPaymentPaidAsync(OrderId.Value, _selectedMethod);
             if (success)
             {
                 _isPaidConfirmed = true;

@@ -474,10 +474,10 @@ code, kbd, samp, pre {
     font-size: 0.8rem !important;
     gap: 3px !important;
   }
-  .search-input {
+  .search-box .search-input {
     width: 135px !important;
   }
-  .search-input:focus {
+  .search-box .search-input:focus {
     width: 175px !important;
   }
 }
@@ -492,7 +492,7 @@ code, kbd, samp, pre {
   display: flex;
   align-items: center;
 }
-.search-input {
+.search-box .search-input {
   padding: 0.45rem 2.2rem 0.45rem 0.95rem;
   border-radius: var(--radius-full);
   border: 1px solid var(--border-color);
@@ -502,7 +502,7 @@ code, kbd, samp, pre {
   width: 190px;
   transition: all 0.35s var(--ease-spring);
 }
-.search-input:focus {
+.search-box .search-input:focus {
   border-color: var(--text-primary);
   width: 240px;
   background-color: #FFFFFF;
@@ -4622,12 +4622,12 @@ body:has(#qf-chat-widget-root) .yame-ai-size-floating {
   .header-actions {
     gap: 0.5rem;
   }
-  .search-input {
+  .search-box .search-input {
     width: 95px;
     font-size: 0.75rem;
     padding: 0.3rem 1.6rem 0.3rem 0.6rem;
   }
-  .search-input:focus {
+  .search-box .search-input:focus {
     width: 140px;
   }
 

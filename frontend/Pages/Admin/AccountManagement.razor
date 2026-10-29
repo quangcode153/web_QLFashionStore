@@ -37,30 +37,110 @@
     <!-- Bảng danh sách tài khoản -->
     <div class="card">
         <div class="card-header-row">
-            <span class="table-count">Tổng số: <strong>@FilteredAccounts.Count</strong> tài khoản</span>
-            <div class="filter-tabs">
-                <button class="tab-btn @(_selectedRoleFilter == null ? "active" : "")" @onclick="() => FilterRole(null)">
-                    Tất cả
-                </button>
-                @if (_isMultiBranchAdmin)
-                {
-                    <button class="tab-btn @(_selectedRoleFilter == RoleConstants.QuanLyChiNhanh ? "active" : "")" 
-                            @onclick="() => FilterRole(RoleConstants.QuanLyChiNhanh)">
-                        Quản lý chi nhánh
+            <div class="header-count-search-group">
+                <span class="table-count">Tổng số: <strong>@FilteredAccounts.Count</strong> tài khoản</span>
+
+                <!-- Ô tìm kiếm tài khoản theo tên, SĐT, chi nhánh, địa chỉ -->
+                <div class="search-box-wrapper">
+                    <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" 
+                           class="account-search-input" 
+                           placeholder="Tìm theo tên NV, username, SĐT, hoặc chi nhánh / địa chỉ..." 
+                           @bind="_searchTerm" 
+                           @bind:event="oninput" />
+                    @if (!string.IsNullOrWhiteSpace(_searchTerm))
+                    {
+                        <button type="button" class="btn-clear-search" @onclick="() => _searchTerm = string.Empty" title="Xóa tìm kiếm">&times;</button>
+                    }
+                </div>
+            </div>
+
+            <!-- Cụm bên phải: Nút Phễu lọc vai trò (Ghim cố định ở góc phải) -->
+            <div class="toolbar-actions-group">
+                <!-- Nút Phễu Lọc Vai Trò Đa Chọn -->
+                <div class="role-multiselect-container">
+                    <button type="button" class="role-multiselect-trigger @(_selectedRoles.Count > 0 ? "has-filter" : "")" @onclick="ToggleRoleDropdown">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        <span class="trigger-label">@RoleFilterSummaryLabel</span>
+                        <span class="trigger-arrow">@(_isRoleDropdownOpen ? "▲" : "▼")</span>
                     </button>
-                }
-                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.OrderCoordinator ? "active" : "")" 
-                        @onclick="() => FilterRole(RoleConstants.OrderCoordinator)">
-                    Order Coordinator
-                </button>
-                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.ThuKho ? "active" : "")" 
-                        @onclick="() => FilterRole(RoleConstants.ThuKho)">
-                    Thủ kho
-                </button>
-                <button class="tab-btn @(_selectedRoleFilter == RoleConstants.NhanVien ? "active" : "")" 
-                        @onclick="() => FilterRole(RoleConstants.NhanVien)">
-                    Nhân viên bán hàng (Thu ngân)
-                </button>
+
+                    @if (_isRoleDropdownOpen)
+                    {
+                        <div class="role-multiselect-menu">
+                            <div class="menu-header">
+                                <span class="menu-title">Lọc theo vai trò</span>
+                                @if (_selectedRoles.Count > 0)
+                                {
+                                    <button type="button" class="btn-link-action" @onclick="SelectAllRoles">Bỏ chọn tất cả</button>
+                                }
+                            </div>
+
+                            <div class="status-option-item all-option @(_selectedRoles.Count == 0 ? "selected" : "")" @onclick="SelectAllRoles">
+                                <label class="status-checkbox-label">
+                                    <input type="checkbox" checked="@(_selectedRoles.Count == 0)" @onchange="SelectAllRoles" />
+                                    <span class="status-name">Tất cả vai trò</span>
+                                </label>
+                                <span class="status-count-badge">@_accounts.Count</span>
+                            </div>
+
+                            <div class="status-divider"></div>
+
+                            @foreach (var opt in AvailableRoleOptions)
+                            {
+                                var isChecked = _selectedRoles.Contains(opt.Key);
+                                var count = GetRoleAccountCount(opt.Key);
+                                <div class="status-option-item @(isChecked ? "selected" : "")">
+                                    <label class="status-checkbox-label">
+                                        <input type="checkbox" 
+                                               data-role-checkbox="@opt.Key" 
+                                               checked="@isChecked" 
+                                               @onchange="(e) => ToggleRole(opt.Key, (bool)(e.Value ?? false))" />
+                                        <span class="status-badge-mini">@opt.Label</span>
+                                    </label>
+                                    <span class="status-count-badge">@count</span>
+                                </div>
+                            }
+
+                            <div class="menu-footer">
+                                <button type="button" class="btn-menu-apply" @onclick="() => _isRoleDropdownOpen = false">
+                                    Áp dụng (@FilteredAccounts.Count tài khoản)
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Đã tích hợp trọn vẹn vào Phễu lọc: Ẩn các nút tab bên ngoài để giao diện gọn gàng tuyệt đối -->
+                <div class="filter-tabs" style="display: none;">
+                    <button class="tab-btn @(_selectedRoles.Count == 0 ? "active" : "")" @onclick="() => FilterRole(null)">
+                        Tất cả
+                    </button>
+                    @if (_isMultiBranchAdmin)
+                    {
+                        <button class="tab-btn @(_selectedRoles.Count == 1 && _selectedRoles.Contains(RoleConstants.QuanLyChiNhanh) ? "active" : "")" 
+                                @onclick="() => FilterRole(RoleConstants.QuanLyChiNhanh)">
+                            Quản lý chi nhánh
+                        </button>
+                    }
+                    <button class="tab-btn @(_selectedRoles.Count == 1 && _selectedRoles.Contains(RoleConstants.OrderCoordinator) ? "active" : "")" 
+                            @onclick="() => FilterRole(RoleConstants.OrderCoordinator)">
+                        Order Coordinator
+                    </button>
+                    <button class="tab-btn @(_selectedRoles.Count == 1 && _selectedRoles.Contains(RoleConstants.ThuKho) ? "active" : "")" 
+                            @onclick="() => FilterRole(RoleConstants.ThuKho)">
+                        Thủ kho
+                    </button>
+                    <button class="tab-btn @(_selectedRoles.Count == 1 && _selectedRoles.Contains(RoleConstants.NhanVien) ? "active" : "")" 
+                            @onclick="() => FilterRole(RoleConstants.NhanVien)">
+                        Nhân viên bán hàng (Thu ngân)
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -129,9 +209,11 @@
                                     </span>
                                 </td>
                                 <td class="text-center">
-                                    @if ((acc.VaiTro == RoleConstants.AdminChuoi || acc.VaiTro == RoleConstants.QuanLyHeThong) && !_isMultiBranchAdmin)
+                                    @if (IsSystemAdminAccount(acc))
                                     {
-                                        <span class="text-muted text-sm">Không thể sửa</span>
+                                        <span class="badge-system-protect" title="Tài khoản Quản trị viên hệ thống cấp cao nhất được bảo vệ vĩnh viễn, không thể khóa">
+                                            🔒 Bảo vệ
+                                        </span>
                                     }
                                     else
                                     {
@@ -471,12 +553,260 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 16px;
         margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .header-count-search-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex: 1;
+        min-width: 280px;
     }
 
     .table-count {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         color: #475569;
+        white-space: nowrap;
+    }
+
+    .search-box-wrapper {
+        position: relative;
+        flex: 1;
+        max-width: 400px;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 10px;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    .account-search-input {
+        width: 100%;
+        padding: 7px 30px 7px 32px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        background: #ffffff;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .account-search-input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .btn-clear-search {
+        position: absolute;
+        right: 8px;
+        background: none;
+        border: none;
+        font-size: 1.1rem;
+        color: #94a3b8;
+        cursor: pointer;
+        padding: 0 4px;
+    }
+
+    .toolbar-actions-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-left: auto;
+        justify-content: flex-end;
+    }
+
+    .selected-status-chips {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .role-filter-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 8px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .btn-chip-remove {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 0.88rem;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .btn-reset-chips {
+        background: none;
+        border: none;
+        color: #ef4444;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: underline;
+        padding: 0 4px;
+    }
+
+    .role-multiselect-container {
+        position: relative;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .role-multiselect-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 170px;
+        padding: 7px 12px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #334155;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .role-multiselect-trigger:hover, .role-multiselect-trigger.has-filter {
+        border-color: #2563eb;
+        background: #f8fafc;
+        color: #1d4ed8;
+    }
+
+    .role-multiselect-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        width: 290px;
+        max-width: 90vw;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+        z-index: 1060;
+        padding: 8px 0;
+        font-family: inherit;
+    }
+
+    .menu-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 14px 10px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .menu-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        font-family: inherit;
+    }
+
+    .btn-link-action {
+        background: none;
+        border: none;
+        color: #2563eb;
+        font-size: 0.74rem;
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0;
+        font-family: inherit;
+        white-space: nowrap;
+    }
+
+    .status-option-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+        font-family: inherit;
+    }
+
+    .status-option-item:hover {
+        background: #f8fafc;
+    }
+
+    .status-checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 0.83rem;
+        color: #1e293b;
+        cursor: pointer;
+        user-select: none;
+        margin: 0;
+        font-family: inherit;
+    }
+
+    .status-badge-mini {
+        font-size: 0.83rem;
+        color: #1e293b;
+        font-family: inherit;
+    }
+
+    .status-count-badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-family: inherit;
+    }
+
+    .status-divider {
+        height: 1px;
+        background: #f1f5f9;
+        margin: 4px 0;
+    }
+
+    .menu-footer {
+        padding: 8px 12px 4px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .btn-menu-apply {
+        background: #0f172a;
+        color: #ffffff;
+        border: none;
+        padding: 7px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        cursor: pointer;
+        width: 100%;
+        font-family: inherit;
+        transition: background 0.15s ease;
+    }
+
+    .btn-menu-apply:hover {
+        background: #1e293b;
     }
 
     .filter-tabs {
@@ -502,6 +832,27 @@
         border-color: #0f172a;
     }
 
+    .table-responsive {
+        max-height: 540px;
+        overflow-y: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+    }
+
+    .table-responsive::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
     .admin-table {
         width: 100%;
         border-collapse: collapse;
@@ -509,9 +860,12 @@
     }
 
     .admin-table th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
         background: #f8fafc;
+        box-shadow: 0 1px 0 #e2e8f0;
         padding: 12px 14px;
-        border-bottom: 1px solid #e2e8f0;
         font-weight: 600;
         color: #475569;
         text-align: left;
@@ -521,6 +875,20 @@
         padding: 12px 14px;
         border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
+    }
+
+    .badge-system-protect {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        user-select: none;
     }
 
     .username-pill {
@@ -976,6 +1344,9 @@
     private List<AccountSummaryDto> _accounts = new();
     private List<BranchDto> _branches = new();
     private string? _selectedRoleFilter = null;
+    private HashSet<string> _selectedRoles = new();
+    private bool _isRoleDropdownOpen = false;
+    private string _searchTerm = string.Empty;
     private bool _isLoading = true;
     private bool _isMultiBranchAdmin = true;
     private bool _showCreateModal = false;
@@ -1000,15 +1371,149 @@
         ChiNhanh = ""
     };
 
-    private List<AccountSummaryDto> FilteredAccounts => string.IsNullOrEmpty(_selectedRoleFilter)
-        ? _accounts
-        : _selectedRoleFilter == RoleConstants.OrderCoordinator
-            ? _accounts.Where(x => x.VaiTro == RoleConstants.OrderCoordinator).ToList()
-            : _selectedRoleFilter == RoleConstants.ThuKho
-                ? _accounts.Where(x => x.VaiTro == RoleConstants.ThuKho).ToList()
-                : (_selectedRoleFilter == RoleConstants.NhanVien || _selectedRoleFilter == RoleConstants.NhanVienBanHang || _selectedRoleFilter == RoleConstants.ThuNgan)
-                    ? _accounts.Where(x => RoleConstants.IsGeneralStaff(x.VaiTro) && x.VaiTro != RoleConstants.ThuKho && x.VaiTro != RoleConstants.OrderCoordinator).ToList()
-                    : _accounts.Where(x => x.VaiTro == _selectedRoleFilter).ToList();
+    private record RoleFilterOption(string Key, string Label);
+
+    private bool IsSystemAdminAccount(AccountSummaryDto acc)
+    {
+        return acc.VaiTro == RoleConstants.AdminChuoi || 
+               acc.VaiTro == RoleConstants.QuanLyHeThong || 
+               acc.MaTaiKhoan == 1 || 
+               acc.TenDangNhap.Equals("admin", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private List<RoleFilterOption> AvailableRoleOptions
+    {
+        get
+        {
+            var list = new List<RoleFilterOption>();
+            if (_isMultiBranchAdmin)
+            {
+                list.Add(new RoleFilterOption(RoleConstants.QuanLyChiNhanh, "Quản lý chi nhánh"));
+            }
+            list.Add(new RoleFilterOption(RoleConstants.OrderCoordinator, "Order Coordinator"));
+            list.Add(new RoleFilterOption(RoleConstants.ThuKho, "Thủ kho"));
+            list.Add(new RoleFilterOption(RoleConstants.NhanVien, "Nhân viên bán hàng (Thu ngân)"));
+            if (_isMultiBranchAdmin && _accounts.Any(IsSystemAdminAccount))
+            {
+                list.Add(new RoleFilterOption("ADMIN_SYSTEM", "Quản trị viên hệ thống"));
+            }
+            return list;
+        }
+    }
+
+    private string RoleFilterSummaryLabel
+    {
+        get
+        {
+            if (_selectedRoles.Count == 0) return "Tất cả vai trò";
+            if (_selectedRoles.Count == 1)
+            {
+                var key = _selectedRoles.First();
+                var opt = AvailableRoleOptions.FirstOrDefault(o => o.Key == key);
+                return opt?.Label ?? key;
+            }
+            return $"Đã chọn ({_selectedRoles.Count}) vai trò";
+        }
+    }
+
+    private void ToggleRoleDropdown()
+    {
+        _isRoleDropdownOpen = !_isRoleDropdownOpen;
+    }
+
+    private bool AccountMatchesRole(AccountSummaryDto acc, string role)
+    {
+        if (role == "ADMIN_SYSTEM" || role == RoleConstants.AdminChuoi || role == RoleConstants.QuanLyHeThong)
+            return IsSystemAdminAccount(acc);
+        if (role == RoleConstants.OrderCoordinator)
+            return acc.VaiTro == RoleConstants.OrderCoordinator;
+        if (role == RoleConstants.ThuKho)
+            return acc.VaiTro == RoleConstants.ThuKho;
+        if (role == RoleConstants.NhanVien || role == RoleConstants.NhanVienBanHang || role == RoleConstants.ThuNgan)
+            return RoleConstants.IsGeneralStaff(acc.VaiTro) && acc.VaiTro != RoleConstants.ThuKho && acc.VaiTro != RoleConstants.OrderCoordinator;
+        return acc.VaiTro == role;
+    }
+
+    private int GetRoleAccountCount(string roleKey)
+    {
+        return _accounts.Count(a => AccountMatchesRole(a, roleKey));
+    }
+
+    private void FilterRole(string? role)
+    {
+        _selectedRoleFilter = role;
+        _selectedRoles.Clear();
+        if (!string.IsNullOrEmpty(role))
+        {
+            _selectedRoles.Add(role);
+        }
+    }
+
+    private void ToggleRole(string role, bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedRoles.Add(role);
+        }
+        else
+        {
+            _selectedRoles.Remove(role);
+        }
+
+        if (_selectedRoles.Count == 1)
+        {
+            _selectedRoleFilter = _selectedRoles.First();
+        }
+        else if (_selectedRoles.Count == 0)
+        {
+            _selectedRoleFilter = null;
+        }
+        else
+        {
+            _selectedRoleFilter = "MULTI";
+        }
+    }
+
+    private void SelectAllRoles()
+    {
+        _selectedRoles.Clear();
+        _selectedRoleFilter = null;
+    }
+
+    private List<AccountSummaryDto> FilteredAccounts
+    {
+        get
+        {
+            IEnumerable<AccountSummaryDto> query = _accounts;
+
+            // 1. Lọc vai trò (Multi-select hoặc Tab đơn)
+            if (_selectedRoles.Count > 0)
+            {
+                query = query.Where(a => _selectedRoles.Any(r => AccountMatchesRole(a, r)));
+            }
+            else if (!string.IsNullOrEmpty(_selectedRoleFilter))
+            {
+                query = query.Where(a => AccountMatchesRole(a, _selectedRoleFilter));
+            }
+
+            // 2. Lọc tìm kiếm theo tên nhân viên, username, sđt, chi nhánh, địa chỉ chi nhánh
+            if (!string.IsNullOrWhiteSpace(_searchTerm))
+            {
+                var term = _searchTerm.Trim().ToLowerInvariant();
+                query = query.Where(acc =>
+                    (!string.IsNullOrEmpty(acc.TenNhanVien) && acc.TenNhanVien.ToLowerInvariant().Contains(term)) ||
+                    (!string.IsNullOrEmpty(acc.TenDangNhap) && acc.TenDangNhap.ToLowerInvariant().Contains(term)) ||
+                    (!string.IsNullOrEmpty(acc.DienThoai) && acc.DienThoai.ToLowerInvariant().Contains(term)) ||
+                    (!string.IsNullOrEmpty(acc.ChiNhanh) && acc.ChiNhanh.ToLowerInvariant().Contains(term)) ||
+                    (!string.IsNullOrEmpty(acc.TenChiNhanh) && acc.TenChiNhanh.ToLowerInvariant().Contains(term)) ||
+                    acc.MaTaiKhoan.ToString().Contains(term) ||
+                    (acc.MaChiNhanh.HasValue && _branches.Any(b => b.MaChiNhanh == acc.MaChiNhanh.Value && !string.IsNullOrEmpty(b.DiaChi) && b.DiaChi.ToLowerInvariant().Contains(term)))
+                );
+            }
+
+            return query.ToList();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -1098,11 +1603,6 @@
             .OrderByDescending(b => b.IsOnlineWarehouse || b.MaChiNhanh == 9)
             .ThenBy(b => b.MaChiNhanh)
             .ToList();
-    }
-
-    private void FilterRole(string? role)
-    {
-        _selectedRoleFilter = role;
     }
 
     private void OpenCreateModal()
@@ -1238,6 +1738,12 @@
         var acc = _accounts.FirstOrDefault(x => x.MaTaiKhoan == accountId);
         if (acc != null)
         {
+            if (IsSystemAdminAccount(acc))
+            {
+                Toast.ShowWarning("Tài khoản Quản trị viên hệ thống cấp cao nhất được bảo vệ vĩnh viễn, không thể khóa!");
+                return;
+            }
+
             try
             {
                 await AdminApi.ToggleAccountStatusAsync(accountId);
