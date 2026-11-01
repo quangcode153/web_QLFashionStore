@@ -33,6 +33,7 @@ public class ProductVariantDto
     public string TinhTrangHang { get; set; } = string.Empty;
     public string? HinhAnh { get; set; }
     public bool DaXoa { get; set; }
+    public int DaBan { get; set; }
 }
 
 public class ProductImageDto

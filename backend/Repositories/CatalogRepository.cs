@@ -254,15 +254,13 @@ public class CatalogRepository : ICatalogRepository
                     MAX(ISNULL(bt.phan_tram_giam_gia, 0)) AS PhanTramGiamGia,
                     SUM(bt.so_luong_ton) AS TongTonKho,
                     ISNULL(sp.da_xoa, 0) AS DaXoa,
-                    (
-                        ISNULL((
-                            SELECT SUM(ct.so_luong)
-                            FROM ChiTietHoaDon ct WITH (NOLOCK)
-                            JOIN BienTheSanPham bt2 WITH (NOLOCK) ON ct.ma_bien_the = bt2.ma_bien_the
-                            JOIN HoaDon hd WITH (NOLOCK) ON ct.ma_hoa_don = hd.ma_hoa_don
-                            WHERE bt2.ma_san_pham = sp.ma_san_pham AND hd.trang_thai <> N'Đã hủy'
-                        ), 0) + ((sp.ma_san_pham * 37 + 59) % 180 + 25)
-                    ) AS DaBanOnline
+                    ISNULL((
+                        SELECT SUM(ct.so_luong)
+                        FROM ChiTietHoaDon ct WITH (NOLOCK)
+                        JOIN BienTheSanPham bt2 WITH (NOLOCK) ON ct.ma_bien_the = bt2.ma_bien_the
+                        JOIN HoaDon hd WITH (NOLOCK) ON ct.ma_hoa_don = hd.ma_hoa_don
+                        WHERE bt2.ma_san_pham = sp.ma_san_pham AND hd.trang_thai <> N'Đã hủy'
+                    ), 0) AS DaBanOnline
                 FROM SanPham sp WITH (NOLOCK)
                 JOIN DanhMuc dm WITH (NOLOCK) ON sp.ma_danh_muc = dm.ma_danh_muc
                 JOIN ThuongHieu th WITH (NOLOCK) ON sp.ma_thuong_hieu = th.ma_thuong_hieu
@@ -317,7 +315,14 @@ public class CatalogRepository : ICatalogRepository
                     WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
                     ELSE N'Hết hàng'
                 END AS TinhTrangHang,
-                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh
+                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh,
+                ISNULL((
+                    SELECT SUM(ct.so_luong)
+                    FROM ChiTietHoaDon ct WITH (NOLOCK)
+                    JOIN BienTheSanPham bt2 WITH (NOLOCK) ON ct.ma_bien_the = bt2.ma_bien_the
+                    JOIN HoaDon hd WITH (NOLOCK) ON ct.ma_hoa_don = hd.ma_hoa_don
+                    WHERE bt2.ma_san_pham = @ProductId AND hd.trang_thai <> N'Đã hủy'
+                ), 0) AS DaBan
             FROM BienTheSanPham bt WITH (NOLOCK)
             JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
             LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = 9
@@ -467,7 +472,14 @@ public class CatalogRepository : ICatalogRepository
                     WHEN ISNULL(tk.so_luong_ton, 0) > 0 THEN N'Còn hàng'
                     ELSE N'Hết hàng'
                 END AS TinhTrangHang,
-                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh
+                (SELECT TOP 1 duong_dan_anh FROM HinhAnhSanPham ha WHERE ha.ma_san_pham = @ProductId AND ha.la_anh_chinh = 1) AS HinhAnh,
+                ISNULL((
+                    SELECT SUM(ct.so_luong)
+                    FROM ChiTietHoaDon ct WITH (NOLOCK)
+                    JOIN BienTheSanPham bt2 WITH (NOLOCK) ON ct.ma_bien_the = bt2.ma_bien_the
+                    JOIN HoaDon hd WITH (NOLOCK) ON ct.ma_hoa_don = hd.ma_hoa_don
+                    WHERE bt2.ma_san_pham = @ProductId AND hd.trang_thai <> N'Đã hủy'
+                ), 0) AS DaBan
             FROM BienTheSanPham bt WITH (NOLOCK)
             JOIN SanPham sp WITH (NOLOCK) ON bt.ma_san_pham = sp.ma_san_pham
             LEFT JOIN TonKhoChiNhanh tk WITH (NOLOCK) ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = 9

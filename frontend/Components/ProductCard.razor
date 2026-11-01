@@ -73,7 +73,7 @@
             </div>
 
             <div class="product-sold-box">
-                <span class="product-sold-text">Đã bán online @(Product.DaBanOnline > 0 ? Product.DaBanOnline : GetDefaultSold(Product.MaSanPham))</span>
+                <span class="product-sold-text">Đã bán online @(Product.DaBanOnline)</span>
             </div>
         </div>
     </div>
@@ -112,6 +112,4 @@
             }
         }
     }
-
-    private int GetDefaultSold(int maSanPham) => ((maSanPham * 37 + 59) % 180) + 25;
 }

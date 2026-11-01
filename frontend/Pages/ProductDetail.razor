@@ -427,7 +427,7 @@
 
     private const string FallbackPlaceholder = "/images/no-image.svg";
     private string ActiveImage = string.Empty;
-    private int SoldOnlineCount => ((id * 37 + 59) % 180) + 25;
+    private int SoldOnlineCount => Variants.FirstOrDefault()?.DaBan ?? 0;
 
     private IEnumerable<string> AvailableColors => Variants
         .Select(v => v.MauSac)
