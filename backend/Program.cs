@@ -203,13 +203,16 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
-// 10. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động
-var connStr = Environment.GetEnvironmentVariable("CONNECTION_STRING")
-    ?? app.Configuration["CONNECTION_STRING"] 
-    ?? app.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;";
+// 10. Tự động sinh bảng và cấu trúc CSDL bằng code khi khởi động (bỏ qua khi chạy kiểm thử tự động in-memory)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    var connStr = Environment.GetEnvironmentVariable("CONNECTION_STRING")
+        ?? app.Configuration["CONNECTION_STRING"] 
+        ?? app.Configuration.GetConnectionString("DefaultConnection")
+        ?? "Server=localhost;Database=FashionStore;Trusted_Connection=True;TrustServerCertificate=True;";
 
-DatabaseInitializer.Initialize(connStr, app.Logger);
+    DatabaseInitializer.Initialize(connStr, app.Logger);
+}
 
 // 11. Cấu hình HTTP Request Pipeline
 app.UseSwagger();
