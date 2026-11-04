@@ -98,7 +98,10 @@ jobs:
 
       - name: Build & Publish Release Frontend
         if: steps.check_changes.outputs.has_changes == 'true'
-        run: dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
+        run: |
+          dotnet publish frontend/Frontend.csproj -c Release -o release-frontend
+          cp frontend/wwwroot/vercel.json release-frontend/wwwroot/vercel.json || true
+          cp release-frontend/wwwroot/index.html release-frontend/wwwroot/404.html || true
 
       - name: Deploy to Vercel Production
         if: steps.check_changes.outputs.has_changes == 'true' && env.VERCEL_TOKEN != ''
