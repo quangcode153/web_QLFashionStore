@@ -107,6 +107,7 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
+          vercel-version: latest
           working-directory: ./release-frontend/wwwroot
           vercel-args: '--prod'
 
