@@ -105,14 +105,16 @@ jobs:
 
       - name: Deploy to Vercel Production
         if: steps.check_changes.outputs.has_changes == 'true' && env.VERCEL_TOKEN != ''
-        uses: amondnet/vercel-action@v25
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
-          vercel-version: latest
-          working-directory: ./release-frontend/wwwroot
-          vercel-args: '--prod'
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
+        run: |
+          npm install -g vercel@latest
+          cd release-frontend/wwwroot
+          mkdir -p .vercel
+          echo "{\"orgId\":\"$VERCEL_ORG_ID\",\"projectId\":\"$VERCEL_PROJECT_ID\"}" > .vercel/project.json
+          DEPLOY_OUTPUT=$(vercel deploy --prod --token=$VERCEL_TOKEN --yes)
+          echo "Deployed successfully to: $DEPLOY_OUTPUT"
+          vercel alias set $DEPLOY_OUTPUT qf-fashion.vercel.app --token=$VERCEL_TOKEN --yes || true
 
