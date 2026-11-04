@@ -73,15 +73,17 @@ jobs:
       - name: Check Frontend Changes (Chỉ deploy khi bản mới có thay đổi)
         id: check_changes
         run: |
-          if [ $(git rev-list --count HEAD) -gt 1 ]; then
-            CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^(frontend/|shared/)' || true)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CHANGED="workflow_dispatch"
+          elif [ $(git rev-list --count HEAD) -gt 1 ]; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E '^(frontend/|shared/|\.github/workflows/)' || true)
           else
             CHANGED="initial"
           fi
 
           if [ -n "$CHANGED" ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Phát hiện thay đổi trong mã nguồn frontend/shared:"
+            echo "✅ Phát hiện thay đổi trong mã nguồn frontend/shared/ci:"
             echo "$CHANGED"
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
