@@ -15,7 +15,11 @@
             <p class="page-subtitle">
                 @if (!_isMultiBranchAdmin)
                 {
-                    <span>Quản lý chi nhánh: Cấp và quản lý tài khoản Nhân viên của chi nhánh phụ trách</span>
+                    <span class="branch-scope-badge">🏢 Phạm vi: <strong>@(_userBranchName ?? $"Chi nhánh #{_userBranchId}")</strong> — Chỉ cấp & quản lý tài khoản nhân viên thuộc chi nhánh phụ trách</span>
+                }
+                else
+                {
+                    <span>Admin Toàn chuỗi: Quản trị tài khoản và phân quyền cho toàn bộ hệ thống chi nhánh</span>
                 }
             </p>
         </div>
@@ -213,6 +217,18 @@
                                     {
                                         <span class="badge-system-protect" title="Tài khoản Quản trị viên hệ thống cấp cao nhất được bảo vệ vĩnh viễn, không thể khóa">
                                             🔒 Bảo vệ
+                                        </span>
+                                    }
+                                    else if (!_isMultiBranchAdmin && _userBranchId.HasValue && acc.MaChiNhanh.HasValue && acc.MaChiNhanh.Value != _userBranchId.Value)
+                                    {
+                                        <span class="badge-other-branch" title="Tài khoản thuộc chi nhánh khác, bạn không có quyền thao tác">
+                                            🔒 Khác chi nhánh
+                                        </span>
+                                    }
+                                    else if (!_isMultiBranchAdmin && (acc.VaiTro == RoleConstants.QuanLyChiNhanh || acc.VaiTro == RoleConstants.AdminChuoi || acc.VaiTro == RoleConstants.QuanLyHeThong))
+                                    {
+                                        <span class="badge-system-protect" title="Quản lý chi nhánh không thể khóa tài khoản quản lý hoặc admin">
+                                            🔒 Quản lý
                                         </span>
                                     }
                                     else
@@ -877,7 +893,7 @@
         vertical-align: middle;
     }
 
-    .badge-system-protect {
+    .badge-system-protect, .badge-other-branch {
         display: inline-flex;
         align-items: center;
         gap: 4px;
@@ -1744,11 +1760,34 @@
                 return;
             }
 
+            if (!_isMultiBranchAdmin)
+            {
+                if (_userBranchId.HasValue && acc.MaChiNhanh.HasValue && acc.MaChiNhanh.Value != _userBranchId.Value)
+                {
+                    Toast.ShowError("Bạn chỉ có quyền quản lý tài khoản thuộc chi nhánh của mình!");
+                    return;
+                }
+                if (acc.VaiTro == RoleConstants.QuanLyChiNhanh || acc.VaiTro == RoleConstants.AdminChuoi || acc.VaiTro == RoleConstants.QuanLyHeThong)
+                {
+                    Toast.ShowError("Bạn không có quyền khóa tài khoản Quản trị viên hoặc Quản lý chi nhánh!");
+                    return;
+                }
+            }
+
             try
             {
-                await AdminApi.ToggleAccountStatusAsync(accountId);
+                var ok = await AdminApi.ToggleAccountStatusAsync(accountId);
+                if (!ok)
+                {
+                    Toast.ShowError("Không thể cập nhật trạng thái tài khoản. Vui lòng kiểm tra lại quyền hạn!");
+                    return;
+                }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Toast.ShowError($"Lỗi: {ex.Message}");
+                return;
+            }
             acc.DangHoatDong = !acc.DangHoatDong;
             Toast.ShowSuccess($"Đã {(acc.DangHoatDong ? "kích hoạt" : "khóa")} tài khoản {acc.TenDangNhap}!");
         }

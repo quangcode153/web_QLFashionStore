@@ -330,5 +330,31 @@ public class AccountManagementBranchScopingComponentTests : BunitContext
         cut.Find("tbody").InnerHtml.Should().NotContain("thukho_online");
         cut.Find("tbody").InnerHtml.Should().NotContain("coordinator01");
     }
+
+    [Fact(DisplayName = "VÒNG 4: Quản lý chi nhánh chỉ có quyền thao tác nhân viên cùng chi nhánh, bị khóa nút với chi nhánh khác")]
+    public void AccountManagement_BranchManager_DisablesActionForOtherBranches()
+    {
+        // Arrange: Quản lý Chi nhánh 1 đăng nhập
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.QuanLyChiNhanh);
+        JSInterop.Setup<string?>("localStorage.getItem", "branchId").SetResult("1");
+        JSInterop.Setup<string?>("localStorage.getItem", "branchName").SetResult("QF Sư Vạn Hạnh (Q.10, TP.HCM)");
+
+        // Act
+        var cut = Render<AccountManagement>();
+
+        // Assert: 
+        // 1. Phải hiển thị phạm vi chi nhánh ở header
+        cut.Markup.Should().Contain("QF Sư Vạn Hạnh (Q.10, TP.HCM)");
+
+        // 2. Tài khoản ở chi nhánh khác (thukho_online ở Chi nhánh 9) phải hiển thị badge "Khác chi nhánh"
+        cut.Markup.Should().Contain("Khác chi nhánh");
+
+        // 3. Tài khoản Admin vẫn được bảo vệ
+        cut.Markup.Should().Contain("Bảo vệ");
+
+        // 4. Tài khoản cùng chi nhánh 1 (thukho_q10) có nút thao tác Khóa/Kích hoạt
+        var toggleButtons = cut.FindAll(".btn-action-toggle");
+        toggleButtons.Should().NotBeEmpty();
+    }
 }
 

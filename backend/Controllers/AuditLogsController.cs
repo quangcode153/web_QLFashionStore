@@ -1,12 +1,15 @@
 using System.Threading.Tasks;
 using Backend.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Constants;
 using Shared.DTOs.Audit;
 
 namespace Backend.Controllers;
 
 [ApiController]
 [Route("api/audit-logs")]
+[Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh}")]
 public class AuditLogsController : ControllerBase
 {
     private readonly IAuditLogService _auditLogService;
@@ -20,31 +23,29 @@ public class AuditLogsController : ControllerBase
     public async Task<IActionResult> GetAuditLogs([FromQuery] string? loaiThaoTac = null, [FromQuery] int? maChiNhanh = null, [FromQuery] int limit = 100)
     {
         var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
-        var isChainAdmin = string.IsNullOrEmpty(userRole) ||
-                           userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
-                           userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase) ||
-                           userRole.Contains("hệ thống", StringComparison.OrdinalIgnoreCase);
+        var isChainAdmin = userRole == RoleConstants.AdminChuoi || userRole == RoleConstants.QuanLyHeThong;
 
-        int? effectiveBranchId = maChiNhanh;
-
-        // Nếu không phải Quản lý chuỗi (Admin), bắt buộc chỉ được xem nhật ký của chi nhánh mình đang quản lý
-        if (!isChainAdmin && !string.IsNullOrEmpty(userRole))
+        int? effectiveBranchId;
+        if (isChainAdmin)
         {
+            // Quản lý chuỗi (Admin): Được quyền xem toàn bộ chuỗi (khi maChiNhanh = null) hoặc lọc theo chi nhánh bất kỳ
+            effectiveBranchId = maChiNhanh;
+        }
+        else
+        {
+            // Quản lý chi nhánh: BẮT BUỘC chỉ được xem nhật ký thuộc chi nhánh của mình
             var branchClaim = User.FindFirst("branchId")?.Value ?? User.FindFirst("ma_chi_nhanh")?.Value;
             if (int.TryParse(branchClaim, out var bId) && bId > 0)
             {
                 effectiveBranchId = bId;
             }
-        }
-
-        Console.WriteLine($"[AuditLogsController] Incoming request: UserRole='{userRole}', isChainAdmin={isChainAdmin}, effectiveBranchId={effectiveBranchId}, limit={limit}");
-        foreach (var c in User.Claims)
-        {
-            Console.WriteLine($"  Claim: {c.Type} = {c.Value}");
+            else
+            {
+                return Forbid();
+            }
         }
 
         var result = await _auditLogService.GetLogsAsync(loaiThaoTac, effectiveBranchId, limit);
-        Console.WriteLine($"[AuditLogsController] Returned logs count: {result.Data?.Count()}");
         return Ok(result);
     }
 

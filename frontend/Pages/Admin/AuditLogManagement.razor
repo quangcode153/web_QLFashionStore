@@ -4,11 +4,31 @@
 @namespace Frontend.Pages.Admin
 @inject IAdminApiClient AdminApi
 @inject IToastService Toast
+@inject IJSRuntime JS
 
 <div class="audit-container">
     <div class="page-header">
         <div>
-            <h2 class="page-title">NHẬT KÝ HỆ THỐNG & BIẾN ĐỘNG VẬN HÀNH</h2>
+            <h2 class="page-title">
+                @if (!_isMultiBranchAdmin)
+                {
+                    <span>NHẬT KÝ BIẾN ĐỘNG CHI NHÁNH</span>
+                }
+                else
+                {
+                    <span>NHẬT KÝ HỆ THỐNG & BIẾN ĐỘNG VẬN HÀNH</span>
+                }
+            </h2>
+            <p class="page-subtitle" style="margin: 4px 0 0; font-size: 0.85rem; color: #64748b;">
+                @if (!_isMultiBranchAdmin)
+                {
+                    <span>🏢 Phạm vi: <strong>@(_userBranchName ?? $"Chi nhánh #{_userBranchId}")</strong> — Giám sát nhật ký thao tác nội bộ của nhân sự chi nhánh</span>
+                }
+                else
+                {
+                    <span>🌐 Phạm vi: <strong>Toàn hệ thống chuỗi</strong> — Giám sát toàn bộ hoạt động kiểm toán tất cả chi nhánh</span>
+                }
+            </p>
         </div>
         <div class="header-actions">
             <button type="button" class="btn btn-outline btn-refresh" @onclick="LoadLogs" disabled="@_isLoading" title="Tải lại dữ liệu">
@@ -780,13 +800,49 @@
     private string _currentFilter = "ALL";
     private string _searchText = string.Empty;
 
+    private bool _isMultiBranchAdmin = true;
+    private int? _userBranchId = null;
+    private string? _userBranchName = null;
+
     // Phân trang & Compact View
     private int _page = 1;
     private int _pageSize = 25;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadUserInfo();
         await LoadLogs();
+    }
+
+    private async Task LoadUserInfo()
+    {
+        try
+        {
+            var role = await JS.InvokeAsync<string?>("localStorage.getItem", "userRole");
+            if (string.IsNullOrEmpty(role))
+            {
+                _isMultiBranchAdmin = true;
+            }
+            else if (role.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) && !role.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase))
+            {
+                _isMultiBranchAdmin = false;
+            }
+            else
+            {
+                _isMultiBranchAdmin = true;
+            }
+
+            var bIdStr = await JS.InvokeAsync<string?>("localStorage.getItem", "branchId");
+            if (int.TryParse(bIdStr, out var bId))
+            {
+                _userBranchId = bId;
+            }
+            _userBranchName = await JS.InvokeAsync<string?>("localStorage.getItem", "branchName");
+        }
+        catch
+        {
+            _isMultiBranchAdmin = true;
+        }
     }
 
     private async Task LoadLogs()
@@ -794,7 +850,8 @@
         _isLoading = true;
         try
         {
-            var data = await AdminApi.GetAuditLogsAsync(loaiThaoTac: null, maChiNhanh: null, limit: 200);
+            var branchFilter = !_isMultiBranchAdmin ? _userBranchId : null;
+            var data = await AdminApi.GetAuditLogsAsync(loaiThaoTac: null, maChiNhanh: branchFilter, limit: 200);
             _logs = data ?? new List<global::Shared.DTOs.Audit.AuditLogDto>();
             _page = 1;
         }

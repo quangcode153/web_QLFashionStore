@@ -68,7 +68,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> GetAccounts()
     {
         var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
-        var response = await _authService.GetAccountsAsync(currentUserRole);
+        int? currentBranchId = int.TryParse(User.FindFirst("branchId")?.Value ?? User.FindFirst("ma_chi_nhanh")?.Value, out var bId) ? bId : null;
+        var response = await _authService.GetAccountsAsync(currentUserRole, currentBranchId);
         return Ok(response);
     }
 
@@ -80,7 +81,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> ToggleAccount(int id)
     {
         var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
-        var response = await _authService.ToggleAccountStatusAsync(id, currentUserRole);
+        int? currentBranchId = int.TryParse(User.FindFirst("branchId")?.Value ?? User.FindFirst("ma_chi_nhanh")?.Value, out var bId) ? bId : null;
+        var response = await _authService.ToggleAccountStatusAsync(id, currentUserRole, currentBranchId);
         if (!response.Success) return BadRequest(response);
         return Ok(response);
     }

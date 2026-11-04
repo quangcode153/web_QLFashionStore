@@ -15,7 +15,9 @@ public interface IAuthService
     Task<ApiResponse<bool>> CreateStaffAccountAsync(CreateStaffAccountDto request, string currentUserRole);
     Task<ApiResponse<bool>> CreateStaffAccountAsync(CreateStaffAccountDto request, string currentUserRole, int? currentBranchId);
     Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole);
+    Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole, int? currentBranchId);
     Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole);
+    Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole, int? currentBranchId);
 }
 
 public class AuthService : IAuthService
@@ -282,7 +284,10 @@ public class AuthService : IAuthService
         return ApiResponse<bool>.Ok(true, $"Tạo tài khoản [{request.VaiTro}] thành công!");
     }
 
-    public async Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole)
+    public Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole)
+        => GetAccountsAsync(currentUserRole, null);
+
+    public async Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole, int? currentBranchId)
     {
         bool isMultiBranchAdmin = currentUserRole == Shared.Constants.RoleConstants.AdminChuoi 
                                || currentUserRole == Shared.Constants.RoleConstants.QuanLyHeThong;
@@ -295,13 +300,21 @@ public class AuthService : IAuthService
         else
         {
             var all = await _authRepository.GetAllAccountsAsync(null);
-            accounts = all.Where(x => Shared.Constants.RoleConstants.IsGeneralStaff(x.VaiTro)).ToList();
+            // Quản lý chi nhánh: Bắt buộc chỉ được xem nhân viên thuộc đúng chi nhánh của mình
+            accounts = all.Where(x => 
+                Shared.Constants.RoleConstants.IsGeneralStaff(x.VaiTro) &&
+                currentBranchId.HasValue && 
+                x.MaChiNhanh == currentBranchId.Value
+            ).ToList();
         }
 
         return ApiResponse<List<AccountSummaryDto>>.Ok(accounts);
     }
 
-    public async Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole)
+    public Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole)
+        => ToggleAccountStatusAsync(accountId, currentUserRole, null);
+
+    public async Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole, int? currentBranchId)
     {
         bool isMultiBranchAdmin = currentUserRole == Shared.Constants.RoleConstants.AdminChuoi 
                                || currentUserRole == Shared.Constants.RoleConstants.QuanLyHeThong;
@@ -312,6 +325,33 @@ public class AuthService : IAuthService
         }
 
         var account = await _authRepository.GetAccountByIdAsync(accountId);
+        if (account == null)
+        {
+            return ApiResponse<bool>.Fail("Không tìm thấy tài khoản yêu cầu!");
+        }
+
+        // NẾU LÀ QUẢN LÝ CHI NHÁNH:
+        if (!isMultiBranchAdmin)
+        {
+            // 1. Tuyệt đối không được chỉnh sửa tài khoản Quản trị cấp cao (Admin chuỗi, Quản lý hệ thống)
+            if (account.VaiTro == Shared.Constants.RoleConstants.AdminChuoi || account.VaiTro == Shared.Constants.RoleConstants.QuanLyHeThong)
+            {
+                return ApiResponse<bool>.Fail("Quản lý chi nhánh không được phép can thiệp tài khoản Quản trị cấp cao!");
+            }
+
+            // 2. Tuyệt đối không được chỉnh sửa tài khoản Quản lý chi nhánh
+            if (account.VaiTro == Shared.Constants.RoleConstants.QuanLyChiNhanh)
+            {
+                return ApiResponse<bool>.Fail("Quản lý chi nhánh không được phép can thiệp tài khoản Quản lý chi nhánh!");
+            }
+
+            // 3. BẮT BUỘC: Tài khoản phải thuộc đúng chi nhánh mà quản lý đang phụ trách
+            if (!currentBranchId.HasValue || account.MaChiNhanh != currentBranchId.Value)
+            {
+                return ApiResponse<bool>.Fail("Quản lý chi nhánh chỉ có quyền chỉnh sửa tài khoản thuộc chi nhánh của mình!");
+            }
+        }
+
         var success = await _authRepository.ToggleAccountStatusAsync(accountId);
 
         if (success && account != null)

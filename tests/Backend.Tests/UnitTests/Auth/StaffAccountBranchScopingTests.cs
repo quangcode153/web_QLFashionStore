@@ -165,4 +165,114 @@ public class StaffAccountBranchScopingTests
         // Assert
         Assert.Equal(shouldSucceed, result.Success);
     }
+
+    // =========================================================================
+    // VÒNG 4: DANH SÁCH & THAO TÁC KHÓA/MỞ KHÓA TÀI KHOẢN THEO CHI NHÁNH
+    // =========================================================================
+    [Fact]
+    public async Task GetAccounts_BranchManager_OnlyReturnsStaffInOwnBranch()
+    {
+        // Arrange
+        var mockAccounts = new System.Collections.Generic.List<AccountSummaryDto>
+        {
+            new() { MaTaiKhoan = 1, TenDangNhap = "staff_cn2", VaiTro = RoleConstants.NhanVien, MaChiNhanh = 2 },
+            new() { MaTaiKhoan = 2, TenDangNhap = "staff_cn3", VaiTro = RoleConstants.NhanVien, MaChiNhanh = 3 },
+            new() { MaTaiKhoan = 3, TenDangNhap = "thukho_cn2", VaiTro = RoleConstants.ThuKho, MaChiNhanh = 2 },
+            new() { MaTaiKhoan = 4, TenDangNhap = "admin_master", VaiTro = RoleConstants.AdminChuoi, MaChiNhanh = null }
+        };
+
+        _authRepoMock.Setup(r => r.GetAllAccountsAsync(It.IsAny<string?>()))
+            .ReturnsAsync(mockAccounts);
+
+        // Act: Quản lý chi nhánh 2 gọi danh sách tài khoản
+        var result = await _authService.GetAccountsAsync(RoleConstants.QuanLyChiNhanh, currentBranchId: 2);
+
+        // Assert: Chỉ trả về 2 tài khoản thuộc chi nhánh 2 (staff_cn2, thukho_cn2)
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(2, result.Data.Count);
+        Assert.All(result.Data, a => Assert.Equal(2, a.MaChiNhanh));
+    }
+
+    [Theory]
+    [InlineData(2, 3, false)] // Quản lý CN 2 cố toggle tài khoản CN 3 -> FAIL
+    [InlineData(2, 4, false)] // Quản lý CN 2 cố toggle tài khoản CN 4 -> FAIL
+    [InlineData(2, 2, true)]  // Quản lý CN 2 toggle tài khoản CN 2 -> PASS
+    public async Task ToggleAccount_BranchManager_IsolationMatrix_EnforcesSameBranch(
+        int managerBranchId, int targetAccountBranchId, bool shouldSucceed)
+    {
+        // Arrange
+        var targetAccount = new AccountSummaryDto
+        {
+            MaTaiKhoan = 10,
+            TenDangNhap = "staff_test",
+            VaiTro = RoleConstants.NhanVien,
+            MaChiNhanh = targetAccountBranchId,
+            DangHoatDong = true
+        };
+
+        _authRepoMock.Setup(r => r.GetAccountByIdAsync(10))
+            .ReturnsAsync(targetAccount);
+        _authRepoMock.Setup(r => r.ToggleAccountStatusAsync(10))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _authService.ToggleAccountStatusAsync(10, RoleConstants.QuanLyChiNhanh, managerBranchId);
+
+        // Assert
+        Assert.Equal(shouldSucceed, result.Success);
+        if (!shouldSucceed)
+        {
+            Assert.Contains("chi nhánh", result.Message, System.StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task ToggleAccount_BranchManager_TargetingAdmin_IsStrictlyForbidden()
+    {
+        // Arrange: Quản lý chi nhánh cố toggle tài khoản Admin
+        var adminAccount = new AccountSummaryDto
+        {
+            MaTaiKhoan = 1,
+            TenDangNhap = "admin",
+            VaiTro = RoleConstants.AdminChuoi,
+            MaChiNhanh = 2, // Dù có gán chi nhánh nào đi nữa
+            DangHoatDong = true
+        };
+
+        _authRepoMock.Setup(r => r.GetAccountByIdAsync(1))
+            .ReturnsAsync(adminAccount);
+
+        // Act
+        var result = await _authService.ToggleAccountStatusAsync(1, RoleConstants.QuanLyChiNhanh, currentBranchId: 2);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("Quản trị", result.Message, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ToggleAccount_ChainAdmin_CanToggleAnyBranch()
+    {
+        // Arrange: Admin chuỗi toggle tài khoản bất kỳ chi nhánh
+        var staffAccount = new AccountSummaryDto
+        {
+            MaTaiKhoan = 20,
+            TenDangNhap = "staff_any_branch",
+            VaiTro = RoleConstants.NhanVien,
+            MaChiNhanh = 5,
+            DangHoatDong = true
+        };
+
+        _authRepoMock.Setup(r => r.GetAccountByIdAsync(20))
+            .ReturnsAsync(staffAccount);
+        _authRepoMock.Setup(r => r.ToggleAccountStatusAsync(20))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _authService.ToggleAccountStatusAsync(20, RoleConstants.AdminChuoi, currentBranchId: null);
+
+        // Assert
+        Assert.True(result.Success);
+    }
 }
