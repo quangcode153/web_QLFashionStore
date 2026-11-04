@@ -105,23 +105,14 @@ jobs:
 
       - name: Deploy to Vercel Production
         if: steps.check_changes.outputs.has_changes == 'true' && env.VERCEL_TOKEN != ''
+        uses: amondnet/vercel-action@v25
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
-        run: |
-          npm install -g vercel@latest
-          cd release-frontend/wwwroot
-
-          # 1. Cố gắng link trực tiếp với project 'qf-fashion' nếu tồn tại
-          vercel link --project qf-fashion --yes --token=$VERCEL_TOKEN || true
-
-          # 2. Deploy lên Production và trích xuất URL duy nhất
-          RAW_OUTPUT=$(vercel deploy --prod --token=$VERCEL_TOKEN --yes)
-          DEPLOY_URL=$(echo "$RAW_OUTPUT" | grep -Eo 'https://[^ ]+\.vercel\.app' | tail -n 1)
-          echo "Production Deployment URL: $DEPLOY_URL"
-
-          # 3. Gán tường minh domain alias vào qf-fashion.vercel.app
-          if [ -n "$DEPLOY_URL" ]; then
-            vercel alias set "$DEPLOY_URL" qf-fashion.vercel.app --token=$VERCEL_TOKEN --yes || true
-          fi
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID || 'team_5HzRnccDuVtZ3wA0ZPd5zCmS' }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID || 'prj_lWMBvJYggkCLBLta7idz325Ys365' }}
+          vercel-version: latest
+          working-directory: ./release-frontend/wwwroot
+          vercel-args: '--prod'
 
