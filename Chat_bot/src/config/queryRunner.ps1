@@ -6,12 +6,13 @@ param(
     [string]$Query = ""
 )
 
-$connString = "Server=$Server;Database=$Database;User Id=$User;Password=$Password;TrustServerCertificate=True;"
+$connString = "Server=$Server;Database=$Database;User Id=$User;Password=$Password;TrustServerCertificate=True;Connection Timeout=3;"
 $conn = New-Object System.Data.SqlClient.SqlConnection($connString)
 
 try {
     $conn.Open()
     $cmd = $conn.CreateCommand()
+    $cmd.CommandTimeout = 3
     $cmd.CommandText = "SET NOCOUNT ON; SELECT ($Query FOR JSON PATH) AS json_data"
     $reader = $cmd.ExecuteReader()
     $sb = New-Object System.Text.StringBuilder

@@ -97,3 +97,4 @@ ngrok.exe
 .vercel/
 *.log
 *.pptx
+*.docx

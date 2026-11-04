@@ -21,7 +21,7 @@ const config = {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE !== 'false',
     enableArithAbort: true,
-    connectTimeout: 4000,
+    connectTimeout: 2000,
   },
   pool: {
     max: 10,
@@ -107,7 +107,8 @@ export async function executeQuery(queryText, inputs = {}) {
 
     const { stdout } = await execFileAsync('powershell', args, {
       maxBuffer: 20 * 1024 * 1024,
-      encoding: 'utf8'
+      encoding: 'utf8',
+      timeout: 5000
     });
 
     const output = stdout.trim();

@@ -171,6 +171,7 @@ builder.Services.AddScoped<IAnnouncementService, AnnouncementService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddHttpClient<IChatService, ChatService>();
 
 // 9. Cấu hình Rate Limiting (Chống Brute-Force & DoS)
 builder.Services.AddRateLimiter(options =>

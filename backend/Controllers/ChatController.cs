@@ -1,57 +1,35 @@
+using Backend.Services;
+using FashionStore.Shared.DTOs.Chat;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
-using System.Text.Json;
 
 namespace Backend.Controllers;
 
 /// <summary>
-/// Proxy điều hướng yêu cầu Chatbot từ Frontend/Vercel sang Microservice Chatbot Node.js (Port 3001).
-/// Giải quyết triệt để lỗi Mixed Content và tránh cần thêm đường hầm tunnel thứ 2.
+/// Proxy điều hướng yêu cầu Chatbot từ Frontend sang Microservice Chatbot Node.js (Port 3001)
+/// Tích hợp Tầng Bảo Hiểm (Backend Fallback Stylist) tự động ứng cứu khi Microservice bận hoặc timeout.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
 {
-    private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-    private readonly string _chatbotUrl;
+    private readonly IChatService _chatService;
 
-    public ChatController(IConfiguration configuration)
+    public ChatController(IChatService chatService)
     {
-        _chatbotUrl = Environment.GetEnvironmentVariable("CHATBOT_URL") 
-            ?? configuration["ChatbotUrl"] 
-            ?? "http://localhost:3001";
+        _chatService = chatService;
     }
 
     [HttpPost]
-    public async Task<IActionResult> SendMessage()
+    public async Task<IActionResult> SendMessage([FromBody] ChatRequestDto request, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var reader = new StreamReader(Request.Body, Encoding.UTF8);
-            var rawBody = await reader.ReadToEndAsync();
-            var content = new StringContent(rawBody, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync($"{_chatbotUrl.TrimEnd('/')}/api/chat", content);
-            var responseContent = await response.Content.ReadAsStringAsync();
-            return Content(responseContent, response.Content.Headers.ContentType?.MediaType ?? "application/json", Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(502, new { reply = $"Không thể kết nối tới Chatbot AI Server: {ex.Message}" });
-        }
+        var response = await _chatService.ProcessChatAsync(request, cancellationToken);
+        return Ok(response);
     }
 
     [HttpGet("health")]
-    public async Task<IActionResult> Health()
+    public async Task<IActionResult> Health(CancellationToken cancellationToken)
     {
-        try
-        {
-            var response = await _httpClient.GetAsync($"{_chatbotUrl.TrimEnd('/')}/api/health");
-            var responseContent = await response.Content.ReadAsStringAsync();
-            return Content(responseContent, "application/json", Encoding.UTF8);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(502, new { status = "ERROR", error = ex.Message });
-        }
+        var health = await _chatService.CheckHealthAsync(cancellationToken);
+        return Ok(health);
     }
 }
