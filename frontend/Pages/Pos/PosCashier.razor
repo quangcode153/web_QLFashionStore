@@ -1,6 +1,7 @@
 @page "/pos"
 @layout EmptyLayout
 @namespace Frontend.Pages.Pos
+@implements IDisposable
 @inject IPosApiClient PosApiClient
 @inject IToastService Toast
 @inject IJSRuntime JS
@@ -384,37 +385,28 @@
             <div class="pos-variant-modal-header">
                 <div>
                     <h3 class="variant-modal-title">📷 QUÉT MÃ QR / BARCODE</h3>
-                    <p class="variant-modal-sub">Bắn mã vạch / quét mã QR từ tag sản phẩm để thêm ngay vào giỏ</p>
+                    <p class="variant-modal-sub">Camera trực tiếp & Hỗ trợ súng bắn Barcode/SKU</p>
                 </div>
                 <button type="button" class="btn-close-modal" @onclick="CloseScannerModal">&times;</button>
             </div>
             <div class="pos-variant-modal-body text-center">
-                <div class="scanner-viewfinder">
+                <div class="scanner-camera-wrapper" style="position: relative; background: #0f172a; border-radius: 10px; overflow: hidden; min-height: 250px; border: 2px solid #3b82f6;">
+                    <div id="pos-camera-view" style="width: 100%; min-height: 240px;"></div>
                     <div class="scanner-laser-line"></div>
-                    <div class="scanner-icon-wrap">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                            <path d="M10 3v4"></path>
-                            <path d="M3 10h4"></path>
-                            <path d="M14 10h7"></path>
-                            <path d="M10 14v7"></path>
-                        </svg>
-                    </div>
-                    <p class="scanner-guide">Hướng đầu đọc hoặc camera về phía mã QR / Barcode</p>
                 </div>
+                <p class="scanner-guide" style="margin-top: 8px; font-size: 0.8rem; color: #64748b;">
+                    💡 Hướng camera về phía tem nhãn QR hoặc dùng máy quét mã vạch
+                </p>
 
-                <div class="scanner-input-box" style="margin-top: 16px;">
+                <div class="scanner-input-box" style="margin-top: 12px;">
                     <input type="text" 
                            id="pos-scanner-modal-input"
                            class="pos-input" 
-                           placeholder="Quét mã QR hoặc nhập SKU tại đây..." 
+                           placeholder="Bắn súng quét hoặc gõ SKU tại đây..." 
                            @bind="_scannerInput" 
                            @bind:event="oninput" 
                            @onkeydown="OnScannerKeyDown" />
-                    <button class="btn btn-primary" style="margin-top: 10px; width: 100%; height: 40px; font-weight: 700;" @onclick="SubmitScannerInput">
+                    <button class="btn btn-primary" style="margin-top: 8px; width: 100%; height: 38px; font-weight: 700;" @onclick="SubmitScannerInput">
                         Xác nhận mã vừa quét
                     </button>
                 </div>
@@ -1597,16 +1589,50 @@
         await LoadFastSaleProducts();
     }
 
-    private void OpenScannerModal()
+    private DotNetObjectReference<PosCashier>? _dotNetRef;
+
+    private async Task OpenScannerModal()
     {
         _scannerInput = string.Empty;
         _showScannerModal = true;
+        StateHasChanged();
+
+        try
+        {
+            _dotNetRef?.Dispose();
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await Task.Delay(150);
+            await JS.InvokeVoidAsync("posCameraScanner.start", _dotNetRef, "pos-camera-view");
+        }
+        catch { }
     }
 
-    private void CloseScannerModal()
+    private async Task CloseScannerModal()
     {
         _showScannerModal = false;
         _scannerInput = string.Empty;
+        try
+        {
+            await JS.InvokeVoidAsync("posCameraScanner.stop");
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public async Task OnCodeScannedFromCamera(string rawCode)
+    {
+        await CloseScannerModal();
+        await ProcessScannedCode(rawCode);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            _dotNetRef?.Dispose();
+        }
+        catch { }
     }
 
     private async Task OnScannerKeyDown(KeyboardEventArgs e)
@@ -1622,7 +1648,7 @@
         if (!string.IsNullOrWhiteSpace(_scannerInput))
         {
             var raw = _scannerInput;
-            CloseScannerModal();
+            await CloseScannerModal();
             await ProcessScannedCode(raw);
         }
     }

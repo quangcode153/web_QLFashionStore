@@ -475,5 +475,26 @@ public class PosCashierComponentTests : BunitContext
         cut.FindAll("tr.cart-item-row").Should().HaveCount(1);
     }
 
+    [Fact(DisplayName = "VÒNG 4: Callback từ Live Camera JS tự động đóng modal và thêm món vào giỏ")]
+    public async Task PosCashier_CameraScanCallback_AddsProductToCart()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Act: Kích hoạt callback từ Camera khi quét trúng mã
+        await cut.InvokeAsync(async () =>
+        {
+            await cut.Instance.OnCodeScannedFromCamera("AT-COT-01");
+        });
+
+        // Assert: Sản phẩm được tìm thấy và nằm trong giỏ
+        _mockPosApi.Verify(api => api.SearchSkuAsync("AT-COT-01"), Times.Once);
+        cut.FindAll("tr.cart-item-row").Should().HaveCount(1);
+        cut.Markup.Should().Contain("AT-COT-01");
+    }
+
     #endregion
 }
