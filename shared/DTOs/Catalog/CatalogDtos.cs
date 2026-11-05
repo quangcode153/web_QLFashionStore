@@ -34,6 +34,7 @@ public class ProductVariantDto
     public string? HinhAnh { get; set; }
     public bool DaXoa { get; set; }
     public int DaBan { get; set; }
+    public string QrCodeUrl => Shared.Helpers.BarcodeParser.GenerateQrCodeUrl(MaSku, 180);
 }
 
 public class ProductImageDto

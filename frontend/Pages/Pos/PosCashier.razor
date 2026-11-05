@@ -87,6 +87,15 @@
             <button class="btn btn-primary btn-search-sku" @onclick="HandleSearchSku">
                 Tìm SKU
             </button>
+            <button type="button" class="btn btn-outline btn-scan-qr" @onclick="OpenScannerModal" title="Quét mã QR bằng Camera">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-2px; margin-right:4px;">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Quét QR
+            </button>
             <button type="button" class="btn btn-outline btn-pos-return" @onclick="OpenReturnModal" title="Đổi trả hàng / Nhập kho lỗi tại quầy (F3)">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:-2px; margin-right:4px;">
                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
@@ -367,6 +376,53 @@
     </div>
 }
 
+<!-- MODAL QUÉT QR / BARCODE SẢN PHẨM -->
+@if (_showScannerModal)
+{
+    <div class="pos-modal-backdrop" @onclick="CloseScannerModal">
+        <div class="pos-variant-modal pos-scanner-modal" @onclick:stopPropagation="true">
+            <div class="pos-variant-modal-header">
+                <div>
+                    <h3 class="variant-modal-title">📷 QUÉT MÃ QR / BARCODE</h3>
+                    <p class="variant-modal-sub">Bắn mã vạch / quét mã QR từ tag sản phẩm để thêm ngay vào giỏ</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseScannerModal">&times;</button>
+            </div>
+            <div class="pos-variant-modal-body text-center">
+                <div class="scanner-viewfinder">
+                    <div class="scanner-laser-line"></div>
+                    <div class="scanner-icon-wrap">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                            <path d="M10 3v4"></path>
+                            <path d="M3 10h4"></path>
+                            <path d="M14 10h7"></path>
+                            <path d="M10 14v7"></path>
+                        </svg>
+                    </div>
+                    <p class="scanner-guide">Hướng đầu đọc hoặc camera về phía mã QR / Barcode</p>
+                </div>
+
+                <div class="scanner-input-box" style="margin-top: 16px;">
+                    <input type="text" 
+                           id="pos-scanner-modal-input"
+                           class="pos-input" 
+                           placeholder="Quét mã QR hoặc nhập SKU tại đây..." 
+                           @bind="_scannerInput" 
+                           @bind:event="oninput" 
+                           @onkeydown="OnScannerKeyDown" />
+                    <button class="btn btn-primary" style="margin-top: 10px; width: 100%; height: 40px; font-weight: 700;" @onclick="SubmitScannerInput">
+                        Xác nhận mã vừa quét
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 <style>
     .pos-layout {
         display: flex;
@@ -472,6 +528,67 @@
         align-items: center;
         transition: all 0.2s;
         white-space: nowrap;
+    }
+
+    .btn-scan-qr {
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-scan-qr:hover {
+        background: #eff6ff;
+        border-color: #3b82f6;
+        color: #1d4ed8;
+    }
+
+    .pos-scanner-modal {
+        max-width: 440px;
+    }
+
+    .scanner-viewfinder {
+        position: relative;
+        background: #0f172a;
+        border-radius: 12px;
+        padding: 32px 16px;
+        border: 2px dashed #3b82f6;
+        overflow: hidden;
+    }
+
+    .scanner-laser-line {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #ef4444;
+        box-shadow: 0 0 12px #ef4444;
+        animation: scanAnim 2s infinite ease-in-out;
+    }
+
+    @@keyframes scanAnim {
+        0% { top: 10%; opacity: 0.3; }
+        50% { top: 90%; opacity: 1; }
+        100% { top: 10%; opacity: 0.3; }
+    }
+
+    .scanner-icon-wrap {
+        margin-bottom: 8px;
+    }
+
+    .scanner-guide {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        margin: 0;
     }
 
     .btn-pos-return:hover {
@@ -1343,6 +1460,8 @@
     private bool _showPrintModal = false;
     private bool _showReturnModal = false;
     private bool _showVariantModal = false;
+    private bool _showScannerModal = false;
+    private string _scannerInput = string.Empty;
     private ProductListItemDto? _selectedFastSaleProduct;
     private List<ProductVariantDto> _fastSaleVariants = new();
     private ReceiptPrintDto? _activeReceipt;
@@ -1478,26 +1597,78 @@
         await LoadFastSaleProducts();
     }
 
-    private async Task HandleSearchSku()
+    private void OpenScannerModal()
     {
-        if (string.IsNullOrWhiteSpace(_searchBarcode)) return;
+        _scannerInput = string.Empty;
+        _showScannerModal = true;
+    }
+
+    private void CloseScannerModal()
+    {
+        _showScannerModal = false;
+        _scannerInput = string.Empty;
+    }
+
+    private async Task OnScannerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SubmitScannerInput();
+        }
+    }
+
+    private async Task SubmitScannerInput()
+    {
+        if (!string.IsNullOrWhiteSpace(_scannerInput))
+        {
+            var raw = _scannerInput;
+            CloseScannerModal();
+            await ProcessScannedCode(raw);
+        }
+    }
+
+    private async Task ProcessScannedCode(string rawCode)
+    {
+        if (string.IsNullOrWhiteSpace(rawCode)) return;
 
         try
         {
-            var variant = await PosApiClient.SearchSkuAsync(_searchBarcode.Trim());
+            var cleanSku = global::Shared.Helpers.BarcodeParser.ExtractSku(rawCode);
+            if (string.IsNullOrWhiteSpace(cleanSku)) return;
+
+            var variant = await PosApiClient.SearchSkuAsync(cleanSku);
             if (variant != null)
             {
                 AddVariantToCart(variant);
+                await PlayBeepSound();
                 _searchBarcode = string.Empty;
+                Toast.ShowSuccess($"Đã quét: {variant.TenSanPham} ({variant.MauSac} - {variant.KichCo})");
             }
             else
             {
-                Toast.ShowWarning($"Không tìm thấy sản phẩm với mã SKU: {_searchBarcode}");
+                Toast.ShowWarning($"Không tìm thấy sản phẩm với mã: {cleanSku}");
             }
         }
         catch (Exception ex)
         {
-            Toast.ShowError($"Lỗi tra cứu SKU: {ex.Message}");
+            Toast.ShowError($"Lỗi tra cứu mã sản phẩm: {ex.Message}");
+        }
+    }
+
+    private async Task HandleSearchSku()
+    {
+        await ProcessScannedCode(_searchBarcode);
+    }
+
+    private async Task PlayBeepSound()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type = 'sine'; osc.frequency.value = 880; gain.gain.value = 0.15; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.1); } catch(e){}");
+        }
+        catch
+        {
+            // Bỏ qua nếu môi trường test hoặc browser không hỗ trợ
         }
     }
 

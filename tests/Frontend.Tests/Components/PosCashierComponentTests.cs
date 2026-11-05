@@ -426,5 +426,54 @@ public class PosCashierComponentTests : BunitContext
         capturedOrderReq.Items[0].MaBienThe.Should().Be(101, "MaBienThe phải là ID biến thể thực tế (101), tuyệt đối không được gán MaSanPham (1)");
     }
 
+    [Fact(DisplayName = "VÒNG 2: Quét mã QR dạng URL hoặc có tiền tố tự động bóc tách SKU chuẩn và thêm vào giỏ")]
+    public void PosCashier_ScanQrCodeWithPrefixOrUrl_ExtractsSkuAndAddsToCart()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Act: Quét chuỗi QR có URL chứa tham số sku=AT-COT-01
+        var input = cut.Find("input.pos-input");
+        input.Change("https://qf-fashion.vercel.app/product/1?sku=AT-COT-01");
+        input.KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+
+        // Assert
+        _mockPosApi.Verify(api => api.SearchSkuAsync("AT-COT-01"), Times.Once);
+        cut.FindAll("tr.cart-item-row").Should().HaveCount(1);
+        cut.Markup.Should().Contain("AT-COT-01");
+    }
+
+    [Fact(DisplayName = "VÒNG 3: Mở modal quét camera và xác nhận mã QR đưa sản phẩm vào giỏ")]
+    public void PosCashier_OpenScannerModal_CanSubmitScanInput()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Act 1: Click nút Quét QR
+        var scanBtn = cut.Find("button.btn-scan-qr");
+        scanBtn.Click();
+
+        // Assert 1: Modal scanner hiển thị
+        cut.Find(".pos-scanner-modal").Should().NotBeNull();
+
+        // Act 2: Bắn mã QF-AT-COT-01 vào modal input và click xác nhận
+        var modalInput = cut.Find("#pos-scanner-modal-input");
+        modalInput.Input("QF-AT-COT-01");
+
+        var submitBtn = cut.Find(".pos-scanner-modal button.btn-primary");
+        submitBtn.Click();
+
+        // Assert 2: Modal đóng và sản phẩm vào giỏ
+        cut.FindAll(".pos-scanner-modal").Should().BeEmpty();
+        _mockPosApi.Verify(api => api.SearchSkuAsync("AT-COT-01"), Times.Once);
+        cut.FindAll("tr.cart-item-row").Should().HaveCount(1);
+    }
+
     #endregion
 }

@@ -121,7 +121,9 @@ public class CatalogService : ICatalogService
     public async Task<ProductVariantDto?> GetVariantBySkuAsync(string sku)
     {
         if (string.IsNullOrWhiteSpace(sku)) return null;
-        return await _catalogRepository.GetVariantBySkuAsync(sku.Trim());
+        var cleanSku = Shared.Helpers.BarcodeParser.ExtractSku(sku);
+        if (string.IsNullOrWhiteSpace(cleanSku)) return null;
+        return await _catalogRepository.GetVariantBySkuAsync(cleanSku);
     }
 
     public async Task<PagedResult<ProductListItemDto>> GetProductsPagedAsync(ProductQueryParameters query)
