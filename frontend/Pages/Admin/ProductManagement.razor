@@ -2748,9 +2748,16 @@
     {
         try
         {
-            await JS.InvokeVoidAsync("window.print");
+            await JS.InvokeVoidAsync("printThermalElement", "printable-qr-tag");
         }
-        catch { }
+        catch
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("print");
+            }
+            catch { }
+        }
     }
 
     private int _batchDiscountPercent = 0;

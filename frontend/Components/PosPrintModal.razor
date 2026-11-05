@@ -366,11 +366,18 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("window.print");
+            await JSRuntime.InvokeVoidAsync("printThermalElement", "receipt-print-area");
         }
         catch
         {
-            // Fallback for bUnit or non-JS environments
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("print");
+            }
+            catch
+            {
+                // Fallback for bUnit or non-JS environments
+            }
         }
     }
 
