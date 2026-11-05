@@ -294,14 +294,14 @@
                     <div class="cash-input-wrapper">
                         <input type="number" 
                                id="cashGiven"
-                               class="pos-input input-cash-given tabular-nums" 
+                               class="pos-input input-cash-given tabular-nums @(_showCashWarning ? "cash-input-error" : "")" 
                                placeholder="Nhập số tiền..." 
                                value="@_cashGivenInput" 
                                @oninput="OnCashGivenInput"
                                @onchange="OnCashGivenChanged" />
                         @if (!string.IsNullOrWhiteSpace(_cashGivenInput))
                         {
-                            <button type="button" class="btn-clear-cash" @onclick='() => _cashGivenInput = string.Empty' title="Xóa nhập lại">×</button>
+                            <button type="button" class="btn-clear-cash" @onclick='() => { _cashGivenInput = string.Empty; _showCashWarning = false; }' title="Xóa nhập lại">×</button>
                         }
                     </div>
                 </div>
@@ -995,6 +995,12 @@
         border-color: #0f172a;
         outline: none;
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .cash-input-wrapper .input-cash-given.cash-input-error {
+        border-color: #ef4444;
+        background-color: #fef2f2;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
     }
 
     .btn-clear-cash {
@@ -1831,31 +1837,46 @@
         _customerPhone = string.Empty;
     }
 
+    private bool _showCashWarning = false;
+
     private void OnCashGivenChanged(ChangeEventArgs e)
     {
         _cashGivenInput = e.Value?.ToString() ?? string.Empty;
+        _showCashWarning = false;
     }
 
     private void OnCashGivenInput(ChangeEventArgs e)
     {
         _cashGivenInput = e.Value?.ToString() ?? string.Empty;
+        _showCashWarning = false;
     }
 
     private void SetQuickCash(decimal amount)
     {
         _cashGivenInput = amount > 0 ? amount.ToString("0") : "0";
+        _showCashWarning = false;
     }
 
     private async Task HandleCheckoutAndPrint()
     {
         if (_cartItems.Count == 0) return;
 
-        if (CashGiven > 0 && CashGiven < GrandTotal)
+        if (CashGiven <= 0)
         {
-            Toast.ShowWarning($"Số tiền khách đưa ({CashGiven:N0} đ) chưa đủ để thanh toán ({GrandTotal:N0} đ).");
+            _showCashWarning = true;
+            Toast.ShowWarning("Vui lòng nhập số tiền khách đưa hoặc bấm nút '✓ Đủ tiền' trước khi thanh toán.");
             return;
         }
 
+        if (CashGiven < GrandTotal)
+        {
+            _showCashWarning = true;
+            var missing = GrandTotal - CashGiven;
+            Toast.ShowWarning($"Số tiền khách đưa ({CashGiven:N0} đ) chưa đủ để thanh toán ({GrandTotal:N0} đ). Còn thiếu: {missing:N0} đ.");
+            return;
+        }
+
+        _showCashWarning = false;
         _isProcessingPayment = true;
         try
         {
@@ -1925,6 +1946,7 @@
         _customerPhone = string.Empty;
         _currentCustomer = null;
         _cashGivenInput = string.Empty;
+        _showCashWarning = false;
         _activeMobileTab = "products";
     }
 

@@ -496,5 +496,56 @@ public class PosCashierComponentTests : BunitContext
         cut.Markup.Should().Contain("AT-COT-01");
     }
 
+    [Fact(DisplayName = "VÒNG 5: Chưa nhập tiền khách đưa mà bấm thanh toán thì PHẢI chặn lại và báo cảnh báo")]
+    public void PosCashier_CheckoutWithoutEnteringCash_ShowsWarningAndBlocksOrderCreation()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Act 1: Thêm sản phẩm vào giỏ
+        var input = cut.Find("input.pos-input");
+        input.Change("AT-COT-01");
+        input.KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+
+        // Act 2: Bấm thanh toán khi chưa nhập tiền khách đưa
+        var payBtn = cut.Find("button.btn-pos-pay");
+        payBtn.Click();
+
+        // Assert: Toast cảnh báo hiện lên, KHÔNG tạo đơn hàng
+        _mockToastService.Verify(t => t.ShowWarning(It.Is<string>(msg => msg.Contains("nhập số tiền khách đưa"))), Times.Once);
+        _mockPosApi.Verify(api => api.CreatePosOrderAsync(It.IsAny<CreateOrderRequestDto>()), Times.Never);
+        cut.Find(".input-cash-given.cash-input-error").Should().NotBeNull("Ô nhập tiền phải được highlight viền đỏ cảnh báo");
+    }
+
+    [Fact(DisplayName = "VÒNG 6: Nhập thiếu tiền khách đưa mà bấm thanh toán thì PHẢI chặn lại và báo còn thiếu bao nhiêu")]
+    public void PosCashier_CheckoutWithInsufficientCash_ShowsWarningAndBlocksOrderCreation()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 200000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Act 1: Thêm sản phẩm 200k vào giỏ
+        var input = cut.Find("input.pos-input");
+        input.Change("AT-COT-01");
+        input.KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+
+        // Act 2: Khách đưa 150k (thiếu 50k)
+        var cashInput = cut.Find("input.input-cash-given");
+        cashInput.Change("150000");
+
+        // Act 3: Bấm thanh toán
+        var payBtn = cut.Find("button.btn-pos-pay");
+        payBtn.Click();
+
+        // Assert: Báo lỗi chưa đủ tiền, chỉ rõ còn thiếu 50.000 đ, KHÔNG tạo đơn
+        _mockToastService.Verify(t => t.ShowWarning(It.Is<string>(msg => msg.Contains("chưa đủ để thanh toán") && msg.Contains("50.000"))), Times.Once);
+        _mockPosApi.Verify(api => api.CreatePosOrderAsync(It.IsAny<CreateOrderRequestDto>()), Times.Never);
+    }
+
     #endregion
 }
