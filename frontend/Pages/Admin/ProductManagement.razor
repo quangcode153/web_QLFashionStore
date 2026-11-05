@@ -536,20 +536,20 @@
                         <table class="variant-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 60px;">Mã BT</th>
+                                    <th style="width: 55px;">Mã BT</th>
                                     <th>Mã SKU</th>
+                                    <th class="text-center" style="width: 105px;">Tem QR</th>
                                     <th>Màu sắc</th>
                                     <th>Kích cỡ</th>
                                     <th class="text-right">Giá niêm yết</th>
-                                    <th class="text-center" style="width: 140px;">% Giảm (SALE)</th>
+                                    <th class="text-center" style="width: 130px;">% Giảm (SALE)</th>
                                     <th class="text-right">Giá sau giảm</th>
                                     <th class="text-center">Số lượng tồn</th>
                                     <th class="text-center">Tình trạng</th>
                                     <th class="text-center">Hiển thị</th>
-                                    <th class="text-center" style="width: 70px;">Mã QR</th>
                                     @if (_isChainAdmin)
                                     {
-                                        <th class="text-center" style="width: 100px;">Thao tác</th>
+                                        <th class="text-center" style="width: 90px;">Thao tác</th>
                                     }
                                 </tr>
                             </thead>
@@ -558,7 +558,31 @@
                                 {
                                     <tr class="@(v.DaXoa ? "row-hidden-variant" : "")">
                                         <td class="font-mono text-muted">#@v.MaBienThe</td>
-                                        <td><code class="sku-badge">@v.MaSku</code></td>
+                                        <td>
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <code class="sku-badge">@v.MaSku</code>
+                                                <button type="button" class="btn-qr-icon-action" @onclick="() => OpenQrModal(v, _viewingProduct?.TenSanPham)" title="Xem và in tem mã QR / Barcode cho biến thể này" style="padding: 2px 6px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; border-radius: 4px; border: 1px solid #cbd5e1; background: #f8fafc; color: #1e293b; cursor: pointer;">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                                    </svg>
+                                                    <span>QR</span>
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn-qr-badge-action" @onclick="() => OpenQrModal(v, _viewingProduct?.TenSanPham)" title="Xem và in tem mã QR / Barcode cho biến thể này" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; background: #EEF2FF; border: 1px solid #C7D2FE; color: #4338CA; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <rect x="3" y="3" width="7" height="7"></rect>
+                                                    <rect x="14" y="3" width="7" height="7"></rect>
+                                                    <rect x="14" y="14" width="7" height="7"></rect>
+                                                    <rect x="3" y="14" width="7" height="7"></rect>
+                                                </svg>
+                                                <span>Xem Tem</span>
+                                            </button>
+                                        </td>
                                         <td>
                                             <div class="color-badge-wrap">
                                                 <span class="color-dot"></span>
@@ -619,16 +643,6 @@
                                             {
                                                 <span class="badge-status-green" title="Biến thể đang mở bán bình thường">🟢 Đang bán</span>
                                             }
-                                        </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn-qr-icon-action" @onclick="() => OpenQrModal(v, _viewingProduct?.TenSanPham)" title="Xem và in tem mã QR / Barcode cho biến thể này">
-                                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <rect x="3" y="3" width="7" height="7"></rect>
-                                                    <rect x="14" y="3" width="7" height="7"></rect>
-                                                    <rect x="14" y="14" width="7" height="7"></rect>
-                                                    <rect x="3" y="14" width="7" height="7"></rect>
-                                                </svg>
-                                            </button>
                                         </td>
                                         @if (_isChainAdmin)
                                         {
@@ -1382,8 +1396,8 @@
     }
 
     .modal-panel-lg {
-        width: 820px;
-        max-width: 100%;
+        width: 1100px;
+        max-width: 96vw;
     }
 
     @@keyframes modalFadeIn {
