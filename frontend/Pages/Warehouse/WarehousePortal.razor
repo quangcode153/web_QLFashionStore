@@ -408,16 +408,19 @@
                             <div class="form-group">
                                 <div class="label-with-action">
                                     <label class="form-label">Nhà cung cấp hàng hóa <span class="required">*</span></label>
-                                    <button type="button" class="btn-text-action" @onclick="ToggleSupplierMode">
-                                        @if (_isCustomSupplierMode)
-                                        {
-                                            <span>&larr; Chọn từ danh sách</span>
-                                        }
-                                        else
-                                        {
-                                            <span>+ Thêm NCC mới</span>
-                                        }
-                                    </button>
+                                    @if (_isChainAdmin)
+                                    {
+                                        <button type="button" class="btn-text-action" @onclick="ToggleSupplierMode">
+                                            @if (_isCustomSupplierMode)
+                                            {
+                                                <span>&larr; Chọn từ danh sách</span>
+                                            }
+                                            else
+                                            {
+                                                <span>+ Thêm NCC mới</span>
+                                            }
+                                        </button>
+                                    }
                                 </div>
 
                                 @if (_isCustomSupplierMode)
@@ -982,6 +985,97 @@
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" @onclick="CloseDispatchModal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- MODAL TẠO SẢN PHẨM MỚI KHI THÊM NGUỒN HÀNG MỚI (ĐẢM BẢO TOÀN VẸN DỮ LIỆU) -->
+        @if (_isNewProductModalOpen && _newlyCreatedSupplier != null)
+        {
+            <div class="modal-backdrop">
+                <div class="modal-card dispatch-modal-box" style="max-width: 580px;">
+                    <div class="modal-header">
+                        <div class="modal-header-left">
+                            <span class="icon-modal-dispatch">✨</span>
+                            <div>
+                                <h3 class="modal-title">TẠO SẢN PHẨM MỚI CHO NGUỒN HÀNG</h3>
+                                <p class="modal-desc">Nguồn hàng <strong>@_newlyCreatedSupplier.TenNhaCungCap</strong> vừa thêm chưa có sản phẩm. Hãy tạo mặt hàng để bắt đầu nhập kho.</p>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-modal-close" @onclick="CloseNewProductModal">&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label font-weight-bold">Tên sản phẩm mới <span class="required">*</span></label>
+                            <input type="text" class="form-control" placeholder="VD: Áo Thun Cổ Tròn QF Exclusive..." @bind="_modalProductName" />
+                        </div>
+
+                        <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                            <div class="form-group">
+                                <label class="form-label">Danh mục (*)</label>
+                                <select class="form-control" @bind="_modalCategoryId">
+                                    @foreach (var c in _modalCategories)
+                                    {
+                                        <option value="@c.MaDanhMuc">@c.TenDanhMuc</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Thương hiệu (*)</label>
+                                <select class="form-control" @bind="_modalBrandId">
+                                    @foreach (var b in _modalBrands)
+                                    {
+                                        <option value="@b.MaThuongHieu">@b.TenThuongHieu</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 8px;">
+                            <label class="form-label">Chất liệu</label>
+                            <input type="text" class="form-control" placeholder="VD: Cotton 100%, Lụa tuyết..." @bind="_modalMaterial" />
+                        </div>
+
+                        <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px; margin-top: 6px;">
+                            <div style="font-weight: 700; font-size: 0.8rem; color: #1e293b; margin-bottom: 6px;">
+                                🏷️ BIẾN THỂ ĐẦU TIÊN CỦA SẢN PHẨM
+                            </div>
+                            <div class="form-row-3" style="display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                                <div>
+                                    <label class="form-label" style="font-size: 0.72rem;">Mã SKU (*)</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="VD: AT-QF-01-L" @bind="_modalSku" />
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 0.72rem;">Màu sắc (*)</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="Đen, Trắng..." @bind="_modalColor" />
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 0.72rem;">Kích cỡ (*)</label>
+                                    <input type="text" class="form-control form-control-sm" placeholder="S, M, L, XL..." @bind="_modalSize" />
+                                </div>
+                            </div>
+                            <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div>
+                                    <label class="form-label" style="font-size: 0.72rem;">Giá nhập đề xuất (VNĐ) (*)</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="_modalCostPrice" />
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 0.72rem;">Giá bán niêm yết (VNĐ) (*)</label>
+                                    <input type="number" class="form-control form-control-sm" @bind="_modalRetailPrice" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer" style="padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                        <button type="button" class="btn btn-secondary btn-sm" @onclick="CloseNewProductModal">
+                            Để sau (Nhập biến thể có sẵn)
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="SaveNewProductForSupplier" disabled="@_isSavingNewProduct">
+                            @(_isSavingNewProduct ? "Đang tạo..." : "✓ Tạo Sản Phẩm & Nhập Kho Ngay")
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2928,7 +3022,9 @@
             _staffName = AuthStateService.StaffName;
             var isChainAdmin = _userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
                                _userRole.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
-                               _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase);
+                               _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase) ||
+                               _userRole.Contains("QuanLyHeThong", StringComparison.OrdinalIgnoreCase) ||
+                               _userRole.Contains("Hệ thống", StringComparison.OrdinalIgnoreCase);
 
             var isBranchManager = _userRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) ||
                                   _userRole.Contains("Cửa hàng trưởng", StringComparison.OrdinalIgnoreCase);
@@ -2989,7 +3085,9 @@
                 {
                     var isChainAdmin = _userRole.Contains("Admin", StringComparison.OrdinalIgnoreCase) ||
                                        _userRole.Contains("đa chi nhánh", StringComparison.OrdinalIgnoreCase) ||
-                                       _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase);
+                                       _userRole.Contains("chuỗi", StringComparison.OrdinalIgnoreCase) ||
+                                       _userRole.Contains("QuanLyHeThong", StringComparison.OrdinalIgnoreCase) ||
+                                       _userRole.Contains("Hệ thống", StringComparison.OrdinalIgnoreCase);
 
                     var isBranchManager = _userRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) ||
                                           _userRole.Contains("Cửa hàng trưởng", StringComparison.OrdinalIgnoreCase);
@@ -3313,10 +3411,9 @@
         string.IsNullOrWhiteSpace(_skuSearchQuery) 
             ? Enumerable.Empty<global::Shared.DTOs.Warehouse.LowStockAlertDto>()
             : (_allVariants.Any() ? _allVariants : _lowStockAlerts).Where(x => 
-                x.MaSku.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase) ||
-                x.TenSanPham.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase) ||
-                (x.MauSac != null && x.MauSac.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase)) ||
-                (x.KichCo != null && x.KichCo.Contains(_skuSearchQuery, StringComparison.OrdinalIgnoreCase)))
+                global::Shared.Helpers.StringSearchHelper.IsFuzzyMatch(
+                    $"{x.TenSanPham} {x.MaSku} {x.MauSac} {x.KichCo}", 
+                    _skuSearchQuery))
                 .Take(25);
 
     private IEnumerable<global::Shared.DTOs.Warehouse.LowStockAlertDto> FilteredInventoryList
@@ -3328,10 +3425,9 @@
             if (!string.IsNullOrWhiteSpace(_inventoryFilterQuery))
             {
                 q = q.Where(x => 
-                    x.MaSku.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
-                    x.TenSanPham.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase) ||
-                    (x.MauSac != null && x.MauSac.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase)) ||
-                    (x.KichCo != null && x.KichCo.Contains(_inventoryFilterQuery, StringComparison.OrdinalIgnoreCase)));
+                    global::Shared.Helpers.StringSearchHelper.IsFuzzyMatch(
+                        $"{x.TenSanPham} {x.MaSku} {x.MauSac} {x.KichCo}", 
+                        _inventoryFilterQuery));
             }
             if (_currentWarehouseScopeId > 0)
             {
@@ -3405,13 +3501,39 @@
         _skuSearchQuery = string.Empty;
     }
 
+    private bool _isNewProductModalOpen = false;
+    private global::Shared.DTOs.Warehouse.SupplierDto? _newlyCreatedSupplier = null;
+    private List<global::Shared.DTOs.Catalog.CategoryDto> _modalCategories = new();
+    private List<global::Shared.DTOs.Catalog.BrandDto> _modalBrands = new();
+    private string _modalProductName = string.Empty;
+    private int _modalCategoryId = 1;
+    private int _modalBrandId = 1;
+    private string _modalMaterial = "Cotton";
+    private string _modalSku = string.Empty;
+    private string _modalColor = "Đen";
+    private string _modalSize = "L";
+    private decimal _modalCostPrice = 120000;
+    private decimal _modalRetailPrice = 220000;
+    private bool _isSavingNewProduct = false;
+
     private void ToggleSupplierMode()
     {
+        if (!_isChainAdmin)
+        {
+            Toast.ShowWarning("Chỉ Quản trị viên (Admin) mới có quyền tạo nguồn hàng mới.");
+            return;
+        }
         _isCustomSupplierMode = !_isCustomSupplierMode;
     }
 
     private async Task SaveNewSupplierQuickly()
     {
+        if (!_isChainAdmin)
+        {
+            Toast.ShowError("Bạn không có quyền thêm nguồn hàng mới.");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_newSupplierName))
         {
             Toast.ShowWarning("Vui lòng nhập tên nhà cung cấp mới.");
@@ -3436,6 +3558,9 @@
                 _newSupplierPhone = null;
                 _isCustomSupplierMode = false;
                 Toast.ShowSuccess($"Đã tạo NCC '{created.TenNhaCungCap}' thành công!");
+
+                // Tự động mở bảng tạo sản phẩm mới thuộc nguồn hàng này nếu chưa có sản phẩm
+                await OpenNewProductForSupplierModal(created);
             }
             else
             {
@@ -3449,6 +3574,134 @@
         finally
         {
             _isSavingSupplier = false;
+        }
+    }
+
+    private async Task OpenNewProductForSupplierModal(global::Shared.DTOs.Warehouse.SupplierDto supplier)
+    {
+        _newlyCreatedSupplier = supplier;
+        try
+        {
+            if (!_modalCategories.Any())
+            {
+                var cats = await AdminApi.GetCategoriesAsync();
+                if (cats != null && cats.Any()) _modalCategories = cats;
+            }
+            if (!_modalBrands.Any())
+            {
+                var brs = await AdminApi.GetBrandsAsync();
+                if (brs != null && brs.Any()) _modalBrands = brs;
+            }
+
+            if (_modalCategories.Any() && _modalCategoryId == 1)
+                _modalCategoryId = _modalCategories[0].MaDanhMuc;
+            if (_modalBrands.Any() && _modalBrandId == 1)
+                _modalBrandId = _modalBrands[0].MaThuongHieu;
+
+            _modalProductName = $"{supplier.TenNhaCungCap} - Sản phẩm mới";
+            _modalSku = $"SKU-{supplier.MaNhaCungCap}-{DateTime.Now:MMddHHmm}";
+            _modalColor = "Đen";
+            _modalSize = "L";
+            _modalCostPrice = 120000;
+            _modalRetailPrice = 220000;
+            _modalMaterial = "Cotton";
+            _isNewProductModalOpen = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error opening new product modal: {ex.Message}");
+        }
+    }
+
+    private void CloseNewProductModal()
+    {
+        _isNewProductModalOpen = false;
+        _newlyCreatedSupplier = null;
+    }
+
+    private async Task SaveNewProductForSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(_modalProductName))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên sản phẩm mới.");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_modalSku))
+        {
+            Toast.ShowWarning("Vui lòng nhập mã SKU cho biến thể.");
+            return;
+        }
+
+        _isSavingNewProduct = true;
+        try
+        {
+            var createProdReq = new global::Shared.DTOs.Catalog.CreateProductRequest
+            {
+                TenSanPham = _modalProductName.Trim(),
+                MaDanhMuc = _modalCategoryId,
+                MaThuongHieu = _modalBrandId,
+                ChatLieu = string.IsNullOrWhiteSpace(_modalMaterial) ? "Cotton" : _modalMaterial.Trim()
+            };
+
+            var prodRes = await AdminApi.CreateProductAsync(createProdReq);
+            if (prodRes == null || !prodRes.Success || prodRes.Data <= 0)
+            {
+                Toast.ShowError(prodRes?.Message ?? "Tạo sản phẩm thất bại.");
+                return;
+            }
+
+            int newProdId = prodRes.Data;
+
+            var createVariantReq = new global::Shared.DTOs.Catalog.CreateProductVariantRequest
+            {
+                MaSanPham = newProdId,
+                MaSku = _modalSku.Trim().ToUpperInvariant(),
+                MauSac = string.IsNullOrWhiteSpace(_modalColor) ? "Mặc định" : _modalColor.Trim(),
+                KichCo = string.IsNullOrWhiteSpace(_modalSize) ? "Freesize" : _modalSize.Trim().ToUpperInvariant(),
+                GiaNhap = _modalCostPrice > 0 ? _modalCostPrice : 100000,
+                GiaBan = _modalRetailPrice > 0 ? _modalRetailPrice : 200000,
+                SoLuongTon = 0
+            };
+
+            var varRes = await AdminApi.CreateProductVariantAsync(createVariantReq);
+            int newVariantId = varRes?.Data ?? 0;
+
+            // Nạp lại danh sách biến thể
+            var updatedVariants = await AdminApi.GetAllWarehouseVariantsAsync();
+            if (updatedVariants != null)
+            {
+                _allVariants = updatedVariants.ToList();
+            }
+
+            // Tự động chọn biến thể vừa tạo để nhập hàng ngay
+            _importVariantId = newVariantId;
+            _selectedVariant = _allVariants.FirstOrDefault(x => x.MaBienThe == newVariantId)
+                ?? new global::Shared.DTOs.Warehouse.LowStockAlertDto
+                {
+                    MaBienThe = newVariantId,
+                    TenSanPham = _modalProductName,
+                    MaSku = _modalSku.ToUpperInvariant(),
+                    MauSac = createVariantReq.MauSac,
+                    KichCo = createVariantReq.KichCo,
+                    GiaNhap = createVariantReq.GiaNhap
+                };
+            _importPrice = createVariantReq.GiaNhap;
+            if (_newlyCreatedSupplier != null)
+            {
+                _selectedSupplierId = _newlyCreatedSupplier.MaNhaCungCap;
+            }
+
+            _isNewProductModalOpen = false;
+            Toast.ShowSuccess($"Đã tạo sản phẩm '{_modalProductName}' cho nhà cung cấp! Bạn có thể nhập số lượng và bấm 'Xác nhận nhập kho' ngay.");
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi tạo sản phẩm: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingNewProduct = false;
         }
     }
 

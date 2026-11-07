@@ -70,7 +70,7 @@ public class WarehouseController : ControllerBase
     }
 
     [HttpPost("suppliers")]
-    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.ThuKho}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong}")]
     public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequestDto request)
     {
         var result = await _warehouseService.CreateSupplierAsync(request);

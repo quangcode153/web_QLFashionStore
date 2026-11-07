@@ -313,5 +313,197 @@ public class WarehousePortalRoleComponentTests : BunitContext
     }
 
     #endregion
+
+    #region Vòng 3: Cấm Thủ Kho & Quản Lý Chi Nhánh Thêm NCC (Chỉ Admin Mới Có Quyền)
+
+    [Theory(DisplayName = "TS-WH-SUPP-01: Thủ kho & Quản lý chi nhánh KHÔNG được hiển thị nút Thêm NCC mới")]
+    [InlineData("Thủ kho")]
+    [InlineData("warehouse_keeper")]
+    [InlineData("Quản lý chi nhánh")]
+    [InlineData("Cửa hàng trưởng")]
+    public void WarehousePortal_WhenRoleIsNotChainAdmin_ShouldNotShowAddSupplierButton(string role)
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(role);
+        JSInterop.Setup<string?>("localStorage.getItem", "staffName").SetResult("Nhân Viên Kho");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffId").SetResult("3");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchId").SetResult("1");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchName").SetResult("Cơ sở QF Quận 1");
+
+        // Act
+        var cut = Render<WarehousePortal>();
+
+        // Assert
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().NotContain("+ Thêm NCC mới", 
+                $"Role '{role}' không có thẩm quyền tạo nhà cung cấp mới, nút phải bị ẩn.");
+            cut.FindAll(".quick-add-supplier-box").Should().BeEmpty(
+                $"Role '{role}' không được mở form tạo nhà cung cấp nhanh.");
+        });
+    }
+
+    [Theory(DisplayName = "TS-WH-SUPP-02: Admin chuỗi & Quản trị hệ thống ĐƯỢC PHÉP hiển thị nút Thêm NCC mới khi nhập kho")]
+    [InlineData("Admin")]
+    [InlineData("Admin chuỗi")]
+    [InlineData("QuanLyHeThong")]
+    public void WarehousePortal_WhenRoleIsChainAdmin_ShouldShowAddSupplierButton(string role)
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(role);
+        JSInterop.Setup<string?>("localStorage.getItem", "staffName").SetResult("Trần Quản Trị");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffId").SetResult("1");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchId").SetResult("9");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchName").SetResult("Kho Tổng QF Tân Bình");
+
+        // Act
+        var cut = Render<WarehousePortal>();
+
+        // Chuyển sang phạm vi Kho Tổng Online #9 để hiển thị form nhập hàng
+        cut.WaitForAssertion(() =>
+        {
+            var select = cut.Find("select[data-testid='warehouse-scope-selector']");
+            select.Change("9");
+        });
+
+        // Assert
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("+ Thêm NCC mới", 
+                $"Role '{role}' là Quản trị viên, phải có nút '+ Thêm NCC mới'.");
+        });
+    }
+
+    #endregion
+
+    #region Vòng 2: State Machine Pipeline (Tạo NCC ➔ Mở Modal Tạo Sản Phẩm & Gợi Ý Fuzzy Search)
+
+    [Fact(DisplayName = "TS-WH-STATE-01: Admin tạo NCC mới ➔ Tự động mở Modal tạo Sản phẩm & Biến thể mới cho NCC đó")]
+    public void WarehousePortal_WhenAdminCreatesSupplier_ShouldOpenNewProductModalAndSave()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult("Admin chuỗi");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffName").SetResult("Trần Quản Trị");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffId").SetResult("1");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchId").SetResult("9");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchName").SetResult("Kho Tổng QF Tân Bình");
+
+        var createdSupplier = new SupplierDto
+        {
+            MaNhaCungCap = 88,
+            TenNhaCungCap = "Xưởng Dệt Kim QF Cao Cấp",
+            DienThoaiLienHe = "0988776655"
+        };
+
+        _mockAdminApi.Setup(api => api.CreateSupplierAsync(It.IsAny<CreateSupplierRequestDto>()))
+            .ReturnsAsync(createdSupplier);
+
+        _mockAdminApi.Setup(api => api.GetCategoriesAsync())
+            .ReturnsAsync(new List<global::Shared.DTOs.Catalog.CategoryDto>
+            {
+                new global::Shared.DTOs.Catalog.CategoryDto { MaDanhMuc = 1, TenDanhMuc = "Áo Nam" }
+            });
+
+        _mockAdminApi.Setup(api => api.GetBrandsAsync())
+            .ReturnsAsync(new List<global::Shared.DTOs.Catalog.BrandDto>
+            {
+                new global::Shared.DTOs.Catalog.BrandDto { MaThuongHieu = 1, TenThuongHieu = "QF Exclusive" }
+            });
+
+        _mockAdminApi.Setup(api => api.CreateProductAsync(It.IsAny<global::Shared.DTOs.Catalog.CreateProductRequest>()))
+            .ReturnsAsync(new global::Shared.DTOs.Common.ApiResponse<int> { Success = true, Data = 77 });
+
+        _mockAdminApi.Setup(api => api.CreateProductVariantAsync(It.IsAny<global::Shared.DTOs.Catalog.CreateProductVariantRequest>()))
+            .ReturnsAsync(new global::Shared.DTOs.Common.ApiResponse<int> { Success = true, Data = 999 });
+
+        // Act
+        var cut = Render<WarehousePortal>();
+
+        // Chuyển sang phạm vi Kho #9
+        cut.WaitForAssertion(() =>
+        {
+            var select = cut.Find("select[data-testid='warehouse-scope-selector']");
+            select.Change("9");
+        });
+
+        // Bấm nút "+ Thêm NCC mới"
+        cut.WaitForAssertion(() =>
+        {
+            var toggleBtn = cut.Find("button.btn-text-action");
+            toggleBtn.Click();
+        });
+
+        // Nhập tên NCC và bấm Lưu & Chọn
+        cut.WaitForAssertion(() =>
+        {
+            var nameInput = cut.Find(".quick-add-supplier-box input[placeholder*='Tên nhà cung cấp']");
+            nameInput.Change("Xưởng Dệt Kim QF Cao Cấp");
+            var saveBtn = cut.Find(".quick-add-supplier-box button.btn-primary");
+            saveBtn.Click();
+        });
+
+        // Assert: Modal tạo sản phẩm mới cho NCC phải lập tức xuất hiện
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("TẠO SẢN PHẨM MỚI CHO NGUỒN HÀNG");
+            cut.Markup.Should().Contain("Xưởng Dệt Kim QF Cao Cấp");
+        });
+
+        // Nhấn nút Tạo Sản Phẩm & Nhập Kho Ngay
+        var createProdBtn = cut.Find(".modal-footer button.btn-primary");
+        createProdBtn.Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            _mockAdminApi.Verify(api => api.CreateProductAsync(It.IsAny<global::Shared.DTOs.Catalog.CreateProductRequest>()), Times.AtLeastOnce);
+            _mockAdminApi.Verify(api => api.CreateProductVariantAsync(It.IsAny<global::Shared.DTOs.Catalog.CreateProductVariantRequest>()), Times.AtLeastOnce);
+        });
+    }
+
+    [Fact(DisplayName = "TS-WH-STATE-02: Gõ từ khóa tìm kiếm gần đúng (Fuzzy/không dấu) gợi ý chính xác biến thể")]
+    public void WarehousePortal_FuzzySearchSuggestions_ShouldMatchDiacriticsAndTokens()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult("Thủ kho");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffName").SetResult("Lê Văn Cường");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffId").SetResult("3");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchId").SetResult("9");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchName").SetResult("Kho Tổng QF Tân Bình");
+        JSInterop.Setup<string?>("localStorage.getItem", "loaiThuKho").SetResult("Online");
+
+        _mockAdminApi.Setup(api => api.GetAllWarehouseVariantsAsync())
+            .ReturnsAsync(new List<LowStockAlertDto>
+            {
+                new LowStockAlertDto { MaBienThe = 10, TenSanPham = "Áo Thun Cổ Tròn Đen Basic", MaSku = "AT-DEN-L", MauSac = "Đen", KichCo = "L", SoLuongTon = 50 },
+                new LowStockAlertDto { MaBienThe = 11, TenSanPham = "Quần Tây Nam Xám Hàn Quốc", MaSku = "QT-XAM-32", MauSac = "Xám", KichCo = "32", SoLuongTon = 20 }
+            });
+
+        _mockAdminApi.Setup(api => api.GetBranchInventoryAsync(It.IsAny<int>(), It.IsAny<string?>()))
+            .ReturnsAsync(new List<BranchInventoryDto>
+            {
+                new BranchInventoryDto { MaBienThe = 10, TenSanPham = "Áo Thun Cổ Tròn Đen Basic", MaSku = "AT-DEN-L", MauSac = "Đen", KichCo = "L", SoLuongTon = 50, GiaBan = 120000 },
+                new BranchInventoryDto { MaBienThe = 11, TenSanPham = "Quần Tây Nam Xám Hàn Quốc", MaSku = "QT-XAM-32", MauSac = "Xám", KichCo = "32", SoLuongTon = 20, GiaBan = 250000 }
+            });
+
+        // Act
+        var cut = Render<WarehousePortal>();
+
+        // Nhập tìm kiếm không dấu "ao thun den" vào ô tìm kiếm SKU/Tên
+        cut.WaitForAssertion(() =>
+        {
+            var searchInput = cut.Find("input.lookup-input");
+            searchInput.Input("ao thun den");
+        });
+
+        // Assert: Dropdown gợi ý phải hiển thị Áo Thun Đen và không hiển thị Quần Tây
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("AT-DEN-L");
+            cut.Markup.Should().Contain("Áo Thun Cổ Tròn Đen Basic");
+            cut.Markup.Should().NotContain("QT-XAM-32");
+        });
+    }
+
+    #endregion
 }
 
