@@ -47,15 +47,66 @@
             }
         </div>
 
-        <!-- Bộ lọc thuộc tính Thương hiệu -->
-        <div class="brand-filter-wrapper">
-            <select class="form-control brand-filter-select" @bind="_selectedBrandFilter">
-                <option value="0">🏷️ Tất cả thương hiệu</option>
+        <!-- Bộ lọc thuộc tính Thương hiệu (Hỗ trợ chọn nhiều thương hiệu + Đếm số lượng SP) -->
+        <div class="brand-filter-wrapper brand-filter-popover-wrapper">
+            <button type="button" class="btn-brand-filter-trigger @(_selectedBrandIds.Any() ? "active" : "")" @onclick="ToggleBrandDropdown" title="Lọc hiển thị theo một hoặc nhiều thương hiệu">
+                <span class="trigger-label">
+                    🏷️ @if (!_selectedBrandIds.Any())
+                    {
+                        <span>Tất cả thương hiệu (@GetTotalProductCount())</span>
+                    }
+                    else if (_selectedBrandIds.Count == 1)
+                    {
+                        var singleBrand = _brandsList?.FirstOrDefault(b => b.MaThuongHieu == _selectedBrandIds.First());
+                        <span>@(singleBrand?.TenThuongHieu ?? "Thương hiệu") (@GetProductCountForBrand(singleBrand?.TenThuongHieu ?? ""))</span>
+                    }
+                    else
+                    {
+                        <span>Đã chọn @_selectedBrandIds.Count thương hiệu (@GetSelectedBrandsProductCount() SP)</span>
+                    }
+                </span>
+                <span class="trigger-arrow">@(_isBrandDropdownOpen ? "▲" : "▼")</span>
+            </button>
+
+            @if (_isBrandDropdownOpen)
+            {
+                <div class="brand-dropdown-overlay" @onclick="CloseBrandDropdown"></div>
+                <div class="brand-dropdown-menu">
+                    <div class="brand-dropdown-header">
+                        <span class="header-title">Chọn nhiều thương hiệu</span>
+                        <div class="header-actions">
+                            <button type="button" class="btn-link-action" @onclick="SelectAllBrands">Tất cả</button>
+                            <span class="sep">|</span>
+                            <button type="button" class="btn-link-action" @onclick="ClearBrandSelection">Bỏ chọn</button>
+                        </div>
+                    </div>
+                    <div class="brand-options-list">
+                        @if (_brandsList != null)
+                        {
+                            @foreach (var b in _brandsList)
+                            {
+                                var isChecked = _selectedBrandIds.Contains(b.MaThuongHieu);
+                                var count = GetProductCountForBrand(b.TenThuongHieu);
+                                <label class="brand-checkbox-item @(isChecked ? "checked" : "")" @onclick:preventDefault @onclick="() => ToggleBrandSelection(b.MaThuongHieu)">
+                                    <input type="checkbox" checked="@isChecked" />
+                                    <span class="brand-name">@b.TenThuongHieu</span>
+                                    <span class="brand-count-badge @(count > 0 ? "has-products" : "zero")">(@count)</span>
+                                </label>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Select phụ đồng bộ phục vụ kiểm thử và tương thích -->
+            <select class="form-control brand-filter-select" style="display:none;" value="@_selectedBrandFilter" @onchange="OnSingleBrandSelectChanged">
+                <option value="0">🏷️ Tất cả thương hiệu (@GetTotalProductCount())</option>
                 @if (_brandsList != null)
                 {
                     @foreach (var b in _brandsList)
                     {
-                        <option value="@b.MaThuongHieu">@b.TenThuongHieu</option>
+                        var count = GetProductCountForBrand(b.TenThuongHieu);
+                        <option value="@b.MaThuongHieu">@b.TenThuongHieu (@count)</option>
                     }
                 }
             </select>
@@ -1150,6 +1201,157 @@
         border-color: #0f172a;
         outline: none;
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
+    }
+
+    /* MULTI-BRAND DROPDOWN STYLES */
+    .brand-multiselect-container {
+        position: relative;
+    }
+
+    .btn-brand-filter-trigger {
+        height: 36px;
+        padding: 0 12px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #0f172a;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .btn-brand-filter-trigger:hover {
+        border-color: #94a3b8;
+        background: #f8fafc;
+    }
+
+    .brand-filter-badge {
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 10px;
+    }
+
+    .brand-filter-arrow {
+        font-size: 0.65rem;
+        color: #64748b;
+        transition: transform 0.2s ease;
+    }
+
+    .brand-filter-arrow.is-open {
+        transform: rotate(180deg);
+    }
+
+    .brand-dropdown-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        background: transparent;
+    }
+
+    .brand-dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 1001;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        width: 260px;
+        overflow: hidden;
+        animation: fadeIn 0.15s ease-out;
+    }
+
+    .brand-dropdown-header {
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .brand-action-link {
+        background: none;
+        border: none;
+        color: #2563eb;
+        font-size: 0.74rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+
+    .brand-action-link:hover {
+        background: #eff6ff;
+        text-decoration: underline;
+    }
+
+    .brand-options-list {
+        max-height: 220px;
+        overflow-y: auto;
+        padding: 4px 0;
+    }
+
+    .brand-checkbox-item {
+        display: flex;
+        align-items: center;
+        padding: 6px 12px;
+        cursor: pointer;
+        transition: background-color 0.1s ease;
+        gap: 8px;
+        user-select: none;
+    }
+
+    .brand-checkbox-item:hover {
+        background-color: #f1f5f9;
+    }
+
+    .brand-checkbox-item input[type="checkbox"] {
+        cursor: pointer;
+        width: 15px;
+        height: 15px;
+        accent-color: #0f172a;
+    }
+
+    .brand-checkbox-label {
+        font-size: 0.82rem;
+        color: #1e293b;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .brand-count-badge {
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 600;
+        background: #f1f5f9;
+        padding: 1px 6px;
+        border-radius: 10px;
+    }
+
+    .brand-dropdown-footer {
+        padding: 6px 12px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        color: #64748b;
+        font-weight: 500;
     }
 
     .catalog-stats-pill {
@@ -2287,6 +2489,8 @@
     private List<CategoryDto>? _categoriesList;
     private List<BrandDto>? _brandsList;
     private int _selectedBrandFilter = 0;
+    private HashSet<int> _selectedBrandIds = new();
+    private bool _isBrandDropdownOpen = false;
 
     // State Thêm nhanh Danh mục & Thương hiệu (Quick Add)
     private bool _showQuickCategory = false;
@@ -2363,12 +2567,110 @@
         }
     }
 
+    private void ToggleBrandDropdown()
+    {
+        _isBrandDropdownOpen = !_isBrandDropdownOpen;
+    }
+
+    private void CloseBrandDropdown()
+    {
+        _isBrandDropdownOpen = false;
+    }
+
+    private void ToggleBrandSelection(int brandId)
+    {
+        if (_selectedBrandIds.Contains(brandId))
+        {
+            _selectedBrandIds.Remove(brandId);
+        }
+        else
+        {
+            _selectedBrandIds.Add(brandId);
+        }
+
+        _selectedBrandFilter = _selectedBrandIds.Count == 1 ? _selectedBrandIds.First() : 0;
+        StateHasChanged();
+    }
+
+    private void SelectAllBrands()
+    {
+        if (_brandsList != null)
+        {
+            _selectedBrandIds = _brandsList.Select(b => b.MaThuongHieu).ToHashSet();
+            _selectedBrandFilter = 0;
+        }
+        _isBrandDropdownOpen = false;
+        StateHasChanged();
+    }
+
+    private void ClearBrandSelection()
+    {
+        _selectedBrandIds.Clear();
+        _selectedBrandFilter = 0;
+        _isBrandDropdownOpen = false;
+        StateHasChanged();
+    }
+
+    private void OnSingleBrandSelectChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var bId))
+        {
+            _selectedBrandFilter = bId;
+            _selectedBrandIds.Clear();
+            if (bId > 0)
+            {
+                _selectedBrandIds.Add(bId);
+            }
+        }
+    }
+
+    private int GetProductCountForBrand(string brandName)
+    {
+        if (string.IsNullOrWhiteSpace(brandName)) return 0;
+        var source = (_allProductsList != null && _allProductsList.Any()) 
+            ? _allProductsList 
+            : _pagedResult?.Items;
+        if (source == null) return 0;
+
+        return source.Count(p => !string.IsNullOrEmpty(p.TenThuongHieu) && 
+                                 p.TenThuongHieu.Equals(brandName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private int GetTotalProductCount()
+    {
+        if (_allProductsList != null && _allProductsList.Any())
+            return _allProductsList.Count;
+        return _pagedResult?.TotalCount ?? 0;
+    }
+
+    private int GetSelectedBrandsProductCount()
+    {
+        if (!_selectedBrandIds.Any()) return GetTotalProductCount();
+        if (_brandsList == null) return 0;
+
+        var selectedBrandNames = _brandsList
+            .Where(b => _selectedBrandIds.Contains(b.MaThuongHieu))
+            .Select(b => b.TenThuongHieu)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var source = (_allProductsList != null && _allProductsList.Any()) 
+            ? _allProductsList 
+            : _pagedResult?.Items;
+        if (source == null) return 0;
+
+        return source.Count(p => !string.IsNullOrEmpty(p.TenThuongHieu) && selectedBrandNames.Contains(p.TenThuongHieu));
+    }
+
     private IEnumerable<ProductListItemDto>? FilteredProducts
     {
         get
         {
-            if (_pagedResult?.Items == null) return null;
-            IEnumerable<ProductListItemDto> query = _pagedResult.Items;
+            var source = (_selectedBrandIds.Any() || !string.IsNullOrWhiteSpace(_searchTerm))
+                ? ((_allProductsList != null && _allProductsList.Any()) ? _allProductsList : _pagedResult?.Items)
+                : _pagedResult?.Items;
+
+            if (source == null) return null;
+            IEnumerable<ProductListItemDto> query = source;
 
             if (!string.IsNullOrWhiteSpace(_searchTerm))
             {
@@ -2380,13 +2682,14 @@
                     (!string.IsNullOrEmpty(p.TenThuongHieu) && p.TenThuongHieu.ToLowerInvariant().Contains(term)));
             }
 
-            if (_selectedBrandFilter > 0 && _brandsList != null)
+            if (_selectedBrandIds.Any() && _brandsList != null)
             {
-                var targetBrand = _brandsList.FirstOrDefault(b => b.MaThuongHieu == _selectedBrandFilter);
-                if (targetBrand != null)
-                {
-                    query = query.Where(p => p.TenThuongHieu.Equals(targetBrand.TenThuongHieu, StringComparison.OrdinalIgnoreCase));
-                }
+                var selectedNames = _brandsList
+                    .Where(b => _selectedBrandIds.Contains(b.MaThuongHieu))
+                    .Select(b => b.TenThuongHieu)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                query = query.Where(p => !string.IsNullOrEmpty(p.TenThuongHieu) && selectedNames.Contains(p.TenThuongHieu));
             }
 
             if (_sortStockOrder == "DESC")
@@ -2413,7 +2716,15 @@
         }
         try
         {
-            _brandsList = await AdminApi.GetBrandsAsync();
+            var brandsTask = AdminApi.GetBrandsAsync();
+            var allProdsTask = AdminApi.GetProductsAsync(1, 100);
+            await Task.WhenAll(brandsTask, allProdsTask);
+            _brandsList = await brandsTask;
+            var bigPage = await allProdsTask;
+            if (bigPage?.Items != null)
+            {
+                _allProductsList = bigPage.Items.ToList();
+            }
         }
         catch { }
         await LoadProducts();
