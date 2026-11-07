@@ -97,3 +97,4 @@ public static class StringSearchHelper
         return patternIndex == pattern.Length;
     }
 }
+
