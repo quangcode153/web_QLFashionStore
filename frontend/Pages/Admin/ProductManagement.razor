@@ -40,11 +40,25 @@
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <input type="text" class="search-catalog-input" placeholder="Lọc nhanh theo tên hoặc mã SP..." @bind="_searchTerm" @bind:event="oninput" />
+            <input type="text" class="search-catalog-input" placeholder="Lọc theo tên, mã SP hoặc thương hiệu..." @bind="_searchTerm" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_searchTerm))
             {
                 <button type="button" class="clear-btn" @onclick="() => _searchTerm = string.Empty">×</button>
             }
+        </div>
+
+        <!-- Bộ lọc thuộc tính Thương hiệu -->
+        <div class="brand-filter-wrapper">
+            <select class="form-control brand-filter-select" @bind="_selectedBrandFilter">
+                <option value="0">🏷️ Tất cả thương hiệu</option>
+                @if (_brandsList != null)
+                {
+                    @foreach (var b in _brandsList)
+                    {
+                        <option value="@b.MaThuongHieu">@b.TenThuongHieu</option>
+                    }
+                }
+            </select>
         </div>
 
         <!-- Bộ lọc trạng thái mở bán / ẩn sản phẩm -->
@@ -1112,6 +1126,30 @@
         font-size: 1rem;
         color: #94a3b8;
         cursor: pointer;
+    }
+
+    .brand-filter-wrapper {
+        display: flex;
+        align-items: center;
+    }
+
+    .brand-filter-select {
+        height: 36px;
+        padding: 0 10px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #0f172a;
+        cursor: pointer;
+        min-width: 170px;
+    }
+
+    .brand-filter-select:focus {
+        border-color: #0f172a;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.05);
     }
 
     .catalog-stats-pill {
@@ -2248,6 +2286,7 @@
     // Danh mục & Thương hiệu cho form thêm sản phẩm
     private List<CategoryDto>? _categoriesList;
     private List<BrandDto>? _brandsList;
+    private int _selectedBrandFilter = 0;
 
     // State Thêm nhanh Danh mục & Thương hiệu (Quick Add)
     private bool _showQuickCategory = false;
@@ -2337,7 +2376,17 @@
                 query = query.Where(p => 
                     p.TenSanPham.ToLowerInvariant().Contains(term) ||
                     p.MaSanPham.ToString().Contains(term) ||
-                    p.TenDanhMuc.ToLowerInvariant().Contains(term));
+                    p.TenDanhMuc.ToLowerInvariant().Contains(term) ||
+                    (!string.IsNullOrEmpty(p.TenThuongHieu) && p.TenThuongHieu.ToLowerInvariant().Contains(term)));
+            }
+
+            if (_selectedBrandFilter > 0 && _brandsList != null)
+            {
+                var targetBrand = _brandsList.FirstOrDefault(b => b.MaThuongHieu == _selectedBrandFilter);
+                if (targetBrand != null)
+                {
+                    query = query.Where(p => p.TenThuongHieu.Equals(targetBrand.TenThuongHieu, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             if (_sortStockOrder == "DESC")
@@ -2362,6 +2411,11 @@
             Navigation.NavigateTo("/warehouse");
             return;
         }
+        try
+        {
+            _brandsList = await AdminApi.GetBrandsAsync();
+        }
+        catch { }
         await LoadProducts();
     }
 
