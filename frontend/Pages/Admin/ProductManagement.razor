@@ -30,6 +30,15 @@
                 </svg>
                 <span>Thêm sản phẩm</span>
             </button>
+
+            <!-- Nút Quản lý thương hiệu & Xóa đối tác ngừng hợp tác -->
+            <button class="btn-action-secondary btn-brand-mgmt" @onclick="OpenBrandManagementModal" title="Quản lý và xóa các thương hiệu không còn hợp tác">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                    <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                </svg>
+                <span>🏷️ Quản lý thương hiệu</span>
+            </button>
         </div>
     </div>
 
@@ -1032,6 +1041,112 @@
                     {
                         <span>Cập nhật sản phẩm</span>
                     }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL: QUẢN LÝ THƯƠNG HIỆU & ĐỐI TÁC (XÓA BRAND KHÔNG CÒN HỢP TÁC)         -->
+<!-- ========================================================================= -->
+@if (_isBrandManagementModalOpen)
+{
+    <div class="modal-backdrop" @onclick="CloseBrandManagementModal">
+        <div class="modal-panel modal-panel-lg" @onclick:stopPropagation>
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge">QUẢN LÝ ĐỐI TÁC CUNG ỨNG</div>
+                    <h3 class="modal-title">Quản Lý Thương Hiệu Thời Trang</h3>
+                    <p class="modal-subtitle">Xóa bỏ thương hiệu không còn hợp tác để khách hàng không truy cập vào danh mục trống hàng</p>
+                </div>
+                <button type="button" class="btn-close-modal" @onclick="CloseBrandManagementModal">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Thêm mới nhanh thương hiệu -->
+                <div class="quick-add-brand-card" style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+                    <div style="font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 8px;">+ BỔ SUNG THƯƠNG HIỆU MỚI</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" class="form-input" style="flex: 2; min-width: 150px;" placeholder="Tên thương hiệu (vd: Routine, Zara...)" @bind="_newBrandNameMgmt" />
+                        <input type="text" class="form-input" style="flex: 1.5; min-width: 130px;" placeholder="Xuất xứ (vd: Việt Nam, Tây Ban Nha...)" @bind="_newBrandOriginMgmt" />
+                        <button type="button" class="btn-action-primary" style="padding: 6px 14px;" @onclick="CreateBrandFromManagement" disabled="@_isSavingBrandMgmt">
+                            @if (_isSavingBrandMgmt) { <span>Đang lưu...</span> } else { <span>Lưu thương hiệu</span> }
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bảng danh sách thương hiệu & hành động xóa -->
+                <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">MÃ</th>
+                                <th>TÊN THƯƠNG HIỆU</th>
+                                <th>XUẤT XỨ</th>
+                                <th style="text-align: center;">SẢN PHẨM HIỆN CÓ</th>
+                                <th>TRẠNG THÁI</th>
+                                <th style="text-align: right; width: 130px;">HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_brandsList != null && _brandsList.Any())
+                            {
+                                @foreach (var brand in _brandsList)
+                                {
+                                    var count = GetProductCountForBrand(brand.TenThuongHieu);
+                                    <tr>
+                                        <td class="tabular-nums" style="color: #64748b; font-weight: 600;">#@brand.MaThuongHieu</td>
+                                        <td style="font-weight: 700; color: #0f172a;">@brand.TenThuongHieu</td>
+                                        <td>@(string.IsNullOrWhiteSpace(brand.XuatXu) ? "—" : brand.XuatXu)</td>
+                                        <td style="text-align: center;">
+                                            <span class="badge @(count > 0 ? "badge-success" : "badge-neutral")" style="padding: 2px 8px; border-radius: 12px; font-weight: 700;">
+                                                @count sản phẩm
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (count > 0)
+                                            {
+                                                <span style="color: #059669; font-size: 0.78rem; font-weight: 600;">● Đang phân phối</span>
+                                            }
+                                            else
+                                            {
+                                                <span style="color: #d97706; font-size: 0.78rem; font-weight: 600;">○ Không có hàng (Ngừng hợp tác)</span>
+                                            }
+                                        </td>
+                                        <td style="text-align: right;">
+                                            @if (count == 0)
+                                            {
+                                                <button type="button" class="btn-delete-brand" disabled="@_isDeletingBrand" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 4px 8px; border-radius: 5px; font-size: 0.75rem; font-weight: 600; cursor: pointer;" 
+                                                        @onclick="() => ConfirmDeleteBrand(brand)" title="Xóa thương hiệu không còn hợp tác">
+                                                    @if (_isDeletingBrand) { <span>Đang xóa...</span> } else { <span>🗑️ Xóa đối tác</span> }
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" disabled style="background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 5px; font-size: 0.75rem; cursor: not-allowed;" 
+                                                        title="Đang có @count sản phẩm kinh doanh. Vui lòng chuyển hoặc xóa sản phẩm trước.">
+                                                    🔒 Có @count SP
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: #94a3b8; padding: 24px;">Chưa có dữ liệu thương hiệu nào.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" @onclick="CloseBrandManagementModal">
+                    Đóng
                 </button>
             </div>
         </div>
@@ -3476,6 +3591,95 @@
         finally
         {
             _isSavingQuickBrand = false;
+        }
+    }
+
+    // =========================================================================
+    // QUẢN LÝ THƯƠNG HIỆU & XÓA ĐỐI TÁC NGỪNG HỢP TÁC (TRÁNH KHÁCH VÀO HẾT HÀNG)
+    // =========================================================================
+    private bool _isBrandManagementModalOpen = false;
+    private string _newBrandNameMgmt = string.Empty;
+    private string _newBrandOriginMgmt = string.Empty;
+    private bool _isSavingBrandMgmt = false;
+    private bool _isDeletingBrand = false;
+
+    private void OpenBrandManagementModal()
+    {
+        _isBrandManagementModalOpen = true;
+    }
+
+    private void CloseBrandManagementModal()
+    {
+        _isBrandManagementModalOpen = false;
+    }
+
+    private async Task CreateBrandFromManagement()
+    {
+        if (string.IsNullOrWhiteSpace(_newBrandNameMgmt))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên thương hiệu.");
+            return;
+        }
+
+        try
+        {
+            _isSavingBrandMgmt = true;
+            var res = await AdminApi.CreateBrandAsync(new CreateBrandRequest
+            {
+                TenThuongHieu = _newBrandNameMgmt.Trim(),
+                XuatXu = string.IsNullOrWhiteSpace(_newBrandOriginMgmt) ? "Việt Nam" : _newBrandOriginMgmt.Trim()
+            });
+
+            if (res.Success && res.Data > 0)
+            {
+                Toast.ShowSuccess($"Đã tạo thương hiệu '{_newBrandNameMgmt.Trim()}' thành công!");
+                _newBrandNameMgmt = string.Empty;
+                _newBrandOriginMgmt = string.Empty;
+                _brandsList = await AdminApi.GetBrandsAsync();
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể tạo thương hiệu mới.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingBrandMgmt = false;
+        }
+    }
+
+    private async Task ConfirmDeleteBrand(BrandDto brand)
+    {
+        if (brand == null) return;
+        var confirm = await JS.InvokeAsync<bool>("confirm", $"Bạn có chắc chắn muốn xóa thương hiệu '{brand.TenThuongHieu}' không còn hợp tác? Thao tác này sẽ dọn sạch danh mục để khách không vào nhầm thương hiệu không có hàng.");
+        if (!confirm) return;
+
+        try
+        {
+            _isDeletingBrand = true;
+            var res = await AdminApi.DeleteBrandAsync(brand.MaThuongHieu);
+            if (res.Success)
+            {
+                Toast.ShowSuccess($"Đã xóa thương hiệu '{brand.TenThuongHieu}' thành công!");
+                _brandsList = await AdminApi.GetBrandsAsync();
+                _selectedBrandIds.Remove(brand.MaThuongHieu);
+            }
+            else
+            {
+                Toast.ShowError(res.Message ?? "Không thể xóa thương hiệu.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi xóa thương hiệu: {ex.Message}");
+        }
+        finally
+        {
+            _isDeletingBrand = false;
         }
     }
 

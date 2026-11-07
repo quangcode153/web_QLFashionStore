@@ -70,23 +70,23 @@ public class BranchRepository : IBranchRepository
         using var connection = _connectionFactory.CreateConnection();
         var sql = @"
             SELECT 
-                tk.ma_chi_nhanh AS MaChiNhanh,
-                cn.ten_chi_nhanh AS TenChiNhanh,
-                tk.ma_bien_the AS MaBienThe,
+                @branchId AS MaChiNhanh,
+                ISNULL(cn.ten_chi_nhanh, N'Chi nhánh') AS TenChiNhanh,
+                bt.ma_bien_the AS MaBienThe,
                 sp.ten_san_pham AS TenSanPham,
                 bt.kich_co AS KichCo,
                 bt.mau_sac AS MauSac,
                 bt.ma_sku AS MaSku,
                 NULL AS Barcode,
-                tk.so_luong_ton AS SoLuongTon,
-                tk.muc_canh_bao_ton AS MucCanhBaoTon,
+                ISNULL(tk.so_luong_ton, 0) AS SoLuongTon,
+                ISNULL(tk.muc_canh_bao_ton, 10) AS MucCanhBaoTon,
                 bt.gia_ban AS GiaBan,
                 ISNULL(sp.da_xoa, 0) AS DaXoa
-            FROM TonKhoChiNhanh tk
-            JOIN ChiNhanh cn ON tk.ma_chi_nhanh = cn.ma_chi_nhanh
-            JOIN BienTheSanPham bt ON tk.ma_bien_the = bt.ma_bien_the
+            FROM BienTheSanPham bt
             JOIN SanPham sp ON bt.ma_san_pham = sp.ma_san_pham
-            WHERE tk.ma_chi_nhanh = @branchId";
+            LEFT JOIN TonKhoChiNhanh tk ON bt.ma_bien_the = tk.ma_bien_the AND tk.ma_chi_nhanh = @branchId
+            LEFT JOIN ChiNhanh cn ON cn.ma_chi_nhanh = @branchId
+            WHERE sp.da_xoa = 0";
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -99,7 +99,7 @@ public class BranchRepository : IBranchRepository
             )";
         }
 
-        sql += " ORDER BY tk.so_luong_ton ASC, sp.ten_san_pham ASC";
+        sql += " ORDER BY ISNULL(tk.so_luong_ton, 0) ASC, sp.ten_san_pham ASC";
 
         return await connection.QueryAsync<BranchInventoryDto>(sql, new 
         { 

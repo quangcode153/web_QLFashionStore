@@ -28,11 +28,17 @@ public class SupplierDto
     public int MaNhaCungCap { get; set; }
     public string TenNhaCungCap { get; set; } = string.Empty;
     public string? DienThoaiLienHe { get; set; }
+    public string? SoDienThoai { get => DienThoaiLienHe; set => DienThoaiLienHe = value; }
+    public string? NguoiLienHe { get; set; }
+    public string? DiaChi { get; set; }
 }
 
 public class CreateSupplierRequestDto
 {
     public string TenNhaCungCap { get; set; } = string.Empty;
     public string? DienThoaiLienHe { get; set; }
+    public string? SoDienThoai { get => DienThoaiLienHe; set => DienThoaiLienHe = value; }
+    public string? NguoiLienHe { get; set; }
+    public string? DiaChi { get; set; }
 }
 

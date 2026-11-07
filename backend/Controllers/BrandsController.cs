@@ -49,4 +49,37 @@ public class BrandsController : ControllerBase
             return StatusCode(500, ApiResponse<int>.Fail($"Lỗi hệ thống: {ex.Message}"));
         }
     }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},AdminChuoi,QuanLyHeThong")]
+    public async Task<IActionResult> DeleteBrand(int id)
+    {
+        if (id <= 0)
+        {
+            return BadRequest(ApiResponse<bool>.Fail("Mã thương hiệu không hợp lệ."));
+        }
+
+        try
+        {
+            var success = await _catalogService.DeleteBrandAsync(id);
+            if (!success)
+            {
+                return NotFound(ApiResponse<bool>.Fail("Không tìm thấy thương hiệu để xóa."));
+            }
+
+            return Ok(ApiResponse<bool>.Ok(true, "Xóa thương hiệu không còn hợp tác thành công."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<bool>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<bool>.Fail($"Lỗi hệ thống: {ex.Message}"));
+        }
+    }
 }

@@ -504,6 +504,38 @@ public class WarehousePortalRoleComponentTests : BunitContext
         });
     }
 
+    [Fact(DisplayName = "TS-WH-OUTOFSTOCK-01: Thẻ KPI Cạn hàng trong kho tính chính xác số biến thể có tồn kho = 0")]
+    public void WarehousePortal_OutOfStockCard_CalculatesAccurately()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult("Thủ kho");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffName").SetResult("Lê Văn Cường");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffId").SetResult("3");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchId").SetResult("9");
+        JSInterop.Setup<string?>("localStorage.getItem", "staffBranchName").SetResult("Kho Tổng QF Tân Bình");
+        JSInterop.Setup<string?>("localStorage.getItem", "loaiThuKho").SetResult("Online");
+
+        // 3 biến thể trong kho, trong đó có 2 biến thể SoLuongTon = 0
+        _mockAdminApi.Setup(api => api.GetBranchInventoryAsync(9, It.IsAny<string?>()))
+            .ReturnsAsync(new List<BranchInventoryDto>
+            {
+                new BranchInventoryDto { MaBienThe = 1, TenSanPham = "Áo Thun A", MaSku = "ATA", SoLuongTon = 0 },
+                new BranchInventoryDto { MaBienThe = 2, TenSanPham = "Áo Thun B", MaSku = "ATB", SoLuongTon = 0 },
+                new BranchInventoryDto { MaBienThe = 3, TenSanPham = "Áo Thun C", MaSku = "ATC", SoLuongTon = 15 }
+            });
+
+        // Act
+        var cut = Render<WarehousePortal>();
+
+        // Assert: Thẻ CẠN HÀNG TRONG KHO phải hiển thị 2 (thay vì 0)
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("CẠN HÀNG TRONG KHO (0 CÁI)");
+            var outOfStockValue = cut.Find(".kpi-card .text-red");
+            outOfStockValue.TextContent.Trim().Should().Be("2", "Kho có 2 biến thể SoLuongTon = 0 thì thẻ hàng cạn phải hiển thị 2");
+        });
+    }
+
     #endregion
 }
 

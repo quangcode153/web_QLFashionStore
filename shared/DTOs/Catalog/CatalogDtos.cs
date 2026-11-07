@@ -66,6 +66,7 @@ public class BrandDto
     public int MaThuongHieu { get; set; }
     public string TenThuongHieu { get; set; } = string.Empty;
     public string? XuatXu { get; set; }
+    public int SoLuongSanPham { get; set; } = 0;
 }
 
 public class CreateProductImageDto

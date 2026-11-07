@@ -310,7 +310,7 @@
                                     @onclick="() => SelectBrand(null)">
                                 Tất cả
                             </button>
-                            @foreach (var brand in Brands)
+                            @foreach (var brand in AvailableBrandsForCustomer)
                             {
                                 <button type="button" 
                                         class="filter-chip @(Query.BrandId == brand.MaThuongHieu ? "active" : "")" 
@@ -443,7 +443,7 @@
                                             <input type="radio" name="brand_filter" checked="@(!Query.BrandId.HasValue)" />
                                             <span class="option-label">Tất cả thương hiệu</span>
                                         </label>
-                                        @foreach (var b in Brands)
+                                        @foreach (var b in AvailableBrandsForCustomer)
                                         {
                                             <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(b.MaThuongHieu)">
                                                 <input type="radio" name="brand_filter" checked="@(Query.BrandId == b.MaThuongHieu)" />
@@ -636,20 +636,34 @@
             }
             else if (!PagedResult.Items.Any())
             {
-                <div class="catalog-empty">
-                    <div class="empty-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="11" cy="11" r="8"/>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
+                @if (Query.BrandId.HasValue)
+                {
+                    var brandName = Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId.Value)?.TenThuongHieu ?? "này";
+                    <div class="catalog-empty brand-empty-state">
+                        <div class="empty-icon" style="background: #fef3c7; color: #d97706; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                        </div>
+                        <h3 class="brand-empty-title" style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0 0 8px;">
+                            Nhãn hàng @brandName tạm thời hết hàng
+                        </h3>
+                        <p class="empty-text" style="max-width: 480px; margin: 0 auto 18px; line-height: 1.5; color: #64748b; font-size: 0.88rem;">
+                            Các mẫu trang phục mới của nhãn hàng <strong>@brandName</strong> đang được bổ sung đợt mới. Quý khách vui lòng chọn xem các thương hiệu khác đang sẵn hàng hoặc xóa bộ lọc để tiếp tục mua sắm.
+                        </p>
+                        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                            <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="() => SelectBrandFilter(null)">
+                                Khám phá thương hiệu khác
+                            </button>
+                            <button type="button" class="btn-reset-filters" style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ResetFilters">
+                                Xem tất cả sản phẩm
+                            </button>
+                        </div>
                     </div>
-                    <p class="empty-text">Không tìm thấy sản phẩm phù hợp</p>
-                    <button type="button" class="btn-reset-filters" @onclick="ResetFilters">Xóa bộ lọc để xem tất cả</button>
-                </div>
-            }
-            else
-            {
-                @if (_hasActiveFilters && !DisplayedProducts.Any())
+                }
+                else
                 {
                     <div class="catalog-empty">
                         <div class="empty-icon">
@@ -658,9 +672,55 @@
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                             </svg>
                         </div>
-                        <p class="empty-text">Không tìm thấy sản phẩm nào khớp với các lựa chọn lọc</p>
-                        <button type="button" class="btn-reset-filters" @onclick="ClearAllHorizontalFilters">Đặt lại bộ lọc để xem tất cả</button>
+                        <p class="empty-text">Không tìm thấy sản phẩm phù hợp</p>
+                        <button type="button" class="btn-reset-filters" @onclick="ResetFilters">Xóa bộ lọc để xem tất cả</button>
                     </div>
+                }
+            }
+            else
+            {
+                @if (_hasActiveFilters && !DisplayedProducts.Any())
+                {
+                    @if (Query.BrandId.HasValue)
+                    {
+                        var brandName = Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId.Value)?.TenThuongHieu ?? "này";
+                        <div class="catalog-empty brand-empty-state">
+                            <div class="empty-icon" style="background: #fef3c7; color: #d97706; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                </svg>
+                            </div>
+                            <h3 class="brand-empty-title" style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0 0 8px;">
+                                Nhãn hàng @brandName tạm thời hết hàng
+                            </h3>
+                            <p class="empty-text" style="max-width: 480px; margin: 0 auto 18px; line-height: 1.5; color: #64748b; font-size: 0.88rem;">
+                                Các mẫu trang phục mới của nhãn hàng <strong>@brandName</strong> đang được bổ sung đợt mới. Quý khách vui lòng chọn xem các thương hiệu khác đang sẵn hàng hoặc đặt lại bộ lọc để tiếp tục mua sắm.
+                            </p>
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="() => SelectBrandFilter(null)">
+                                    Khám phá thương hiệu khác
+                                </button>
+                                <button type="button" class="btn-reset-filters" style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ClearAllHorizontalFilters">
+                                    Đặt lại bộ lọc
+                                </button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="catalog-empty">
+                            <div class="empty-icon">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                            </div>
+                            <p class="empty-text">Không tìm thấy sản phẩm nào khớp với các lựa chọn lọc</p>
+                            <button type="button" class="btn-reset-filters" @onclick="ClearAllHorizontalFilters">Đặt lại bộ lọc để xem tất cả</button>
+                        </div>
+                    }
                 }
                 else
                 {
@@ -951,6 +1011,19 @@
     private PagedResult<ProductListItemDto>? PagedResult;
     private IEnumerable<CategoryDto> Categories = Enumerable.Empty<CategoryDto>();
     private IEnumerable<BrandDto> Brands = Enumerable.Empty<BrandDto>();
+    private IEnumerable<BrandDto> AvailableBrandsForCustomer
+    {
+        get
+        {
+            if (Brands == null) return Enumerable.Empty<BrandDto>();
+            // Ẩn các nhãn hàng hết hàng (SoLuongSanPham == 0) để khách không chọn nhầm
+            if (Brands.Any(b => b.SoLuongSanPham > 0))
+            {
+                return Brands.Where(b => b.SoLuongSanPham > 0);
+            }
+            return Brands;
+        }
+    }
     private IEnumerable<BannerDto> Banners = Enumerable.Empty<BannerDto>();
     private int _currentBannerIndex = 0;
     private System.Threading.Timer? _bannerAutoplayTimer;

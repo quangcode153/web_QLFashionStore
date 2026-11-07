@@ -609,6 +609,33 @@ public class AdminApiClient : IAdminApiClient
         }
     }
 
+    public async Task<ApiResponse<bool>> DeleteBrandAsync(int brandId)
+    {
+        await AttachAuthHeaderAsync();
+        try
+        {
+            var res = await _http.DeleteAsync($"api/brands/{brandId}");
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorText = await res.Content.ReadAsStringAsync();
+                try
+                {
+                    var errObj = System.Text.Json.JsonSerializer.Deserialize<ApiResponse<bool>>(errorText, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    if (errObj != null && !string.IsNullOrWhiteSpace(errObj.Message))
+                        return errObj;
+                }
+                catch { }
+                return ApiResponse<bool>.Fail($"Lỗi xóa thương hiệu (HTTP {(int)res.StatusCode})");
+            }
+            var content = await res.Content.ReadFromJsonAsync<ApiResponse<bool>>();
+            return content ?? ApiResponse<bool>.Fail("Không nhận được phản hồi từ hệ thống.");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.Fail($"Lỗi kết nối khi xóa thương hiệu: {ex.Message}");
+        }
+    }
+
 
     public async Task<List<AccountSummaryDto>?> GetAccountsAsync()
     {

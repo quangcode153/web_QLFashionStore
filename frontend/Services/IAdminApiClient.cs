@@ -50,6 +50,7 @@ public interface IAdminApiClient
     Task<List<BrandDto>> GetBrandsAsync();
     Task<ApiResponse<int>> CreateCategoryAsync(CreateCategoryRequest request);
     Task<ApiResponse<int>> CreateBrandAsync(CreateBrandRequest request);
+    Task<ApiResponse<bool>> DeleteBrandAsync(int brandId);
 
     // Quản lý tài khoản & Phân quyền (RBAC)
     Task<List<AccountSummaryDto>?> GetAccountsAsync();

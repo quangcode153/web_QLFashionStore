@@ -98,5 +98,39 @@ public class AuditLogBranchScopingTests
         // Assert: Bị từ chối Forbid 403
         Assert.IsType<ForbidResult>(result);
     }
+
+    [Fact(DisplayName = "VÒNG 1: Controller [Authorize] attribute bắt buộc phải chứa RoleConstants.ThuKho")]
+    public void AuditLogsController_AuthorizeAttribute_MustIncludeThuKhoRole()
+    {
+        var authAttr = typeof(AuditLogsController)
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
+            .FirstOrDefault();
+
+        Assert.NotNull(authAttr);
+        Assert.Contains(RoleConstants.ThuKho, authAttr.Roles);
+    }
+
+    [Theory(DisplayName = "VÒNG 2 & 3: Thủ kho truy cập nhật ký nhập hàng được scoped chính xác theo kho quản lý")]
+    [InlineData(RoleConstants.ThuKho, "9", 9)]
+    [InlineData(RoleConstants.ThuKho, "2", 2)]
+    [InlineData(RoleConstants.ThuKho, "1", 1)]
+    public async Task GetAuditLogs_WarehouseKeeper_AuthorizedAndScopedToOwnBranch(string role, string branchClaim, int expectedBranchId)
+    {
+        // Arrange
+        SetUserContext(role, branchId: branchClaim);
+        int? capturedBranchId = null;
+        _auditServiceMock.Setup(s => s.GetLogsAsync(It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<int>()))
+            .Callback<string?, int?, int>((loai, branch, limit) => capturedBranchId = branch)
+            .ReturnsAsync(ApiResponse<IEnumerable<AuditLogDto>>.Ok(new List<AuditLogDto>()));
+
+        // Act: Thủ kho xem log
+        var result = await _controller.GetAuditLogs(loaiThaoTac: "NHAP_HANG", maChiNhanh: null, limit: 50);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(okResult);
+        Assert.Equal(expectedBranchId, capturedBranchId);
+    }
 }
 

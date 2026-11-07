@@ -334,6 +334,20 @@
                     <span class="tab-badge-blue">@_announcements.Count</span>
                 }
             </button>
+
+            @if (_isChainAdmin || _canAccessAdminChain)
+            {
+                <button type="button" class="wh-tab-btn @(_currentTab == TabType.Suppliers ? "active" : "")" @onclick="() => SetTab(TabType.Suppliers)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                    <span>QUẢN LÝ & BỔ SUNG NGUỒN HÀNG</span>
+                    <span class="tab-badge-count">@_suppliers.Count</span>
+                </button>
+            }
         </div>
 
         <!-- 3. NỘI DUNG TỪNG TAB -->
@@ -926,6 +940,103 @@
                             </div>
                         }
                     }
+                </div>
+            </div>
+        }
+        else if (_currentTab == TabType.Suppliers && (_isChainAdmin || _canAccessAdminChain))
+        {
+            <!-- TAB 5: QUẢN LÝ & BỔ SUNG NGUỒN HÀNG (CHO ADMIN) -->
+            <div class="card wh-card" style="margin-bottom: 20px;">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 14px 18px;">
+                    <div>
+                        <h3 class="card-title" style="margin: 0; font-size: 1rem; font-weight: 800; color: #0f172a;">🏢 BỔ SUNG NGUỒN HÀNG (NHÀ CUNG CẤP) MỚI</h3>
+                        <p style="margin: 3px 0 0; font-size: 0.78rem; color: #64748b;">
+                            Admin bổ sung nguồn hàng tại đây để Quản lý chi nhánh và Thủ kho có thể chọn nhập hàng hoặc cấu hình sản phẩm.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="padding: 18px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">TÊN NHÀ CUNG CẤP / NGUỒN HÀNG (*)</label>
+                            <input type="text" class="form-control" placeholder="vd: Tổng Kho Dệt May Phong Phú" @bind="_adminSupplierName" />
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">SỐ ĐIỆN THOẠI ĐỐI TÁC (*)</label>
+                            <input type="text" class="form-control" placeholder="vd: 0988776655" @bind="_adminSupplierPhone" />
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">NGƯỜI LIÊN HỆ ĐẠI DIỆN</label>
+                            <input type="text" class="form-control" placeholder="vd: Trần Văn Hùng (GĐ Kinh doanh)" @bind="_adminSupplierContact" />
+                        </div>
+                        <div>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">ĐỊA CHỈ TRỤ SỞ / KHO XƯỞNG</label>
+                            <input type="text" class="form-control" placeholder="vd: KCN Tân Bình, P. Tây Thạnh, TP.HCM" @bind="_adminSupplierAddress" />
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button type="button" class="btn btn-primary" style="padding: 8px 18px; font-weight: 700;" @onclick="SaveAdminNewSupplier" disabled="@_isSavingAdminSupplier">
+                            @if (_isSavingAdminSupplier)
+                            {
+                                <span>Đang lưu nguồn hàng...</span>
+                            }
+                            else
+                            {
+                                <span>+ Lưu nguồn hàng vào CSDL</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card wh-card">
+                <div class="card-header" style="background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 14px 18px;">
+                    <h3 class="card-title" style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a;">
+                        📦 DANH SÁCH NGUỒN HÀNG HỆ THỐNG (@_suppliers.Count đối tác đã kết nối)
+                    </h3>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="wh-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8fafc; text-align: left; font-size: 0.75rem; color: #64748b;">
+                                <th style="padding: 10px 12px;">MÃ NCC</th>
+                                <th style="padding: 10px 12px;">TÊN NHÀ CUNG CẤP / NGUỒN HÀNG</th>
+                                <th style="padding: 10px 12px;">NGƯỜI LIÊN HỆ</th>
+                                <th style="padding: 10px 12px;">ĐIỆN THOẠI</th>
+                                <th style="padding: 10px 12px;">ĐỊA CHỈ</th>
+                                <th style="padding: 10px 12px; text-align: center;">KHẢ DỤNG CHO CHI NHÁNH & THỦ KHO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (_suppliers.Any())
+                            {
+                                @foreach (var s in _suppliers)
+                                {
+                                    <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;">
+                                        <td style="padding: 10px 12px; font-weight: 700; color: #64748b;">#@s.MaNhaCungCap</td>
+                                        <td style="padding: 10px 12px; font-weight: 700; color: #0f172a;">@s.TenNhaCungCap</td>
+                                        <td style="padding: 10px 12px; color: #475569;">@(string.IsNullOrWhiteSpace(s.NguoiLienHe) ? "—" : s.NguoiLienHe)</td>
+                                        <td style="padding: 10px 12px; color: #2563eb; font-weight: 600;">@(string.IsNullOrWhiteSpace(s.SoDienThoai) ? "—" : s.SoDienThoai)</td>
+                                        <td style="padding: 10px 12px; color: #475569;">@(string.IsNullOrWhiteSpace(s.DiaChi) ? "—" : s.DiaChi)</td>
+                                        <td style="padding: 10px 12px; text-align: center;">
+                                            <span style="background: #ecfdf5; color: #059669; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;">
+                                                <span>✓</span> Sẵn sàng chọn nhập hàng
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Chưa có nguồn hàng nào trong hệ thống.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         }
@@ -2944,7 +3055,7 @@
 </style>
 
 @code {
-    private enum TabType { Import, Inventory, History, Announcements }
+    private enum TabType { Import, Inventory, History, Announcements, Suppliers }
     private TabType _currentTab = TabType.Import;
 
     private string? _staffName;
@@ -3003,6 +3114,13 @@
     private string? _newSupplierPhone;
     private bool _isSavingSupplier = false;
 
+    // Quản lý & Bổ sung Nguồn hàng (Admin)
+    private string _adminSupplierName = string.Empty;
+    private string? _adminSupplierPhone;
+    private string? _adminSupplierContact;
+    private string? _adminSupplierAddress;
+    private bool _isSavingAdminSupplier = false;
+
     // Bộ lọc Tab 2
     private string _inventoryFilterQuery = string.Empty;
     private string _stockFilterMode = "ALL";
@@ -3029,6 +3147,10 @@
             var isBranchManager = _userRole.Contains("chi nhánh", StringComparison.OrdinalIgnoreCase) ||
                                   _userRole.Contains("Cửa hàng trưởng", StringComparison.OrdinalIgnoreCase);
 
+            var isThuKho = _userRole.Contains("Thủ kho", StringComparison.OrdinalIgnoreCase) ||
+                           _userRole.Contains("kho", StringComparison.OrdinalIgnoreCase) ||
+                           _userRole.Contains("warehouse", StringComparison.OrdinalIgnoreCase);
+
             if (isChainAdmin)
             {
                 _isChainAdmin = true;
@@ -3045,10 +3167,40 @@
                 _isBranchManager = true;
                 _canAccessPos = true;
                 _badgeRoleTitle = "QUẢN LÝ CHI NHÁNH";
+                _currentWarehouseScopeId = _staffBranchId;
+                _selectedBranchId = _staffBranchId;
                 _scopeDescText = $"Phạm vi: {_staffBranchName}";
                 _roleDisplayTitle = "Cửa hàng trưởng chi nhánh";
                 var name = _staffName ?? "QL";
                 _avatarLetters = name.Length >= 2 ? name.Substring(0, 2).ToUpper() : "QL";
+            }
+            else if (isThuKho)
+            {
+                _canAccessAdminChain = false;
+                _canAccessPos = false;
+                if (_loaiThuKho.Contains("Online", StringComparison.OrdinalIgnoreCase) || _staffBranchId == 9)
+                {
+                    _isChainAdmin = false;
+                    _isOnlineWarehouseKeeper = true;
+                    _isBranchWarehouseKeeper = false;
+                    _currentWarehouseScopeId = 9;
+                    _selectedBranchId = 9;
+                    _badgeRoleTitle = "THỦ KHO ONLINE (KHO TỔNG)";
+                    _scopeDescText = "Phạm vi: Kho Tổng QF Tân Bình (Đơn Online & Bán buôn)";
+                    _roleDisplayTitle = "Thủ kho Online (Kho Tổng)";
+                }
+                else
+                {
+                    _isChainAdmin = false;
+                    _isOnlineWarehouseKeeper = false;
+                    _isBranchWarehouseKeeper = true;
+                    _currentWarehouseScopeId = _staffBranchId > 0 ? _staffBranchId : 1;
+                    _selectedBranchId = _currentWarehouseScopeId;
+                    _badgeRoleTitle = "THỦ KHO CHI NHÁNH";
+                    _scopeDescText = $"Phạm vi: {_staffBranchName}";
+                    _roleDisplayTitle = $"Thủ kho {_staffBranchName}";
+                }
+                _avatarLetters = "TK";
             }
         }
     }
@@ -3196,6 +3348,11 @@
         {
             await LoadAnnouncements();
         }
+        else if (tab == TabType.Suppliers && !_suppliers.Any())
+        {
+            var data = await AdminApi.GetSuppliersAsync();
+            if (data != null) _suppliers = data;
+        }
     }
 
     private string CurrentWarehouseDisplayName
@@ -3300,8 +3457,8 @@
 
                 _totalStockInChain = _allVariants.Sum(x => x.SoLuongTon);
                 _totalSkuTracked = _allVariants.Any() ? _allVariants.Count : 351;
-                _lowStockAlerts = new();
-                _outOfStockCount = 0;
+                _lowStockAlerts = _allVariants.Where(x => x.SoLuongTon <= 10).OrderBy(x => x.SoLuongTon).ToList();
+                _outOfStockCount = _allVariants.Count(x => x.SoLuongTon == 0);
             }
             else
             {
@@ -3404,6 +3561,53 @@
         catch (Exception ex)
         {
             Toast.ShowError($"Lỗi tải thông báo: {ex.Message}");
+        }
+    }
+
+    private async Task SaveAdminNewSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(_adminSupplierName))
+        {
+            Toast.ShowWarning("Vui lòng nhập tên nhà cung cấp / nguồn hàng.");
+            return;
+        }
+
+        try
+        {
+            _isSavingAdminSupplier = true;
+            var newSupplier = await AdminApi.CreateSupplierAsync(new CreateSupplierRequestDto
+            {
+                TenNhaCungCap = _adminSupplierName.Trim(),
+                SoDienThoai = string.IsNullOrWhiteSpace(_adminSupplierPhone) ? "0900000000" : _adminSupplierPhone.Trim(),
+                NguoiLienHe = _adminSupplierContact?.Trim(),
+                DiaChi = _adminSupplierAddress?.Trim()
+            });
+
+            if (newSupplier != null)
+            {
+                Toast.ShowSuccess($"Đã bổ sung nguồn hàng '{newSupplier.TenNhaCungCap}' thành công! Thủ kho và chi nhánh có thể chọn ngay.");
+                _adminSupplierName = string.Empty;
+                _adminSupplierPhone = null;
+                _adminSupplierContact = null;
+                _adminSupplierAddress = null;
+                var updated = await AdminApi.GetSuppliersAsync();
+                if (updated != null)
+                {
+                    _suppliers = updated;
+                }
+            }
+            else
+            {
+                Toast.ShowError("Không thể bổ sung nguồn hàng mới.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.ShowError($"Lỗi khi tạo nguồn hàng: {ex.Message}");
+        }
+        finally
+        {
+            _isSavingAdminSupplier = false;
         }
     }
 

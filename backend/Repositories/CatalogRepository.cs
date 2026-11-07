@@ -18,6 +18,7 @@ public interface ICatalogRepository
     Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId);
     Task<int> CreateCategoryAsync(CreateCategoryRequest request);
     Task<int> CreateBrandAsync(CreateBrandRequest request);
+    Task<bool> DeleteBrandAsync(int brandId);
     Task<bool> ToggleProductStatusAsync(int productId);
     Task<bool> ToggleVariantStatusAsync(int variantId);
     Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
@@ -390,13 +391,45 @@ public class CatalogRepository : ICatalogRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             SELECT 
-                ma_thuong_hieu AS MaThuongHieu,
-                ten_thuong_hieu AS TenThuongHieu,
-                xuat_xu AS XuatXu
-            FROM ThuongHieu
-            ORDER BY ten_thuong_hieu;
+                th.ma_thuong_hieu AS MaThuongHieu,
+                th.ten_thuong_hieu AS TenThuongHieu,
+                th.xuat_xu AS XuatXu,
+                ISNULL((SELECT COUNT(1) FROM SanPham sp WITH (NOLOCK) WHERE sp.ma_thuong_hieu = th.ma_thuong_hieu AND sp.da_xoa = 0), 0) AS SoLuongSanPham
+            FROM ThuongHieu th WITH (NOLOCK)
+            ORDER BY th.ten_thuong_hieu;
         ";
         return await connection.QueryAsync<BrandDto>(sql);
+    }
+
+    public async Task<bool> DeleteBrandAsync(int brandId)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        // 1. Kiểm tra sản phẩm đang kinh doanh
+        const string checkActiveSql = "SELECT COUNT(1) FROM SanPham WITH (NOLOCK) WHERE ma_thuong_hieu = @BrandId AND da_xoa = 0;";
+        var activeCount = await connection.ExecuteScalarAsync<int>(checkActiveSql, new { BrandId = brandId });
+        if (activeCount > 0)
+        {
+            throw new InvalidOperationException($"Không thể xóa thương hiệu vì đang có {activeCount} sản phẩm kinh doanh. Vui lòng chuyển hoặc xóa các sản phẩm này trước khi ngừng hợp tác.");
+        }
+
+        // 2. Kiểm tra xem có sản phẩm cũ nào (kể cả đã xóa mềm) còn tham chiếu khóa ngoại
+        const string checkAnySql = "SELECT COUNT(1) FROM SanPham WITH (NOLOCK) WHERE ma_thuong_hieu = @BrandId;";
+        var totalCount = await connection.ExecuteScalarAsync<int>(checkAnySql, new { BrandId = brandId });
+        if (totalCount > 0)
+        {
+            const string cleanSoftDeletedSql = @"
+                DELETE FROM HinhAnhSanPham WHERE ma_san_pham IN (SELECT ma_san_pham FROM SanPham WHERE ma_thuong_hieu = @BrandId AND da_xoa = 1);
+                DELETE FROM TonKhoChiNhanh WHERE ma_bien_the IN (SELECT ma_bien_the FROM BienTheSanPham WHERE ma_san_pham IN (SELECT ma_san_pham FROM SanPham WHERE ma_thuong_hieu = @BrandId AND da_xoa = 1));
+                DELETE FROM BienTheSanPham WHERE ma_san_pham IN (SELECT ma_san_pham FROM SanPham WHERE ma_thuong_hieu = @BrandId AND da_xoa = 1);
+                DELETE FROM SanPham WHERE ma_thuong_hieu = @BrandId AND da_xoa = 1;
+            ";
+            await connection.ExecuteAsync(cleanSoftDeletedSql, new { BrandId = brandId });
+        }
+
+        // 3. Thực hiện xóa thương hiệu khỏi CSDL
+        const string deleteSql = "DELETE FROM ThuongHieu WHERE ma_thuong_hieu = @BrandId;";
+        var rows = await connection.ExecuteAsync(deleteSql, new { BrandId = brandId });
+        return rows > 0;
     }
 
     public async Task<int> CreateCategoryAsync(CreateCategoryRequest request)

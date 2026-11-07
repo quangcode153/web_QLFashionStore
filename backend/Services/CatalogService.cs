@@ -17,6 +17,7 @@ public interface ICatalogService
     Task<IEnumerable<ProductBranchStockDto>> GetProductBranchStockAsync(int productId);
     Task<int> CreateCategoryAsync(CreateCategoryRequest request);
     Task<int> CreateBrandAsync(CreateBrandRequest request);
+    Task<bool> DeleteBrandAsync(int brandId);
     Task<bool> ToggleProductStatusAsync(int productId);
     Task<bool> ToggleVariantStatusAsync(int variantId);
     Task<IEnumerable<ProductVariantDto>> GetProductVariantsForAdminAsync(int productId);
@@ -201,6 +202,14 @@ public class CatalogService : ICatalogService
             throw new ArgumentException("Tên thương hiệu không được để trống.");
 
         return await _catalogRepository.CreateBrandAsync(request);
+    }
+
+    public async Task<bool> DeleteBrandAsync(int brandId)
+    {
+        if (brandId <= 0)
+            throw new ArgumentException("Mã thương hiệu không hợp lệ.");
+
+        return await _catalogRepository.DeleteBrandAsync(brandId);
     }
 
     public async Task<bool> ToggleProductStatusAsync(int productId)

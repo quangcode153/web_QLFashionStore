@@ -9,7 +9,7 @@ namespace Backend.Controllers;
 
 [ApiController]
 [Route("api/audit-logs")]
-[Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh}")]
+[Authorize(Roles = $"{RoleConstants.AdminChuoi},{RoleConstants.QuanLyHeThong},{RoleConstants.QuanLyChiNhanh},{RoleConstants.ThuKho}")]
 public class AuditLogsController : ControllerBase
 {
     private readonly IAuditLogService _auditLogService;
@@ -33,11 +33,21 @@ public class AuditLogsController : ControllerBase
         }
         else
         {
-            // Quản lý chi nhánh: BẮT BUỘC chỉ được xem nhật ký thuộc chi nhánh của mình
+            // Quản lý chi nhánh & Thủ kho: BẮT BUỘC chỉ được xem nhật ký thuộc chi nhánh/kho của mình
             var branchClaim = User.FindFirst("branchId")?.Value ?? User.FindFirst("ma_chi_nhanh")?.Value;
             if (int.TryParse(branchClaim, out var bId) && bId > 0)
             {
                 effectiveBranchId = bId;
+            }
+            else if (maChiNhanh.HasValue && maChiNhanh.Value > 0)
+            {
+                // Nếu không có claim branchId nhưng có query maChiNhanh (Thủ kho Online hoặc môi trường dev)
+                effectiveBranchId = maChiNhanh.Value;
+            }
+            else if (userRole == RoleConstants.ThuKho)
+            {
+                // Thủ kho mặc định kho 9 (Kho Tổng Online) nếu không có claim cụ thể
+                effectiveBranchId = 9;
             }
             else
             {
