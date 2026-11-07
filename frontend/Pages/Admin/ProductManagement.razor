@@ -90,18 +90,24 @@
                         </div>
                     </div>
                     <div class="brand-options-list">
-                        @if (_brandsList != null)
+                        @if (_brandsList != null && _brandsList.Any())
                         {
                             @foreach (var b in _brandsList)
                             {
                                 var isChecked = _selectedBrandIds.Contains(b.MaThuongHieu);
                                 var count = GetProductCountForBrand(b.TenThuongHieu);
-                                <label class="brand-checkbox-item @(isChecked ? "checked" : "")" @onclick:preventDefault @onclick="() => ToggleBrandSelection(b.MaThuongHieu)">
-                                    <input type="checkbox" checked="@isChecked" />
+                                <div class="brand-checkbox-item @(isChecked ? "checked" : "")" @onclick="() => ToggleBrandSelection(b.MaThuongHieu)">
+                                    <input type="checkbox" checked="@isChecked" style="pointer-events: none;" />
                                     <span class="brand-name">@b.TenThuongHieu</span>
                                     <span class="brand-count-badge @(count > 0 ? "has-products" : "zero")">(@count)</span>
-                                </label>
+                                </div>
                             }
+                        }
+                        else
+                        {
+                            <div style="padding: 12px; text-align: center; color: #94a3b8; font-size: 0.8rem;">
+                                Không có thương hiệu nào
+                            </div>
                         }
                     </div>
                 </div>
@@ -1294,9 +1300,11 @@
         cursor: pointer;
     }
 
-    .brand-filter-wrapper {
+    .brand-filter-wrapper,
+    .brand-filter-popover-wrapper {
         display: flex;
         align-items: center;
+        position: relative !important;
     }
 
     .brand-filter-select {
@@ -1338,6 +1346,8 @@
         gap: 8px;
         transition: all 0.15s ease;
         white-space: nowrap;
+        position: relative;
+        z-index: 1001;
     }
 
     .btn-brand-filter-trigger:hover {
@@ -1378,12 +1388,13 @@
         position: absolute;
         top: calc(100% + 4px);
         left: 0;
-        z-index: 1001;
+        z-index: 1002;
         background: #ffffff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         border-radius: 8px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        width: 260px;
+        box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        width: 280px;
+        min-width: 280px;
         overflow: hidden;
         animation: fadeIn 0.15s ease-out;
     }
@@ -1397,7 +1408,8 @@
         align-items: center;
     }
 
-    .brand-action-link {
+    .brand-action-link,
+    .btn-link-action {
         background: none;
         border: none;
         color: #2563eb;
@@ -1408,7 +1420,8 @@
         border-radius: 3px;
     }
 
-    .brand-action-link:hover {
+    .brand-action-link:hover,
+    .btn-link-action:hover {
         background: #eff6ff;
         text-decoration: underline;
     }

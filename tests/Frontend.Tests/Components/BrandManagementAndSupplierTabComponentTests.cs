@@ -159,4 +159,65 @@ public class BrandManagementAndSupplierTabComponentTests : BunitContext
         // Tab bổ sung nguồn hàng của Admin không được xuất hiện
         cut.Markup.Should().NotContain("QUẢN LÝ & BỔ SUNG NGUỒN HÀNG");
     }
+
+    [Fact(DisplayName = "TS-BRAND-POP-04: Nút chọn thương hiệu click mở dropdown menu trải danh sách và toggle chọn thương hiệu")]
+    public void ProductManagement_BrandFilterDropdown_TogglesAndSelectsBrands()
+    {
+        // Arrange
+        var mockBrands = new List<BrandDto>
+        {
+            new BrandDto { MaThuongHieu = 1, TenThuongHieu = "QF NOIR", XuatXu = "Việt Nam", SoLuongSanPham = 2 },
+            new BrandDto { MaThuongHieu = 2, TenThuongHieu = "Uno", XuatXu = "Việt Nam", SoLuongSanPham = 0 }
+        };
+
+        var mockProducts = new List<ProductListItemDto>
+        {
+            new ProductListItemDto { MaSanPham = 1, TenSanPham = "Áo Thun Noir 1", TenThuongHieu = "QF NOIR", TongTonKho = 10 },
+            new ProductListItemDto { MaSanPham = 2, TenSanPham = "Áo Thun Noir 2", TenThuongHieu = "QF NOIR", TongTonKho = 5 }
+        };
+
+        _mockAdminApi.Setup(x => x.GetBrandsAsync()).ReturnsAsync(mockBrands);
+        _mockAdminApi.Setup(x => x.GetCategoriesAsync()).ReturnsAsync(new List<CategoryDto>());
+        _mockAdminApi.Setup(x => x.GetProductsAsync(It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new PagedResult<ProductListItemDto>
+            {
+                Items = mockProducts,
+                TotalCount = 2,
+                PageNumber = 1,
+                PageSize = 10
+            });
+
+        // Act
+        var cut = Render<ProductManagement>();
+
+        // 1. Ban đầu dropdown menu chưa mở
+        cut.FindAll(".brand-dropdown-menu").Should().BeEmpty();
+
+        // 2. Click nút trigger
+        var triggerBtn = cut.Find(".btn-brand-filter-trigger");
+        triggerBtn.Click();
+
+        // 3. Dropdown menu phải mở và hiển thị danh sách thương hiệu
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find(".brand-dropdown-menu").Should().NotBeNull();
+            cut.Markup.Should().Contain("QF NOIR");
+            cut.Markup.Should().Contain("Uno");
+            cut.FindAll(".brand-checkbox-item").Should().HaveCount(2);
+        });
+
+        // 4. Click chọn thương hiệu Uno
+        var brandItems = cut.FindAll(".brand-checkbox-item");
+        brandItems[1].Click(); // Click vào Uno
+
+        // 5. Đóng dropdown qua overlay
+        var overlay = cut.Find(".brand-dropdown-overlay");
+        overlay.Click();
+
+        // 6. Menu đã đóng
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll(".brand-dropdown-menu").Should().BeEmpty();
+        });
+    }
 }
