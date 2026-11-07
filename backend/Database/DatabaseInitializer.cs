@@ -583,6 +583,63 @@ BEGIN
         FROM ChiTietHoaDon
         WHERE ma_hoa_don = hd.ma_hoa_don
     ) ct;
+END;
+GO
+CREATE OR ALTER FUNCTION dbo.fn_TinhTongChiTieuKhachHang
+(
+    @MaKhachHang INT
+)
+RETURNS DECIMAL(12,2)
+AS
+BEGIN
+    DECLARE @TongChiTieu DECIMAL(12,2) = 0;
+    DECLARE @TongHoanTra DECIMAL(12,2) = 0;
+
+    -- 1. Tổng tiền các hóa đơn khách đã thanh toán thành công
+    SELECT @TongChiTieu = ISNULL(SUM(tong_thanh_toan), 0)
+    FROM HoaDon
+    WHERE ma_khach_hang = @MaKhachHang
+      AND trang_thai = N'Đã hoàn thành';
+
+    -- 2. Tổng số tiền đã hoàn trả cho khách từ các đơn trả hàng thành công (chống trục lợi cày rank VIP)
+    SELECT @TongHoanTra = ISNULL(SUM(dt.so_tien_hoan), 0)
+    FROM DonTraHang dt
+    JOIN HoaDon hd ON dt.ma_hoa_don = hd.ma_hoa_don
+    WHERE hd.ma_khach_hang = @MaKhachHang
+      AND dt.trang_thai IN (N'Đã nhận hàng hoàn', N'Đã hoàn tiền', N'Đã xử lý');
+
+    -- Chi tiêu thuần thực tế = Chi tiêu gộp - Hoàn trả (tối thiểu = 0)
+    RETURN CASE 
+        WHEN (@TongChiTieu - @TongHoanTra) > 0 THEN (@TongChiTieu - @TongHoanTra)
+        ELSE 0 
+    END;
+END;
+GO
+CREATE OR ALTER PROCEDURE dbo.sp_TuDongXetHangThanhVien
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Hạng Vàng: Tổng chi tiêu thuần >= 10.000.000 VNĐ (ma_cap_do = 3)
+    -- Hạng Bạc:  Tổng chi tiêu thuần >= 3.000.000 VNĐ  (ma_cap_do = 2)
+    -- Hạng Thường: Các trường hợp còn lại              (ma_cap_do = 1)
+
+    UPDATE kh
+    SET kh.ma_cap_do = CASE
+        WHEN dbo.fn_TinhTongChiTieuKhachHang(kh.ma_khach_hang) >= 10000000 THEN 3
+        WHEN dbo.fn_TinhTongChiTieuKhachHang(kh.ma_khach_hang) >= 3000000 THEN 2
+        ELSE 1
+    END
+    FROM KhachHang kh
+    WHERE kh.da_xoa = 0;
+
+    SELECT 
+        kh.ma_khach_hang,
+        kh.ten_khach_hang,
+        dbo.fn_TinhTongChiTieuKhachHang(kh.ma_khach_hang) AS tong_chi_tieu,
+        cd.ten_cap_do AS cap_do_moi
+    FROM KhachHang kh
+    JOIN CapDoThanhVien cd ON kh.ma_cap_do = cd.ma_cap_do;
 END;";
     }
 }
