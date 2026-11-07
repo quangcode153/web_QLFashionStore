@@ -962,22 +962,14 @@
                 </div>
 
                 <div style="padding: 18px;">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 14px;">
                         <div>
                             <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">TÊN NHÀ CUNG CẤP / NGUỒN HÀNG (*)</label>
                             <input type="text" class="form-control" placeholder="vd: Tổng Kho Dệt May Phong Phú" @bind="_adminSupplierName" />
                         </div>
                         <div>
-                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">SỐ ĐIỆN THOẠI ĐỐI TÁC (*)</label>
+                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">SỐ ĐIỆN THOẠI LIÊN HỆ ĐỐI TÁC (*)</label>
                             <input type="text" class="form-control" placeholder="vd: 0988776655" @bind="_adminSupplierPhone" />
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">NGƯỜI LIÊN HỆ ĐẠI DIỆN</label>
-                            <input type="text" class="form-control" placeholder="vd: Trần Văn Hùng (GĐ Kinh doanh)" @bind="_adminSupplierContact" />
-                        </div>
-                        <div>
-                            <label style="display: block; font-size: 0.75rem; font-weight: 700; color: #334155; margin-bottom: 4px;">ĐỊA CHỈ TRỤ SỞ / KHO XƯỞNG</label>
-                            <input type="text" class="form-control" placeholder="vd: KCN Tân Bình, P. Tây Thạnh, TP.HCM" @bind="_adminSupplierAddress" />
                         </div>
                     </div>
 
@@ -1007,12 +999,10 @@
                     <table class="wh-table" style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background: #f8fafc; text-align: left; font-size: 0.75rem; color: #64748b;">
-                                <th style="padding: 10px 12px;">MÃ NCC</th>
+                                <th style="padding: 10px 12px; width: 80px;">MÃ NCC</th>
                                 <th style="padding: 10px 12px;">TÊN NHÀ CUNG CẤP / NGUỒN HÀNG</th>
-                                <th style="padding: 10px 12px;">NGƯỜI LIÊN HỆ</th>
-                                <th style="padding: 10px 12px;">ĐIỆN THOẠI</th>
-                                <th style="padding: 10px 12px;">ĐỊA CHỈ</th>
-                                <th style="padding: 10px 12px; text-align: center;">KHẢ DỤNG CHO CHI NHÁNH & THỦ KHO</th>
+                                <th style="padding: 10px 12px; width: 180px;">SỐ ĐIỆN THOẠI ĐỐI TÁC</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 240px;">KHẢ DỤNG CHO CHI NHÁNH & THỦ KHO</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1023,9 +1013,7 @@
                                     <tr style="border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;">
                                         <td style="padding: 10px 12px; font-weight: 700; color: #64748b;">#@s.MaNhaCungCap</td>
                                         <td style="padding: 10px 12px; font-weight: 700; color: #0f172a;">@s.TenNhaCungCap</td>
-                                        <td style="padding: 10px 12px; color: #475569;">@(string.IsNullOrWhiteSpace(s.NguoiLienHe) ? "—" : s.NguoiLienHe)</td>
                                         <td style="padding: 10px 12px; color: #2563eb; font-weight: 600;">@(string.IsNullOrWhiteSpace(s.SoDienThoai) ? "—" : s.SoDienThoai)</td>
-                                        <td style="padding: 10px 12px; color: #475569;">@(string.IsNullOrWhiteSpace(s.DiaChi) ? "—" : s.DiaChi)</td>
                                         <td style="padding: 10px 12px; text-align: center;">
                                             <span style="background: #ecfdf5; color: #059669; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px;">
                                                 <span>✓</span> Sẵn sàng chọn nhập hàng
@@ -1037,7 +1025,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Chưa có nguồn hàng nào trong hệ thống.</td>
+                                    <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8;">Chưa có nguồn hàng nào trong hệ thống.</td>
                                 </tr>
                             }
                         </tbody>
