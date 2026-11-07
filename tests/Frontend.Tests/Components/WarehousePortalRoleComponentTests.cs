@@ -534,6 +534,29 @@ public class WarehousePortalRoleComponentTests : BunitContext
             var outOfStockValue = cut.Find(".kpi-card .text-red");
             outOfStockValue.TextContent.Trim().Should().Be("2", "Kho có 2 biến thể SoLuongTon = 0 thì thẻ hàng cạn phải hiển thị 2");
         });
+
+        // Chuyển sang Tab Kiểm kê để kiểm tra bộ lọc bảng
+        cut.Find("button[data-testid='tab-inventory-btn']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            // Nút chip bộ lọc bảng phải hiển thị Cạn kho (2) thay vì hardcode (0)
+            cut.Markup.Should().Contain("Cạn kho (2)", "Chip bộ lọc bảng kiểm kê phải hiển thị đúng số lượng 2 sản phẩm cạn kho");
+        });
+
+        // Click nút Cạn kho (2) để lọc danh sách
+        var filterChips = cut.FindAll(".status-filters .filter-chip");
+        var outChip = filterChips.FirstOrDefault(c => c.TextContent.Contains("Cạn kho"));
+        outChip.Should().NotBeNull();
+        outChip!.Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var tableSkus = cut.FindAll(".wh-table tbody tr td code.sku-code").Select(e => e.TextContent.Trim()).ToList();
+            tableSkus.Should().Contain("ATA");
+            tableSkus.Should().Contain("ATB");
+            tableSkus.Should().NotContain("ATC", "Biến thể ATC có tồn kho 15 không được hiển thị khi lọc cạn kho trong bảng");
+        });
     }
 
     #endregion
