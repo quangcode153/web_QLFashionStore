@@ -828,6 +828,42 @@ public class StorefrontCatalogComponentTests : BunitContext
         soldElement.TextContent.Should().Contain(expectedText);
     }
 
+    [Fact(DisplayName = "CAT-PRICE-01: Bộ lọc nâng cao hỗ trợ điền trực tiếp và kéo thanh trượt mức giá")]
+    public async Task Catalog_AdvancedPriceFilter_SliderAndDirectInputs_AppliesPriceRange()
+    {
+        // Arrange
+        _mockCatalogApi.Setup(x => x.GetCategoriesAsync()).ReturnsAsync(new List<CategoryDto>());
+        _mockCatalogApi.Setup(x => x.GetBrandsAsync()).ReturnsAsync(new List<BrandDto>());
+        _mockCatalogApi.Setup(x => x.GetProductsAsync(It.IsAny<ProductQueryParameters>()))
+            .ReturnsAsync(new PagedResult<ProductListItemDto>(new List<ProductListItemDto>(), 0, 1, 10));
+
+        var nav = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        nav.NavigateTo("/catalog?category=ao-nam");
+
+        var cut = Render<Catalog>();
+
+        // Act 1: Click mở dropdown Mức giá
+        var priceChip = cut.Find("button.filter-price-chip");
+        priceChip.Click();
+
+        // Assert 1: Modal/Panel giá nâng cao mở ra
+        cut.Find(".filter-price-advanced-menu").Should().NotBeNull();
+        cut.Find(".custom-price-slider").Should().NotBeNull();
+
+        // Act 2: Nhập trực tiếp Min = 150000, Max = 450000
+        var priceInputs = cut.FindAll(".form-control-price");
+        priceInputs[0].Change("150000");
+        priceInputs[1].Change("450000");
+
+        // Act 3: Bấm Áp dụng mức giá
+        var applyBtn = cut.Find(".btn-apply-price-filter");
+        await cut.InvokeAsync(() => applyBtn.Click());
+
+        // Assert 2: Gọi API với MinPrice = 150000 và MaxPrice = 450000
+        _mockCatalogApi.Verify(x => x.GetProductsAsync(It.Is<ProductQueryParameters>(q => 
+            q.MinPrice == 150000 && q.MaxPrice == 450000)), Times.Once);
+    }
+
     #endregion
 }
 

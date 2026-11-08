@@ -359,6 +359,12 @@
                         </select>
                     </div>
 
+                    @if (ActiveDropdown != null)
+                    {
+                        <!-- Lớp nền mờ trên Mobile đóng bộ lọc khi chạm ngoài -->
+                        <div class="mobile-filter-backdrop" @onclick="CloseAllDropdowns"></div>
+                    }
+
                     <div class="dedicated-filter-tags">
                         <span class="filter-lead">Bộ lọc:</span>
 
@@ -373,9 +379,13 @@
                             @if (ActiveDropdown == "cat")
                             {
                                 <div class="filter-dropdown-menu">
+                                    <div class="mobile-sheet-handle"></div>
                                     <div class="dropdown-header-row">
                                         <span class="dropdown-selected-count">Chọn danh mục</span>
-                                        <button type="button" class="dropdown-reset-btn" @onclick="ResetToBranchDefault">Tất cả</button>
+                                        <div class="header-action-group">
+                                            <button type="button" class="dropdown-reset-btn" @onclick="ResetToBranchDefault">Tất cả</button>
+                                            <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
+                                        </div>
                                     </div>
                                     <div class="dropdown-options-list">
                                         @foreach (var opt in GetAvailableCategoryOptions())
@@ -403,9 +413,13 @@
                             @if (ActiveDropdown == "kieu")
                             {
                                 <div class="filter-dropdown-menu">
+                                    <div class="mobile-sheet-handle"></div>
                                     <div class="dropdown-header-row">
                                         <span class="dropdown-selected-count">Đã chọn @_selectedKieuFilters.Count</span>
-                                        <button type="button" class="dropdown-reset-btn" @onclick="ResetKieuFilters">Đặt lại</button>
+                                        <div class="header-action-group">
+                                            <button type="button" class="dropdown-reset-btn" @onclick="ResetKieuFilters">Đặt lại</button>
+                                            <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
+                                        </div>
                                     </div>
                                     <div class="dropdown-options-list">
                                         @foreach (var kieu in GetAvailableKieuOptions())
@@ -431,12 +445,16 @@
                             @if (ActiveDropdown == "brand")
                             {
                                 <div class="filter-dropdown-menu">
+                                    <div class="mobile-sheet-handle"></div>
                                     <div class="dropdown-header-row">
                                         <span class="dropdown-selected-count">Chọn thương hiệu</span>
-                                        @if (Query.BrandId.HasValue)
-                                        {
-                                            <button type="button" class="dropdown-reset-btn" @onclick="() => SelectBrandFilter(null)">Tất cả</button>
-                                        }
+                                        <div class="header-action-group">
+                                            @if (Query.BrandId.HasValue)
+                                            {
+                                                <button type="button" class="dropdown-reset-btn" @onclick="() => SelectBrandFilter(null)">Tất cả</button>
+                                            }
+                                            <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
+                                        </div>
                                     </div>
                                     <div class="dropdown-options-list">
                                         <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(null)">
@@ -457,45 +475,105 @@
                             }
                         </div>
 
-                        <!-- 3. Mức giá (Theo SQL MinPrice / MaxPrice) -->
+                        <!-- 3. Mức giá (Nâng cấp Slider Kéo + Điền Trực Tiếp + Chọn Nhanh) -->
                         <div class="filter-dropdown-wrapper">
                             <button type="button" 
-                                    class="filter-tag-chip @(ActiveDropdown == "price" ? "active-open" : "") @(Query.MinPrice.HasValue || Query.MaxPrice.HasValue ? "has-val" : "")" 
+                                    class="filter-tag-chip filter-price-chip @(ActiveDropdown == "price" ? "active-open" : "") @(Query.MinPrice.HasValue || Query.MaxPrice.HasValue ? "has-val" : "")" 
                                     @onclick='() => ToggleDropdown("price")'>
                                 @GetPriceFilterLabel()
                                 <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
                             @if (ActiveDropdown == "price")
                             {
-                                <div class="filter-dropdown-menu">
+                                <div class="filter-dropdown-menu filter-price-advanced-menu">
+                                    <div class="mobile-sheet-handle"></div>
                                     <div class="dropdown-header-row">
-                                        <span class="dropdown-selected-count">Khoảng giá</span>
-                                        @if (Query.MinPrice.HasValue || Query.MaxPrice.HasValue)
-                                        {
-                                            <button type="button" class="dropdown-reset-btn" @onclick="() => SetPriceFilter(null, null)">Đặt lại</button>
-                                        }
+                                        <span class="dropdown-selected-count font-bold">Lọc theo mức giá</span>
+                                        <div class="header-action-group">
+                                            @if (Query.MinPrice.HasValue || Query.MaxPrice.HasValue || _tempMinPrice.HasValue || _tempMaxPrice.HasValue)
+                                            {
+                                                <button type="button" class="dropdown-reset-btn" @onclick="ResetPriceFilterInputs">Đặt lại</button>
+                                            }
+                                            <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
+                                        </div>
                                     </div>
-                                    <div class="dropdown-options-list">
-                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(null, null)">
-                                            <input type="radio" name="price_range" checked="@(!Query.MinPrice.HasValue && !Query.MaxPrice.HasValue)" />
-                                            <span class="option-label">Tất cả mức giá</span>
-                                        </label>
-                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(null, 200000)">
-                                            <input type="radio" name="price_range" checked="@(Query.MaxPrice == 200000 && !Query.MinPrice.HasValue)" />
-                                            <span class="option-label">Dưới 200.000 ₫</span>
-                                        </label>
-                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(200000, 350000)">
-                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 200000 && Query.MaxPrice == 350000)" />
-                                            <span class="option-label">200.000 ₫ - 350.000 ₫</span>
-                                        </label>
-                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(350000, 500000)">
-                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 350000 && Query.MaxPrice == 500000)" />
-                                            <span class="option-label">350.000 ₫ - 500.000 ₫</span>
-                                        </label>
-                                        <label class="dropdown-option-item" @onclick="() => SetPriceFilter(500000, null)">
-                                            <input type="radio" name="price_range" checked="@(Query.MinPrice == 500000 && !Query.MaxPrice.HasValue)" />
-                                            <span class="option-label">Trên 500.000 ₫</span>
-                                        </label>
+
+                                    <div class="price-slider-content">
+                                        <!-- A. Thanh trượt kéo mức giá trần -->
+                                        <div class="slider-section">
+                                            <div class="slider-label-row">
+                                                <span class="slider-label-title">Kéo chọn mức giá tối đa:</span>
+                                                <span class="slider-current-val font-mono">@(_tempMaxPrice.HasValue ? _tempMaxPrice.Value.ToString("N0") + " ₫" : "Tối đa (1.500k+)")</span>
+                                            </div>
+                                            <input type="range" 
+                                                   min="50000" 
+                                                   max="1500000" 
+                                                   step="25000" 
+                                                   class="custom-price-slider" 
+                                                   value="@(_tempMaxPrice ?? 1500000)" 
+                                                   @oninput="OnPriceSliderInput" />
+                                            <div class="slider-ticks font-mono">
+                                                <span>50k</span>
+                                                <span>500k</span>
+                                                <span>1.000k</span>
+                                                <span>1.500k+</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- B. Ô điền trực tiếp giá Min & Max -->
+                                        <div class="direct-input-section">
+                                            <span class="direct-input-title">Hoặc điền trực tiếp khoảng giá (₫):</span>
+                                            <div class="price-input-duo">
+                                                <div class="price-input-box">
+                                                    <label>Từ</label>
+                                                    <input type="number" 
+                                                           class="form-control-price tabular-nums" 
+                                                           placeholder="0" 
+                                                           min="0"
+                                                           step="10000"
+                                                           value="@_tempMinPrice" 
+                                                           @onchange="OnMinPriceInputChanged" />
+                                                </div>
+                                                <span class="price-separator">-</span>
+                                                <div class="price-input-box">
+                                                    <label>Đến</label>
+                                                    <input type="number" 
+                                                           class="form-control-price tabular-nums" 
+                                                           placeholder="Không giới hạn" 
+                                                           min="0"
+                                                           step="10000"
+                                                           value="@_tempMaxPrice" 
+                                                           @onchange="OnMaxPriceInputChanged" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- C. Mức giá gợi ý 1 chạm nhanh -->
+                                        <div class="preset-price-chips">
+                                            <span class="preset-label">Gợi ý nhanh:</span>
+                                            <div class="preset-chips-list">
+                                                <button type="button" 
+                                                        class="btn-preset-chip @(!_tempMinPrice.HasValue && !_tempMaxPrice.HasValue ? "active" : "")" 
+                                                        @onclick="() => SetQuickPricePreset(null, null)">Tất cả</button>
+                                                <button type="button" 
+                                                        class="btn-preset-chip @(!_tempMinPrice.HasValue && _tempMaxPrice == 200000 ? "active" : "")" 
+                                                        @onclick="() => SetQuickPricePreset(null, 200000)">&lt; 200k</button>
+                                                <button type="button" 
+                                                        class="btn-preset-chip @(_tempMinPrice == 200000 && _tempMaxPrice == 350000 ? "active" : "")" 
+                                                        @onclick="() => SetQuickPricePreset(200000, 350000)">200k - 350k</button>
+                                                <button type="button" 
+                                                        class="btn-preset-chip @(_tempMinPrice == 350000 && _tempMaxPrice == 500000 ? "active" : "")" 
+                                                        @onclick="() => SetQuickPricePreset(350000, 500000)">350k - 500k</button>
+                                                <button type="button" 
+                                                        class="btn-preset-chip @(_tempMinPrice == 500000 && !_tempMaxPrice.HasValue ? "active" : "")" 
+                                                        @onclick="() => SetQuickPricePreset(500000, null)">&gt; 500k</button>
+                                            </div>
+                                        </div>
+
+                                        <!-- D. Nút Áp dụng -->
+                                        <button type="button" class="btn-apply-price-filter" @onclick="ApplyAdvancedPriceFilter">
+                                            ÁP DỤNG MỨC GIÁ
+                                        </button>
                                     </div>
                                 </div>
                             }
@@ -512,6 +590,13 @@
                             @if (ActiveDropdown == "stock")
                             {
                                 <div class="filter-dropdown-menu">
+                                    <div class="mobile-sheet-handle"></div>
+                                    <div class="dropdown-header-row">
+                                        <span class="dropdown-selected-count">Tình trạng tồn kho</span>
+                                        <div class="header-action-group">
+                                            <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
+                                        </div>
+                                    </div>
                                     <div class="dropdown-options-list">
                                         <label class="dropdown-option-item" @onclick="() => SetStockFilter(false)">
                                             <input type="radio" name="stock_filter" checked="@(!_onlyInStock)" />
@@ -1995,10 +2080,80 @@
 
     private string? ActiveDropdown = null;
     private bool _onlyInStock = false;
+    private decimal? _tempMinPrice;
+    private decimal? _tempMaxPrice;
 
     private void ToggleDropdown(string key)
     {
+        if (ActiveDropdown != key && key == "price")
+        {
+            _tempMinPrice = Query.MinPrice;
+            _tempMaxPrice = Query.MaxPrice;
+        }
         ActiveDropdown = (ActiveDropdown == key) ? null : key;
+    }
+
+    private void OnPriceSliderInput(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val))
+        {
+            if (val >= 1500000)
+            {
+                _tempMaxPrice = null;
+            }
+            else
+            {
+                _tempMaxPrice = val;
+            }
+        }
+    }
+
+    private void OnMinPriceInputChanged(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val) && val >= 0)
+        {
+            _tempMinPrice = val;
+        }
+        else
+        {
+            _tempMinPrice = null;
+        }
+    }
+
+    private void OnMaxPriceInputChanged(ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var val) && val >= 0)
+        {
+            _tempMaxPrice = val;
+        }
+        else
+        {
+            _tempMaxPrice = null;
+        }
+    }
+
+    private void SetQuickPricePreset(decimal? min, decimal? max)
+    {
+        _tempMinPrice = min;
+        _tempMaxPrice = max;
+    }
+
+    private void ResetPriceFilterInputs()
+    {
+        _tempMinPrice = null;
+        _tempMaxPrice = null;
+        _ = SetPriceFilter(null, null);
+    }
+
+    private async Task ApplyAdvancedPriceFilter()
+    {
+        if (_tempMinPrice.HasValue && _tempMaxPrice.HasValue && _tempMinPrice.Value > _tempMaxPrice.Value)
+        {
+            Toast.ShowWarning("Khoảng giá không hợp lệ: Giá tối thiểu không được lớn hơn giá tối đa.");
+            return;
+        }
+
+        await SetPriceFilter(_tempMinPrice, _tempMaxPrice);
     }
 
     private void CloseAllDropdowns()

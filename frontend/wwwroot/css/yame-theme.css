@@ -1298,6 +1298,214 @@ code, kbd, samp, pre {
   flex: 1;
   line-height: 1.4;
 }
+
+/* Advance Price Filter Menu */
+.filter-dropdown-menu.filter-price-advanced-menu {
+  min-width: 320px;
+  max-width: 360px;
+}
+
+.header-action-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dropdown-close-sheet-btn {
+  display: none;
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748B;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.dropdown-close-sheet-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.mobile-sheet-handle {
+  display: none;
+}
+
+.mobile-filter-backdrop {
+  display: none;
+}
+
+.price-slider-content {
+  padding: 0.9rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.slider-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.slider-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slider-label-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.slider-current-val {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.custom-price-slider {
+  width: 100%;
+  accent-color: #0F172A;
+  cursor: pointer;
+  height: 6px;
+  margin: 4px 0 2px 0;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #94A3B8;
+}
+
+.direct-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.direct-input-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.price-input-duo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.price-input-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price-input-box label {
+  font-size: 0.7rem;
+  color: #64748B;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.form-control-price {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  outline: none;
+  background: #FFFFFF;
+  color: #0F172A;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-control-price:focus {
+  border-color: #0F172A;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+}
+
+.price-separator {
+  color: #94A3B8;
+  font-weight: 700;
+  margin-top: 14px;
+}
+
+.preset-price-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.preset-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748B;
+}
+
+.preset-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.btn-preset-chip {
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-preset-chip:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.btn-preset-chip.active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #0F172A;
+}
+
+.btn-apply-price-filter {
+  width: 100%;
+  padding: 10px 14px;
+  background: #0F172A;
+  color: #FFFFFF;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background-color 0.2s ease;
+  margin-top: 4px;
+}
+
+.btn-apply-price-filter:hover {
+  background: #1E293B;
+}
+
+.btn-apply-price-filter:active {
+  transform: scale(0.99);
+}
 .dropdown-option-item .option-label.selected-underline {
   text-decoration: underline;
   font-weight: 500;
@@ -4558,18 +4766,91 @@ body:has(#qf-chat-widget-root) .yame-ai-size-floating {
     white-space: nowrap !important;
     margin-left: auto !important;
   }
+  /* Backdrop mờ phía sau trên mobile */
+  .mobile-filter-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.45) !important;
+    backdrop-filter: blur(2px) !important;
+    -webkit-backdrop-filter: blur(2px) !important;
+    z-index: 1200 !important;
+    animation: fadeInBackdrop 0.2s ease !important;
+  }
+  @keyframes fadeInBackdrop {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Bottom sheet trên mobile: Không bao giờ bị cắt khung bởi overflow của parent! */
   .filter-dropdown-menu {
-    min-width: 200px !important;
-    max-width: 88vw !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    max-height: 82vh !important;
+    background: #FFFFFF !important;
+    border-radius: 20px 20px 0 0 !important;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.3) !important;
+    border: none !important;
+    border-top: 1px solid #E2E8F0 !important;
+    z-index: 1250 !important;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    animation: slideUpMobileFilter 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
+  @keyframes slideUpMobileFilter {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .mobile-sheet-handle {
+    display: block !important;
+    width: 36px !important;
+    height: 4px !important;
+    border-radius: 9999px !important;
+    background: #CBD5E1 !important;
+    margin: 10px auto 4px auto !important;
+  }
+
+  .dropdown-close-sheet-btn {
+    display: inline-flex !important;
+  }
+
   .dropdown-header-row {
-    padding: 0.5rem 0.75rem !important;
-    font-size: 0.78rem !important;
+    padding: 0.65rem 1rem !important;
+    font-size: 0.88rem !important;
+    background: #FFFFFF !important;
   }
+
   .dropdown-option-item {
-    padding: 0.4rem 0.75rem !important;
-    font-size: 0.78rem !important;
+    padding: 0.65rem 1rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  .filter-dropdown-menu.filter-price-advanced-menu {
+    max-width: 100vw !important;
+  }
+
+  .price-slider-content {
+    padding: 0.85rem 1rem !important;
+    gap: 0.85rem !important;
+  }
+
+  .btn-apply-price-filter {
+    padding: 12px 14px !important;
+    font-size: 0.88rem !important;
   }
 
   /* Active Horizontal Chips on mobile: Scrollable row with no layout break */
