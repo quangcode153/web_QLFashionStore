@@ -147,9 +147,11 @@ public class OrderRepository : IOrderRepository
     public async Task UpdateOrderShippingAddressAsync(int orderId, string address)
     {
         using var connection = _connectionFactory.CreateConnection();
-        await connection.ExecuteAsync(
-            "UPDATE HoaDon SET dia_chi_giao_hang = @address WHERE ma_hoa_don = @orderId",
-            new { address, orderId });
+        var isPos = !string.IsNullOrEmpty(address) && address.Contains("[POS-", StringComparison.OrdinalIgnoreCase);
+        var sql = isPos
+            ? "UPDATE HoaDon SET dia_chi_giao_hang = @address, loai_don_hang = 'TAI_QUAY' WHERE ma_hoa_don = @orderId"
+            : "UPDATE HoaDon SET dia_chi_giao_hang = @address WHERE ma_hoa_don = @orderId";
+        await connection.ExecuteAsync(sql, new { address, orderId });
     }
 
     public async Task<string?> GetOrderShippingAddressAsync(int orderId)
