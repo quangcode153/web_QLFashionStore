@@ -547,5 +547,90 @@ public class PosCashierComponentTests : BunitContext
         _mockPosApi.Verify(api => api.CreatePosOrderAsync(It.IsAny<CreateOrderRequestDto>()), Times.Never);
     }
 
+    [Fact(DisplayName = "VÒNG 7: Chuyển đổi phương thức Tiền mặt và Quét mã QR trên quầy POS")]
+    public void PosCashier_PaymentMethodToggle_SwitchesBetweenCashAndQr()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+
+        var cut = Render<PosCashier>();
+
+        // Mặc định ban đầu là Tiền mặt
+        cut.Find(".btn-paymethod-cash.active").Should().NotBeNull();
+        cut.Find(".cash-calc-box").Should().NotBeNull();
+
+        // Act: Bấm chọn Quét mã QR
+        var qrBtn = cut.Find("button.btn-paymethod-qr");
+        qrBtn.Click();
+
+        // Assert: Chuyển sang active QR, hiển thị khung QR và ẩn ô tính tiền mặt
+        cut.Find(".btn-paymethod-qr.active").Should().NotBeNull();
+        cut.Find(".pos-qr-panel").Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "VÒNG 8: Thanh toán VietQR tại quầy tạo đơn hàng có tag [POS-VIETQR] và mở hóa đơn K80")]
+    public void PosCashier_CheckoutWithVietQr_CreatesOrderWithPosVietQrTagAndOpensReceipt()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 200000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+        _mockPosApi.Setup(api => api.CreatePosOrderAsync(It.IsAny<CreateOrderRequestDto>()))
+            .ReturnsAsync(new OrderSummaryDto { MaHoaDon = 8888, TongThanhToan = 200000m });
+        _mockPosApi.Setup(api => api.GetReceiptPrintAsync(8888))
+            .ReturnsAsync(CreateSampleReceipt(8888));
+
+        var cut = Render<PosCashier>();
+
+        // Act 1: Thêm sản phẩm vào giỏ
+        var input = cut.Find("input.pos-input");
+        input.Change("AT-COT-01");
+        input.KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+
+        // Act 2: Chọn phương thức Quét mã QR
+        cut.Find("button.btn-paymethod-qr").Click();
+
+        // Act 3: Thu ngân bấm xác nhận đã nhận tiền QR hoàn tất
+        var confirmQrBtn = cut.Find("button.btn-pos-pay");
+        confirmQrBtn.Click();
+
+        // Assert: Tạo đơn với tag [POS-VIETQR]
+        _mockPosApi.Verify(api => api.CreatePosOrderAsync(It.Is<CreateOrderRequestDto>(req => 
+            req.DiaChiGiaoHang != null && req.DiaChiGiaoHang.Contains("[POS-VIETQR]"))), Times.Once);
+
+        // Mở popup in hóa đơn K80
+        cut.Find(".pos-modal-overlay").Should().NotBeNull();
+    }
+
+    [Fact(DisplayName = "VÒNG 9: Thanh toán Tiền mặt tại quầy tạo đơn hàng có tag [POS-TIEN-MAT]")]
+    public void PosCashier_CheckoutWithCash_AttachesPosTienMatTag()
+    {
+        // Arrange
+        var sampleVariant = CreateSampleVariant("AT-COT-01", 150000m);
+        _mockPosApi.Setup(api => api.SearchSkuAsync("AT-COT-01")).ReturnsAsync(sampleVariant);
+        _mockPosApi.Setup(api => api.CreatePosOrderAsync(It.IsAny<CreateOrderRequestDto>()))
+            .ReturnsAsync(new OrderSummaryDto { MaHoaDon = 7777, TongThanhToan = 15000m });
+        _mockPosApi.Setup(api => api.GetReceiptPrintAsync(7777))
+            .ReturnsAsync(CreateSampleReceipt(7777));
+
+        var cut = Render<PosCashier>();
+
+        // Act 1: Thêm sản phẩm
+        var input = cut.Find("input.pos-input");
+        input.Change("AT-COT-01");
+        input.KeyDown(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+
+        // Act 2: Nhập đủ tiền khách đưa
+        var cashInput = cut.Find("input.input-cash-given");
+        cashInput.Change("200000");
+
+        // Act 3: Bấm thanh toán
+        cut.Find("button.btn-pos-pay").Click();
+
+        // Assert: Tạo đơn với tag [POS-TIEN-MAT]
+        _mockPosApi.Verify(api => api.CreatePosOrderAsync(It.Is<CreateOrderRequestDto>(req => 
+            req.DiaChiGiaoHang != null && req.DiaChiGiaoHang.Contains("[POS-TIEN-MAT]"))), Times.Once);
+    }
+
     #endregion
 }

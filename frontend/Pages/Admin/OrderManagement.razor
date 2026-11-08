@@ -368,6 +368,24 @@
                                         <span class="channel-badge pos-channel" title="Đơn thanh toán quầy POS do nhân viên hỗ trợ">
                                             POS &bull; @o.NguoiLapDon
                                         </span>
+                                        @if (o.DiaChiGiaoHang?.Contains("VIETQR") == true)
+                                        {
+                                            <div style="font-size: 0.72rem; color: #0284c7; font-weight: 700; margin-top: 3px;" title="Thanh toán chuyển khoản VietQR tại quầy">
+                                                🔷 VietQR (Chuyển khoản)
+                                            </div>
+                                        }
+                                        else if (o.DiaChiGiaoHang?.Contains("MOMO") == true)
+                                        {
+                                            <div style="font-size: 0.72rem; color: #a21caf; font-weight: 700; margin-top: 3px;" title="Thanh toán qua ví MoMo tại quầy">
+                                                🟣 MoMo (Quét ví)
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div style="font-size: 0.72rem; color: #16a34a; font-weight: 700; margin-top: 3px;" title="Thanh toán tiền mặt tại quầy">
+                                                💵 Tiền mặt
+                                            </div>
+                                        }
                                     }
                                     else
                                     {
@@ -682,7 +700,25 @@
                         <div class="summary-box delivery-address-box" style="grid-column: 1 / -1; background: #f8fafc; border-left: 4px solid #2563eb; padding: 12px 16px;">
                             <span class="box-label">Địa chỉ nhận hàng & Phương thức thanh toán:</span>
                             <strong class="box-val text-dark" style="display: block; margin: 4px 0 6px 0; font-size: 0.95rem;">@_selectedOrder.DiaChiGiaoHang</strong>
-                            @if (_selectedOrder.DiaChiGiaoHang.Contains("MOMO"))
+                            @if (_selectedOrder.DiaChiGiaoHang.Contains("POS-MOMO") || (_selectedOrder.DiaChiGiaoHang.Contains("MOMO") && _selectedOrder.LoaiDonHang == "TAI_QUAY"))
+                            {
+                                <span class="badge" style="background: #fdf4ff; color: #a21caf; border: 1px solid #f0abfc; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">
+                                    🟣 VÍ MOMO - ĐÃ QUÉT VÍ TẠI QUẦY (ĐÃ THU ĐỦ: @_selectedOrder.TongThanhToan.ToString("N0") đ)
+                                </span>
+                            }
+                            else if (_selectedOrder.DiaChiGiaoHang.Contains("POS-VIETQR") || (_selectedOrder.DiaChiGiaoHang.Contains("VIETQR") && _selectedOrder.LoaiDonHang == "TAI_QUAY"))
+                            {
+                                <span class="badge" style="background: #f0f9ff; color: #0284c7; border: 1px solid #7dd3fc; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">
+                                    🔷 VIETQR MBBANK - ĐÃ CHUYỂN KHOẢN TẠI QUẦY (ĐÃ THU ĐỦ: @_selectedOrder.TongThanhToan.ToString("N0") đ)
+                                </span>
+                            }
+                            else if (_selectedOrder.DiaChiGiaoHang.Contains("POS-TIEN-MAT") || _selectedOrder.LoaiDonHang == "TAI_QUAY" || (!string.IsNullOrEmpty(_selectedOrder.NguoiLapDon) && _selectedOrder.NguoiLapDon != "Đặt online qua Web"))
+                            {
+                                <span class="badge" style="background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">
+                                    💵 TIỀN MẶT - THU TIỀN TẠI QUẦY (ĐÃ THU ĐỦ: @_selectedOrder.TongThanhToan.ToString("N0") đ)
+                                </span>
+                            }
+                            else if (_selectedOrder.DiaChiGiaoHang.Contains("MOMO"))
                             {
                                 <span class="badge" style="background: #fdf4ff; color: #a21caf; border: 1px solid #f0abfc; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 0.82rem;">
                                     🟣 VÍ MOMO - ĐÃ THANH TOÁN (SHIPPER THU HỘ: 0Đ)

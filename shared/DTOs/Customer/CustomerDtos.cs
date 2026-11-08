@@ -51,7 +51,11 @@ public class CustomerOrderHistoryItemDto
         {
             if (string.Equals(LoaiDonHang, "TAI_QUAY", StringComparison.OrdinalIgnoreCase))
             {
-                return "Tại quầy (POS)";
+                if (DiaChiGiaoHang?.Contains("VIETQR", StringComparison.OrdinalIgnoreCase) == true)
+                    return "Tại quầy (VietQR)";
+                if (DiaChiGiaoHang?.Contains("MOMO", StringComparison.OrdinalIgnoreCase) == true)
+                    return "Tại quầy (MoMo)";
+                return "Tại quầy (Tiền mặt)";
             }
             if (string.IsNullOrEmpty(DiaChiGiaoHang))
             {

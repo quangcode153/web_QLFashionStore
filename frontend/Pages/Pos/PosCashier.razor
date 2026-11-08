@@ -282,41 +282,96 @@
                 <span class="grand-total-val">@GrandTotal.ToString("N0") đ</span>
             </div>
 
-            <!-- Khối Tiền Khách Đưa & Tiền Thừa Linh Hoạt -->
-            <div class="cash-calc-box">
-                <div class="cash-input-row">
-                    <div class="cash-label-group">
-                        <label for="cashGiven">Khách đưa (VNĐ):</label>
-                        <button type="button" class="btn-exact-cash" @onclick="() => SetQuickCash(GrandTotal)" title="Gán khách đưa đúng số tiền cần thanh toán">
-                            ✓ Đủ tiền
+            <!-- Bộ Chọn Phương Thức Thanh Toán Tại Quầy POS -->
+            <div class="pos-payment-methods">
+                <button type="button" 
+                        class="btn-paymethod btn-paymethod-cash @(_selectedPaymentMethod == "CASH" ? "active" : "")" 
+                        @onclick='() => SetPaymentMethod("CASH")'
+                        title="Thanh toán tiền mặt truyền thống">
+                    <span>💵 Tiền mặt</span>
+                </button>
+                <button type="button" 
+                        class="btn-paymethod btn-paymethod-qr @(_selectedPaymentMethod == "QR" ? "active" : "")" 
+                        @onclick='() => SetPaymentMethod("QR")'
+                        title="Khách quét mã chuyển khoản QR">
+                    <span>📲 Quét mã QR</span>
+                </button>
+            </div>
+
+            @if (_selectedPaymentMethod == "CASH")
+            {
+                <!-- Khối Tiền Khách Đưa & Tiền Thừa Linh Hoạt -->
+                <div class="cash-calc-box">
+                    <div class="cash-input-row">
+                        <div class="cash-label-group">
+                            <label for="cashGiven">Khách đưa (VNĐ):</label>
+                            <button type="button" class="btn-exact-cash" @onclick="() => SetQuickCash(GrandTotal)" title="Gán khách đưa đúng số tiền cần thanh toán">
+                                ✓ Đủ tiền
+                            </button>
+                        </div>
+                        <div class="cash-input-wrapper">
+                            <input type="number" 
+                                   id="cashGiven"
+                                   class="pos-input input-cash-given tabular-nums @(_showCashWarning ? "cash-input-error" : "")" 
+                                   placeholder="Nhập số tiền..." 
+                                   value="@_cashGivenInput" 
+                                   @oninput="OnCashGivenInput"
+                                   @onchange="OnCashGivenChanged" />
+                            @if (!string.IsNullOrWhiteSpace(_cashGivenInput))
+                            {
+                                <button type="button" class="btn-clear-cash" @onclick='() => { _cashGivenInput = string.Empty; _showCashWarning = false; }' title="Xóa nhập lại">×</button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="change-due-row">
+                        <span class="change-title">Tiền thừa trả khách:</span>
+                        <span class="pos-change-amount tabular-nums @(ChangeDue > 0 ? "has-change" : "")">@ChangeDue.ToString("N0") đ</span>
+                    </div>
+                    @if (CashGiven > 0 && CashGiven < GrandTotal)
+                    {
+                        <div class="cash-short-warning tabular-nums">
+                            (Còn thiếu: @((GrandTotal - CashGiven).ToString("N0")) đ)
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <!-- Khối Hiển Thị Mã QR Hướng Về Khách Hàng -->
+                <div class="pos-qr-panel">
+                    <div class="qr-method-tabs">
+                        <button type="button" 
+                                class="btn-qr-subtab @(_qrChannel == "VIETQR" ? "active" : "")" 
+                                @onclick='() => SetQrChannel("VIETQR")'>
+                            <span>🔷 VietQR MBBank</span>
+                        </button>
+                        <button type="button" 
+                                class="btn-qr-subtab @(_qrChannel == "MOMO" ? "active" : "")" 
+                                @onclick='() => SetQrChannel("MOMO")'>
+                            <span>🟣 Ví MoMo</span>
                         </button>
                     </div>
-                    <div class="cash-input-wrapper">
-                        <input type="number" 
-                               id="cashGiven"
-                               class="pos-input input-cash-given tabular-nums @(_showCashWarning ? "cash-input-error" : "")" 
-                               placeholder="Nhập số tiền..." 
-                               value="@_cashGivenInput" 
-                               @oninput="OnCashGivenInput"
-                               @onchange="OnCashGivenChanged" />
-                        @if (!string.IsNullOrWhiteSpace(_cashGivenInput))
+
+                    <div class="qr-code-box text-center">
+                        @if (GrandTotal > 0)
                         {
-                            <button type="button" class="btn-clear-cash" @onclick='() => { _cashGivenInput = string.Empty; _showCashWarning = false; }' title="Xóa nhập lại">×</button>
+                            <div class="qr-image-wrapper">
+                                <img src="@GetQrImageUrl()" alt="Mã QR thanh toán quầy" class="pos-qr-img" />
+                            </div>
+                            <div class="qr-meta-info">
+                                <div class="qr-amount-pill tabular-nums">@GrandTotal.ToString("N0") đ</div>
+                                <div class="qr-transfer-memo">Nội dung: <strong>@GetQrTransferContent()</strong></div>
+                                <div class="qr-account-info">@GetQrAccountInfo()</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted py-3" style="font-size: 0.85rem;">Vui lòng thêm sản phẩm vào đơn để tạo mã QR</div>
                         }
                     </div>
                 </div>
-
-                <div class="change-due-row">
-                    <span class="change-title">Tiền thừa trả khách:</span>
-                    <span class="pos-change-amount tabular-nums @(ChangeDue > 0 ? "has-change" : "")">@ChangeDue.ToString("N0") đ</span>
-                </div>
-                @if (CashGiven > 0 && CashGiven < GrandTotal)
-                {
-                    <div class="cash-short-warning tabular-nums">
-                        (Còn thiếu: @((GrandTotal - CashGiven).ToString("N0")) đ)
-                    </div>
-                }
-            </div>
+            }
 
             <!-- Nút Hành Động Thanh Toán -->
             <button class="btn btn-primary btn-block btn-pos-pay" 
@@ -325,6 +380,10 @@
                 @if (_isProcessingPayment)
                 {
                     <span>ĐANG XỬ LÝ...</span>
+                }
+                else if (_selectedPaymentMethod == "QR")
+                {
+                    <span>✅ ĐÃ NHẬN TIỀN QR & IN HÓA ĐƠN</span>
                 }
                 else
                 {
@@ -339,6 +398,7 @@
 <PosPrintModal IsVisible="@_showPrintModal" 
                Receipt="@_activeReceipt" 
                CashGiven="@CashGiven" 
+               PhuongThucThanhToan="@(_selectedPaymentMethod == "QR" ? _qrChannel : "TIEN_MAT")"
                OnClose="ClosePrintModal" />
 
 <!-- Modal Nhập Hàng Trả Tại Quầy (POS Return F3) -->
@@ -913,6 +973,106 @@
         color: #111827;
     }
 
+    .pos-payment-methods {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin: 10px 0 8px 0;
+    }
+
+    .btn-paymethod {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 7px 10px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        border-radius: 6px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #4b5563;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-paymethod:hover {
+        background: #f3f4f6;
+        color: #111827;
+    }
+
+    .btn-paymethod.active {
+        background: #111827;
+        color: #ffffff;
+        border-color: #111827;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .pos-qr-panel {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 10px;
+        margin: 8px 0 10px 0;
+    }
+
+    .qr-method-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .btn-qr-subtab {
+        padding: 5px 8px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        background: #ffffff;
+        color: #64748b;
+        cursor: pointer;
+    }
+
+    .btn-qr-subtab.active {
+        background: #0284c7;
+        color: #ffffff;
+        border-color: #0284c7;
+    }
+
+    .qr-code-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .pos-qr-img {
+        width: 140px;
+        height: 140px;
+        object-fit: contain;
+        background: #ffffff;
+        padding: 4px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+    }
+
+    .qr-amount-pill {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0284c7;
+    }
+
+    .qr-transfer-memo {
+        font-size: 0.75rem;
+        color: #334155;
+    }
+
+    .qr-account-info {
+        font-size: 0.7rem;
+        color: #64748b;
+    }
+
     .cash-calc-box {
         background: #f9fafb;
         border: 1px solid #e5e7eb;
@@ -1448,6 +1608,48 @@
     private string _customerPhone = string.Empty;
     private string _cashGivenInput = string.Empty;
     private decimal CashGiven => decimal.TryParse(_cashGivenInput, out var val) ? val : 0;
+    private string _selectedPaymentMethod = "CASH";
+    private string _qrChannel = "VIETQR";
+
+    private void SetPaymentMethod(string method)
+    {
+        _selectedPaymentMethod = method;
+        _showCashWarning = false;
+    }
+
+    private void SetQrChannel(string channel)
+    {
+        _qrChannel = channel;
+    }
+
+    private string GetQrImageUrl()
+    {
+        var amountStr = GrandTotal.ToString("0");
+        var memo = GetQrTransferContent();
+        if (_qrChannel == "MOMO")
+        {
+            var rawMomo = $"2|99|0869161050|QF NOIR FASHION||0|0|{amountStr}|{memo}|transfer_myqr";
+            return $"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={Uri.EscapeDataString(rawMomo)}";
+        }
+        else
+        {
+            return $"https://api.vietqr.io/image/970422-0869161050-print.png?amount={amountStr}&addInfo={Uri.EscapeDataString(memo)}&accountName={Uri.EscapeDataString("QF NOIR FASHION")}";
+        }
+    }
+
+    private string GetQrTransferContent()
+    {
+        return $"POS CN{_cashierBranchId} {DateTime.Now:HHmmss}";
+    }
+
+    private string GetQrAccountInfo()
+    {
+        if (_qrChannel == "MOMO")
+        {
+            return "Ví MoMo: 0869161050 - QF NOIR FASHION";
+        }
+        return "MBBank: 0869161050 - QF NOIR FASHION";
+    }
 
     private List<ProductListItemDto> _fastSaleProducts = new();
     private List<PosCartLineItem> _cartItems = new();
@@ -1861,25 +2063,40 @@
     {
         if (_cartItems.Count == 0) return;
 
-        if (CashGiven <= 0)
+        if (_selectedPaymentMethod == "CASH")
         {
-            _showCashWarning = true;
-            Toast.ShowWarning("Vui lòng nhập số tiền khách đưa hoặc bấm nút '✓ Đủ tiền' trước khi thanh toán.");
-            return;
-        }
+            if (CashGiven <= 0)
+            {
+                _showCashWarning = true;
+                Toast.ShowWarning("Vui lòng nhập số tiền khách đưa hoặc bấm nút '✓ Đủ tiền' trước khi thanh toán.");
+                return;
+            }
 
-        if (CashGiven < GrandTotal)
-        {
-            _showCashWarning = true;
-            var missing = GrandTotal - CashGiven;
-            Toast.ShowWarning($"Số tiền khách đưa ({CashGiven:N0} đ) chưa đủ để thanh toán ({GrandTotal:N0} đ). Còn thiếu: {missing:N0} đ.");
-            return;
+            if (CashGiven < GrandTotal)
+            {
+                _showCashWarning = true;
+                var missing = GrandTotal - CashGiven;
+                Toast.ShowWarning($"Số tiền khách đưa ({CashGiven:N0} đ) chưa đủ để thanh toán ({GrandTotal:N0} đ). Còn thiếu: {missing:N0} đ.");
+                return;
+            }
         }
 
         _showCashWarning = false;
         _isProcessingPayment = true;
         try
         {
+            var branchName = _cashierBranchName ?? "Chi nhánh 1";
+            string diaChiGiaoHang;
+            if (_selectedPaymentMethod == "QR")
+            {
+                var ptttName = _qrChannel == "MOMO" ? "[POS-MOMO] Quét ví MoMo tại quầy" : "[POS-VIETQR] Chuyển khoản VietQR tại quầy";
+                diaChiGiaoHang = $"{ptttName} - {branchName}";
+            }
+            else
+            {
+                diaChiGiaoHang = $"[POS-TIEN-MAT] Thanh toán tiền mặt tại quầy - {branchName}";
+            }
+
             var orderReq = new CreateOrderRequestDto
             {
                 MaKhachHang = _currentCustomer?.MaKhachHang,
@@ -1887,6 +2104,7 @@
                 MaChiNhanh = _cashierBranchId > 0 ? _cashierBranchId : 1, // Chi nhánh của thu ngân
                 MaGiamGia = null,
                 TrangThai = "Đã hoàn thành", // Khách thanh toán đủ tại quầy -> tự động hoàn tất đơn
+                DiaChiGiaoHang = diaChiGiaoHang,
                 Items = _cartItems.Select(x => new CreateOrderItemDto
                 {
                     MaBienThe = x.MaBienThe,
@@ -1909,6 +2127,7 @@
                     TienGiamGia = DiscountAmount,
                     TongThanhToan = GrandTotal,
                     TrangThai = "Đã thanh toán",
+                    PhuongThucThanhToan = _selectedPaymentMethod == "QR" ? _qrChannel : "TIEN_MAT",
                     Items = _cartItems.Select(x => new ReceiptItemDto
                     {
                         TenSanPham = x.TenSanPham,
@@ -1919,6 +2138,11 @@
                         ThanhTien = x.ThanhTien
                     }).ToList()
                 };
+
+                if (receipt != null)
+                {
+                    receipt.PhuongThucThanhToan = _selectedPaymentMethod == "QR" ? _qrChannel : "TIEN_MAT";
+                }
 
                 _showPrintModal = true;
                 Toast.ShowSuccess($"Tạo đơn hàng #{orderRes.MaHoaDon} thành công!");
@@ -1947,6 +2171,7 @@
         _currentCustomer = null;
         _cashGivenInput = string.Empty;
         _showCashWarning = false;
+        _selectedPaymentMethod = "CASH";
         _activeMobileTab = "products";
     }
 

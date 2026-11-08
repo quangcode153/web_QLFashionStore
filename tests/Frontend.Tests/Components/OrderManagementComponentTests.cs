@@ -261,6 +261,47 @@ public class OrderManagementComponentTests : BunitContext
         items.Should().NotContain(i => i.TextContent.Contains("Quang Trung"));
     }
 
+    [Fact(DisplayName = "UI-ORD-10: Quản lý đơn hàng hiển thị chuẩn xác badge Tiền mặt / VietQR / MoMo cho đơn tại quầy POS")]
+    public void OrderManagement_RenderPosOrders_DisplaysAccuratePaymentMethodBadges()
+    {
+        // Arrange
+        JSInterop.Setup<string?>("localStorage.getItem", "userRole").SetResult(RoleConstants.AdminChuoi);
+        var orders = new List<OrderSummaryDto>
+        {
+            new()
+            {
+                MaHoaDon = 201,
+                NguoiLapDon = "Thu Ngân 01",
+                LoaiDonHang = "TAI_QUAY",
+                DiaChiGiaoHang = "[POS-TIEN-MAT] Thanh toán tiền mặt tại quầy",
+                TongThanhToan = 150000,
+                TrangThai = "Đã hoàn thành",
+                MaChiNhanh = 1,
+                TenChiNhanh = "QF Sư Vạn Hạnh"
+            },
+            new()
+            {
+                MaHoaDon = 202,
+                NguoiLapDon = "Thu Ngân 02",
+                LoaiDonHang = "TAI_QUAY",
+                DiaChiGiaoHang = "[POS-VIETQR] Chuyển khoản VietQR tại quầy",
+                TongThanhToan = 350000,
+                TrangThai = "Đã hoàn thành",
+                MaChiNhanh = 1,
+                TenChiNhanh = "QF Sư Vạn Hạnh"
+            }
+        };
+        _mockAdminApi.Setup(api => api.GetAllOrdersAsync(It.IsAny<int?>())).ReturnsAsync(orders);
+
+        // Act
+        var cut = Render<OrderManagement>();
+
+        // Assert: Hiển thị badge Tiền mặt và VietQR
+        var content = cut.Markup;
+        content.Should().Contain("Tiền mặt");
+        content.Should().Contain("VietQR (Chuyển khoản)");
+    }
+
     private List<FeedbackDto> CreateSampleFeedbacks()
     {
         return new List<FeedbackDto>

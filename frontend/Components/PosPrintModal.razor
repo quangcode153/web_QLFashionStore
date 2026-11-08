@@ -90,15 +90,33 @@
                         <span>TỔNG THANH TOÁN:</span>
                         <span class="total-amount">@Receipt.TongThanhToan.ToString("N0") đ</span>
                     </div>
-                    @if (CashGiven > 0)
+                    @if (PhuongThucThanhToan == "VIETQR" || PhuongThucThanhToan == "MOMO" || Receipt.PhuongThucThanhToan == "VIETQR" || Receipt.PhuongThucThanhToan == "MOMO")
                     {
+                        <div class="summary-row receipt-payment-method">
+                            <span>Hình thức:</span>
+                            <span class="font-bold">@(PhuongThucThanhToan == "VIETQR" || Receipt.PhuongThucThanhToan == "VIETQR" ? "Chuyển khoản VietQR" : "Ví điện tử MoMo")</span>
+                        </div>
                         <div class="summary-row">
+                            <span>Trạng thái:</span>
+                            <span class="font-bold" style="color: #16a34a;">Đã thanh toán (Thu hộ: 0đ)</span>
+                        </div>
+                    }
+                    else if (CashGiven > 0)
+                    {
+                        <div class="summary-row receipt-cash-given">
                             <span>Tiền khách đưa:</span>
                             <span>@CashGiven.ToString("N0") đ</span>
                         </div>
-                        <div class="summary-row">
+                        <div class="summary-row receipt-change-due">
                             <span>Tiền thối lại:</span>
                             <span>@((CashGiven >= Receipt.TongThanhToan ? CashGiven - Receipt.TongThanhToan : 0).ToString("N0")) đ</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="summary-row receipt-payment-method">
+                            <span>Hình thức:</span>
+                            <span class="font-bold">Tiền mặt tại quầy</span>
                         </div>
                     }
                 </div>
@@ -360,6 +378,7 @@
     [Parameter] public bool IsVisible { get; set; }
     [Parameter] public ReceiptPrintDto? Receipt { get; set; }
     [Parameter] public decimal CashGiven { get; set; }
+    [Parameter] public string PhuongThucThanhToan { get; set; } = "TIEN_MAT";
     [Parameter] public EventCallback OnClose { get; set; }
 
     private async Task PrintReceipt()

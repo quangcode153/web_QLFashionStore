@@ -74,6 +74,7 @@ public class ReceiptPrintDto
     public decimal TienGiamGia { get; set; }
     public decimal TongThanhToan { get; set; }
     public string TrangThai { get; set; } = string.Empty;
+    public string PhuongThucThanhToan { get; set; } = "TIEN_MAT";
     public List<ReceiptItemDto> Items { get; set; } = new();
 }
 
