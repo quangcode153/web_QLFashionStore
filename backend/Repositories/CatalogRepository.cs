@@ -168,7 +168,12 @@ public class CatalogRepository : ICatalogRepository
             }
         }
 
-        if (query.BrandId.HasValue)
+        if (query.BrandIds != null && query.BrandIds.Any())
+        {
+            whereConditions.Add("sp.ma_thuong_hieu IN @BrandIds");
+            dynamicParams.Add("@BrandIds", query.BrandIds);
+        }
+        else if (query.BrandId.HasValue)
         {
             whereConditions.Add("sp.ma_thuong_hieu = @BrandId");
             dynamicParams.Add("@BrandId", query.BrandId.Value);

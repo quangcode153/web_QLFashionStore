@@ -137,6 +137,7 @@ public class CatalogService : ICatalogService
             Search = query.Search,
             CategoryId = query.CategoryId,
             BrandId = query.BrandId,
+            BrandIds = query.BrandIds,
             MinPrice = query.MinPrice,
             MaxPrice = query.MaxPrice,
             SortBy = query.SortBy,

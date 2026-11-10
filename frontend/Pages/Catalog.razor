@@ -306,15 +306,16 @@
                         <h4 class="filter-group-title">Thương Hiệu</h4>
                         <div class="filter-options">
                             <button type="button" 
-                                    class="filter-chip @(!Query.BrandId.HasValue ? "active" : "")" 
-                                    @onclick="() => SelectBrand(null)">
+                                    class="filter-chip @(!_selectedBrandIds.Any() && !Query.BrandId.HasValue ? "active" : "")" 
+                                    @onclick="ClearBrandFilters">
                                 Tất cả
                             </button>
                             @foreach (var brand in AvailableBrandsForCustomer)
                             {
+                                var isBrandActive = _selectedBrandIds.Contains(brand.MaThuongHieu) || Query.BrandId == brand.MaThuongHieu;
                                 <button type="button" 
-                                        class="filter-chip @(Query.BrandId == brand.MaThuongHieu ? "active" : "")" 
-                                        @onclick="() => SelectBrand(brand.MaThuongHieu)">
+                                        class="filter-chip @(isBrandActive ? "active" : "")" 
+                                        @onclick="() => ToggleSidebarBrand(brand.MaThuongHieu)">
                                     @brand.TenThuongHieu
                                 </button>
                             }
@@ -407,7 +408,7 @@
                             <button type="button" 
                                     class="filter-tag-chip @(ActiveDropdown == "kieu" ? "active-open" : "") @(_selectedKieuFilters.Any() ? "has-val" : "")" 
                                     @onclick='() => ToggleDropdown("kieu")'>
-                                Kiểu sản phẩm
+                                @GetKieuFilterChipLabel()
                                 <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
                             @if (ActiveDropdown == "kieu")
@@ -434,12 +435,12 @@
                             }
                         </div>
 
-                        <!-- 2. Thương hiệu (Từ CSDL) -->
+                        <!-- 2. Thương hiệu (Từ CSDL - Chọn một hoặc nhiều thương hiệu đồng thời) -->
                         <div class="filter-dropdown-wrapper">
                             <button type="button" 
-                                    class="filter-tag-chip @(ActiveDropdown == "brand" ? "active-open" : "") @(Query.BrandId.HasValue ? "has-val" : "")" 
+                                    class="filter-tag-chip @(ActiveDropdown == "brand" ? "active-open" : "") @(_selectedBrandIds.Any() || Query.BrandId.HasValue ? "has-val" : "")" 
                                     @onclick='() => ToggleDropdown("brand")'>
-                                @(Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId)?.TenThuongHieu ?? "Thương hiệu")
+                                @GetBrandFilterChipLabel()
                                 <svg class="dropdown-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                             </button>
                             @if (ActiveDropdown == "brand")
@@ -447,25 +448,23 @@
                                 <div class="filter-dropdown-menu">
                                     <div class="mobile-sheet-handle"></div>
                                     <div class="dropdown-header-row">
-                                        <span class="dropdown-selected-count">Chọn thương hiệu</span>
+                                        <span class="dropdown-selected-count">
+                                            @(_selectedBrandIds.Count > 0 ? $"Đã chọn {_selectedBrandIds.Count}" : "Chọn thương hiệu")
+                                        </span>
                                         <div class="header-action-group">
-                                            @if (Query.BrandId.HasValue)
+                                            @if (_selectedBrandIds.Any() || Query.BrandId.HasValue)
                                             {
-                                                <button type="button" class="dropdown-reset-btn" @onclick="() => SelectBrandFilter(null)">Tất cả</button>
+                                                <button type="button" class="dropdown-reset-btn" @onclick="ClearBrandFilters">Đặt lại</button>
                                             }
                                             <button type="button" class="dropdown-close-sheet-btn" @onclick="CloseAllDropdowns" title="Đóng">✕</button>
                                         </div>
                                     </div>
                                     <div class="dropdown-options-list">
-                                        <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(null)">
-                                            <input type="radio" name="brand_filter" checked="@(!Query.BrandId.HasValue)" />
-                                            <span class="option-label">Tất cả thương hiệu</span>
-                                        </label>
                                         @foreach (var b in AvailableBrandsForCustomer)
                                         {
-                                            <label class="dropdown-option-item" @onclick="() => SelectBrandFilter(b.MaThuongHieu)">
-                                                <input type="radio" name="brand_filter" checked="@(Query.BrandId == b.MaThuongHieu)" />
-                                                <span class="option-label @(Query.BrandId == b.MaThuongHieu ? "selected-underline" : "")">
+                                            <label class="dropdown-option-item">
+                                                <input type="checkbox" checked="@(_selectedBrandIds.Contains(b.MaThuongHieu))" @onchange="(e) => ToggleBrandFilter(b.MaThuongHieu, (bool)e.Value!)" />
+                                                <span class="option-label @(_selectedBrandIds.Contains(b.MaThuongHieu) ? "selected-underline" : "")">
                                                     @b.TenThuongHieu
                                                 </span>
                                             </label>
@@ -618,7 +617,7 @@
                             <option value="price_asc">Giá: Thấp đến Cao</option>
                             <option value="price_desc">Giá: Cao đến Thấp</option>
                         </select>
-                        <span class="product-count-summary dedicated-count-val"><strong>@(PagedResult?.TotalCount ?? 0) sản phẩm</strong></span>
+                        <span class="product-count-summary dedicated-count-val"><strong>@((_selectedKieuFilters.Any() || _onlyInStock) ? DisplayedProducts.Count() : (PagedResult?.TotalCount ?? 0)) sản phẩm</strong></span>
                     </div>
                 </div>
 
@@ -642,7 +641,18 @@
                                     <button type="button" class="chip-remove-btn" @onclick="() => RemoveKieuFilter(kieuName)">✕</button>
                                 </span>
                             }
-                            @if (Query.BrandId.HasValue)
+                            @if (_selectedBrandIds.Any())
+                            {
+                                @foreach (var bId in _selectedBrandIds)
+                                {
+                                    var brandName = Brands.FirstOrDefault(b => b.MaThuongHieu == bId)?.TenThuongHieu ?? $"Thương hiệu #{bId}";
+                                    <span class="active-chip-pill">
+                                        Thương hiệu: @brandName
+                                        <button type="button" class="chip-remove-btn" @onclick="() => RemoveBrandFilter(bId)">✕</button>
+                                    </span>
+                                }
+                            }
+                            else if (Query.BrandId.HasValue)
                             {
                                 <span class="active-chip-pill">
                                     Thương hiệu: @(Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId)?.TenThuongHieu)
@@ -678,7 +688,7 @@
                 <!-- TOP BAR: COUNT & SORT (Cho Trang Chủ) -->
                 <div class="catalog-top-bar">
                     <div class="product-count-summary">
-                        <span>Tìm thấy <strong>@(PagedResult?.TotalCount ?? 0) sản phẩm</strong></span>
+                        <span>Tìm thấy <strong>@((_selectedKieuFilters.Any() || _onlyInStock) ? DisplayedProducts.Count() : (PagedResult?.TotalCount ?? 0)) sản phẩm</strong></span>
                     </div>
 
                     <div class="sort-selector-wrapper">
@@ -721,9 +731,13 @@
             }
             else if (!PagedResult.Items.Any())
             {
-                @if (Query.BrandId.HasValue)
+                @if (_selectedBrandIds.Any() || Query.BrandId.HasValue)
                 {
-                    var brandName = Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId.Value)?.TenThuongHieu ?? "này";
+                    var brandName = _selectedBrandIds.Count == 1 
+                        ? (Brands.FirstOrDefault(b => b.MaThuongHieu == _selectedBrandIds.First())?.TenThuongHieu ?? "này")
+                        : (_selectedBrandIds.Count > 1 
+                            ? string.Join(", ", Brands.Where(b => _selectedBrandIds.Contains(b.MaThuongHieu)).Select(b => b.TenThuongHieu))
+                            : (Brands.FirstOrDefault(b => b.MaThuongHieu == (Query.BrandId ?? 0))?.TenThuongHieu ?? "này"));
                     <div class="catalog-empty brand-empty-state">
                         <div class="empty-icon" style="background: #fef3c7; color: #d97706; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -739,7 +753,7 @@
                             Các mẫu trang phục mới của nhãn hàng <strong>@brandName</strong> đang được bổ sung đợt mới. Quý khách vui lòng chọn xem các thương hiệu khác đang sẵn hàng hoặc xóa bộ lọc để tiếp tục mua sắm.
                         </p>
                         <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                            <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="() => SelectBrandFilter(null)">
+                            <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ClearBrandFilters">
                                 Khám phá thương hiệu khác
                             </button>
                             <button type="button" class="btn-reset-filters" style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ResetFilters">
@@ -766,9 +780,13 @@
             {
                 @if (_hasActiveFilters && !DisplayedProducts.Any())
                 {
-                    @if (Query.BrandId.HasValue)
+                    @if (_selectedBrandIds.Any() || Query.BrandId.HasValue)
                     {
-                        var brandName = Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId.Value)?.TenThuongHieu ?? "này";
+                        var brandName = _selectedBrandIds.Count == 1 
+                            ? (Brands.FirstOrDefault(b => b.MaThuongHieu == _selectedBrandIds.First())?.TenThuongHieu ?? "này")
+                            : (_selectedBrandIds.Count > 1 
+                                ? string.Join(", ", Brands.Where(b => _selectedBrandIds.Contains(b.MaThuongHieu)).Select(b => b.TenThuongHieu))
+                                : (Brands.FirstOrDefault(b => b.MaThuongHieu == (Query.BrandId ?? 0))?.TenThuongHieu ?? "này"));
                         <div class="catalog-empty brand-empty-state">
                             <div class="empty-icon" style="background: #fef3c7; color: #d97706; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -784,7 +802,7 @@
                                 Các mẫu trang phục mới của nhãn hàng <strong>@brandName</strong> đang được bổ sung đợt mới. Quý khách vui lòng chọn xem các thương hiệu khác đang sẵn hàng hoặc đặt lại bộ lọc để tiếp tục mua sắm.
                             </p>
                             <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                                <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="() => SelectBrandFilter(null)">
+                                <button type="button" class="btn-reset-filters" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ClearBrandFilters">
                                     Khám phá thương hiệu khác
                                 </button>
                                 <button type="button" class="btn-reset-filters" style="background: #0f172a; color: #ffffff; border: 1px solid #0f172a; padding: 8px 18px; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;" @onclick="ClearAllHorizontalFilters">
@@ -1508,6 +1526,7 @@
                 Search = Query.Search,
                 CategoryId = Query.CategoryId,
                 BrandId = Query.BrandId,
+                BrandIds = Query.BrandIds != null ? new List<int>(Query.BrandIds) : null,
                 MinPrice = Query.MinPrice,
                 MaxPrice = Query.MaxPrice,
                 SortBy = Query.SortBy,
@@ -1529,6 +1548,7 @@
                     Search = Query.Search,
                     CategoryId = Query.CategoryId,
                     BrandId = Query.BrandId,
+                    BrandIds = Query.BrandIds != null ? new List<int>(Query.BrandIds) : null,
                     MinPrice = Query.MinPrice,
                     MaxPrice = Query.MaxPrice,
                     SortBy = Query.SortBy,
@@ -1564,7 +1584,12 @@
 
     private async Task SelectBrand(int? brandId)
     {
-        Query.BrandId = brandId;
+        _selectedBrandIds.Clear();
+        if (brandId.HasValue)
+        {
+            _selectedBrandIds.Add(brandId.Value);
+        }
+        SyncBrandQueryParameters();
         Query.PageNumber = 1;
         await LoadProductsAsync();
     }
@@ -1589,6 +1614,8 @@
 
     private async Task ResetFilters()
     {
+        _selectedBrandIds.Clear();
+        Query.BrandIds = new();
         Query.CategoryId = null;
         Query.BrandId = null;
         Query.MinPrice = null;
@@ -2222,6 +2249,72 @@
         }
     }
 
+    private HashSet<int> _selectedBrandIds = new();
+
+    private string GetBrandFilterChipLabel()
+    {
+        if (_selectedBrandIds.Count == 0 && !Query.BrandId.HasValue)
+            return "Thương hiệu";
+        if (_selectedBrandIds.Count == 1)
+        {
+            var singleId = _selectedBrandIds.First();
+            return Brands.FirstOrDefault(b => b.MaThuongHieu == singleId)?.TenThuongHieu ?? "Thương hiệu";
+        }
+        if (_selectedBrandIds.Count > 1)
+        {
+            return $"{_selectedBrandIds.Count} thương hiệu";
+        }
+        return Brands.FirstOrDefault(b => b.MaThuongHieu == Query.BrandId)?.TenThuongHieu ?? "Thương hiệu";
+    }
+
+    private async Task ToggleBrandFilter(int brandId, bool isChecked)
+    {
+        if (isChecked)
+            _selectedBrandIds.Add(brandId);
+        else
+            _selectedBrandIds.Remove(brandId);
+
+        SyncBrandQueryParameters();
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    private async Task ToggleSidebarBrand(int brandId)
+    {
+        if (_selectedBrandIds.Contains(brandId))
+            _selectedBrandIds.Remove(brandId);
+        else
+            _selectedBrandIds.Add(brandId);
+
+        SyncBrandQueryParameters();
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
+    private void SyncBrandQueryParameters()
+    {
+        Query.BrandIds = _selectedBrandIds.ToList();
+        Query.BrandId = _selectedBrandIds.Count == 1 ? _selectedBrandIds.First() : null;
+    }
+
+    private async Task ClearBrandFilters()
+    {
+        _selectedBrandIds.Clear();
+        Query.BrandIds = new();
+        Query.BrandId = null;
+        Query.PageNumber = 1;
+        ActiveDropdown = null;
+        await LoadProductsAsync();
+    }
+
+    private async Task RemoveBrandFilter(int brandId)
+    {
+        _selectedBrandIds.Remove(brandId);
+        SyncBrandQueryParameters();
+        Query.PageNumber = 1;
+        await LoadProductsAsync();
+    }
+
     private async Task SelectBrandFilter(int? brandId)
     {
         ActiveDropdown = null;
@@ -2262,14 +2355,140 @@
         public string Label { get; set; } = "";
     }
 
+    private static readonly Dictionary<string, string[]> KieuKeywordMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Accessory
+        ["Ví Da & Bóp Cầm Tay"] = new[] { "ví", "clutch", "bóp", "wallet" },
+        ["Thắt Lưng & Dây Nịt"] = new[] { "thắt lưng", "dây nịt", "dây lưng", "belt" },
+        ["Túi Xách & Balo"] = new[] { "balo", "túi", "cặp", "backpack", "bag" },
+        ["Phụ Kiện Da Thật"] = new[] { "da bò", "da thật", "leather" },
+        ["Nón & Phụ Kiện Khác"] = new[] { "nón", "mũ", "vớ", "tất", "kính", "khuyên", "vòng" },
+
+        // Shirt
+        ["Form Rộng / Oversize"] = new[] { "oversize", "form rộng", "rộng" },
+        ["Regular Fit / Vừa Vặn"] = new[] { "regular", "vừa vặn" },
+        ["Slim Fit / Ôm Dáng"] = new[] { "slim fit", "slimfit", "ôm" },
+        ["Áo Polo / Cổ Bẻ"] = new[] { "polo", "cổ bẻ" },
+        ["Áo Thun Cổ Tròn"] = new[] { "cổ tròn", "t-shirt", "thun" },
+        ["Áo Sơ Mi"] = new[] { "sơ mi", "somi", "shirt" },
+        ["Áo Khoác & Hoodie"] = new[] { "khoác", "hoodie", "jacket", "sweater" },
+
+        // Pant
+        ["Quần Tây Loose Fit"] = new[] { "loose", "ống rộng" },
+        ["Quần Tây Regular Fit"] = new[] { "regular", "suông" },
+        ["Quần Tây Slim Fit"] = new[] { "slim fit", "slimfit", "ôm" },
+        ["Quần Tây Công Sở"] = new[] { "quần tây", "tây", "âu" },
+        ["Quần Khaki Lịch Lãm"] = new[] { "khaki", "kaki" },
+        ["Quần Short Năng Động"] = new[] { "short", "lửng", "ngắn" },
+
+        // Jean
+        ["Quần Jean Slim Fit"] = new[] { "slim fit", "slimfit", "ôm" },
+        ["Quần Jean Regular Fit"] = new[] { "regular", "suông" },
+        ["Quần Jean Loose / Ống Rộng"] = new[] { "loose", "rộng" },
+        ["Quần Jean Rách / Wash"] = new[] { "rách", "wash", "xước" },
+        ["Quần Short Jean"] = new[] { "short", "lửng", "ngắn" },
+
+        // General / Sale
+        ["Áo Nam (Polo, Thun, Sơ Mi)"] = new[] { "áo", "polo", "thun", "sơ mi", "t-shirt" },
+        ["Quần Nam (Tây, Khaki, Short)"] = new[] { "quần", "pant", "short" },
+        ["Đồ Jean / Denim"] = new[] { "jean", "denim" },
+        ["Phụ Kiện Thời Trang"] = new[] { "ví", "thắt lưng", "balo", "túi", "phụ kiện" },
+        ["Form Rộng / Oversize"] = new[] { "oversize", "loose", "rộng" },
+        ["Form Slim Fit"] = new[] { "slim fit", "slimfit", "ôm" }
+    };
+
+    private string GetKieuFilterChipLabel()
+    {
+        if (_selectedKieuFilters.Count == 0) return "Kiểu sản phẩm";
+        if (_selectedKieuFilters.Count == 1) return _selectedKieuFilters[0];
+        return $"Kiểu dáng ({_selectedKieuFilters.Count})";
+    }
+
     private IEnumerable<KieuOption> GetAvailableKieuOptions()
     {
-        return new List<KieuOption>
+        var branch = CurrentBranch;
+        var rawOptions = branch switch
         {
-            new() { Name = "Quần Tây Loose Fit", Label = "Quần Tây Loose Fit (1)" },
-            new() { Name = "Quần Tây Regular Fit", Label = "Quần Tây Regular Fit (4)" },
-            new() { Name = "Quần Tây Slim Fit", Label = "Quần Tây Slim Fit (20)" }
+            CatalogBranch.Accessory => new List<(string Name, string[] Keywords, int DefaultCount)>
+            {
+                ("Ví Da & Bóp Cầm Tay", KieuKeywordMap["Ví Da & Bóp Cầm Tay"], 0),
+                ("Thắt Lưng & Dây Nịt", KieuKeywordMap["Thắt Lưng & Dây Nịt"], 0),
+                ("Túi Xách & Balo", KieuKeywordMap["Túi Xách & Balo"], 0),
+                ("Phụ Kiện Da Thật", KieuKeywordMap["Phụ Kiện Da Thật"], 0),
+                ("Nón & Phụ Kiện Khác", KieuKeywordMap["Nón & Phụ Kiện Khác"], 0)
+            },
+            CatalogBranch.Shirt => new List<(string Name, string[] Keywords, int DefaultCount)>
+            {
+                ("Form Rộng / Oversize", KieuKeywordMap["Form Rộng / Oversize"], 0),
+                ("Regular Fit / Vừa Vặn", KieuKeywordMap["Regular Fit / Vừa Vặn"], 0),
+                ("Slim Fit / Ôm Dáng", KieuKeywordMap["Slim Fit / Ôm Dáng"], 0),
+                ("Áo Polo / Cổ Bẻ", KieuKeywordMap["Áo Polo / Cổ Bẻ"], 0),
+                ("Áo Thun Cổ Tròn", KieuKeywordMap["Áo Thun Cổ Tròn"], 0),
+                ("Áo Sơ Mi", KieuKeywordMap["Áo Sơ Mi"], 0),
+                ("Áo Khoác & Hoodie", KieuKeywordMap["Áo Khoác & Hoodie"], 0)
+            },
+            CatalogBranch.Jean => new List<(string Name, string[] Keywords, int DefaultCount)>
+            {
+                ("Quần Jean Slim Fit", KieuKeywordMap["Quần Jean Slim Fit"], 0),
+                ("Quần Jean Regular Fit", KieuKeywordMap["Quần Jean Regular Fit"], 0),
+                ("Quần Jean Loose / Ống Rộng", KieuKeywordMap["Quần Jean Loose / Ống Rộng"], 0),
+                ("Quần Jean Rách / Wash", KieuKeywordMap["Quần Jean Rách / Wash"], 0),
+                ("Quần Short Jean", KieuKeywordMap["Quần Short Jean"], 0)
+            },
+            CatalogBranch.Pant => new List<(string Name, string[] Keywords, int DefaultCount)>
+            {
+                ("Quần Tây Loose Fit", KieuKeywordMap["Quần Tây Loose Fit"], 1),
+                ("Quần Tây Regular Fit", KieuKeywordMap["Quần Tây Regular Fit"], 4),
+                ("Quần Tây Slim Fit", KieuKeywordMap["Quần Tây Slim Fit"], 20),
+                ("Quần Tây Công Sở", KieuKeywordMap["Quần Tây Công Sở"], 0),
+                ("Quần Khaki Lịch Lãm", KieuKeywordMap["Quần Khaki Lịch Lãm"], 0),
+                ("Quần Short Năng Động", KieuKeywordMap["Quần Short Năng Động"], 0)
+            },
+            _ => new List<(string Name, string[] Keywords, int DefaultCount)>
+            {
+                ("Áo Nam (Polo, Thun, Sơ Mi)", KieuKeywordMap["Áo Nam (Polo, Thun, Sơ Mi)"], 0),
+                ("Quần Nam (Tây, Khaki, Short)", KieuKeywordMap["Quần Nam (Tây, Khaki, Short)"], 0),
+                ("Đồ Jean / Denim", KieuKeywordMap["Đồ Jean / Denim"], 0),
+                ("Phụ Kiện Thời Trang", KieuKeywordMap["Phụ Kiện Thời Trang"], 0),
+                ("Form Rộng / Oversize", KieuKeywordMap["Form Rộng / Oversize"], 0),
+                ("Form Slim Fit", KieuKeywordMap["Form Slim Fit"], 0)
+            }
         };
+
+        var allItems = PagedResult?.Items ?? Enumerable.Empty<ProductListItemDto>();
+        bool hasItems = allItems.Any();
+
+        return rawOptions.Select(opt =>
+        {
+            var count = hasItems ? allItems.Count(p => MatchesKeywords(p, opt.Keywords)) : opt.DefaultCount;
+            return new KieuOption
+            {
+                Name = opt.Name,
+                Label = $"{opt.Name} ({count})"
+            };
+        }).ToList();
+    }
+
+    private static bool MatchesKeywords(ProductListItemDto p, string[] keywords)
+    {
+        var text = $"{p.TenSanPham} {p.ChatLieu}".ToLowerInvariant();
+        return keywords.Any(kw => text.Contains(kw.ToLowerInvariant()));
+    }
+
+    private bool MatchesSingleKieu(ProductListItemDto p, string kieuName)
+    {
+        if (KieuKeywordMap.TryGetValue(kieuName, out var kw))
+        {
+            return MatchesKeywords(p, kw);
+        }
+        var text = $"{p.TenSanPham} {p.ChatLieu}".ToLowerInvariant();
+        return text.Contains(kieuName.ToLowerInvariant());
+    }
+
+    private bool MatchesKieuFilter(ProductListItemDto product)
+    {
+        if (!_selectedKieuFilters.Any()) return true;
+        return _selectedKieuFilters.Any(name => MatchesSingleKieu(product, name));
     }
 
     private void ToggleKieuFilter(string name, bool isChecked)
@@ -2292,7 +2511,7 @@
         return Task.CompletedTask;
     }
 
-    private bool _hasActiveFilters => HasActiveCategoryFilter || _selectedKieuFilters.Any() || Query.BrandId.HasValue || Query.MinPrice.HasValue || Query.MaxPrice.HasValue || _onlyInStock;
+    private bool _hasActiveFilters => HasActiveCategoryFilter || _selectedKieuFilters.Any() || _selectedBrandIds.Any() || Query.BrandId.HasValue || Query.MinPrice.HasValue || Query.MaxPrice.HasValue || _onlyInStock;
 
     private bool _isFilterOpen = false;
     private void ToggleFilter() => _isFilterOpen = !_isFilterOpen;
@@ -2301,6 +2520,8 @@
 
     private void ClearAllHorizontalFilters()
     {
+        _selectedBrandIds.Clear();
+        Query.BrandIds = new();
         Query.BrandId = null;
         Query.MinPrice = null;
         Query.MaxPrice = null;
@@ -2317,10 +2538,15 @@
             if (PagedResult == null || PagedResult.Items == null)
                 return Enumerable.Empty<ProductListItemDto>();
 
-            if (_onlyInStock)
-                return PagedResult.Items.Where(p => p.TongTonKho > 0);
+            var items = PagedResult.Items.AsEnumerable();
 
-            return PagedResult.Items;
+            if (_onlyInStock)
+                items = items.Where(p => p.TongTonKho > 0);
+
+            if (_selectedKieuFilters.Any())
+                items = items.Where(p => MatchesKieuFilter(p));
+
+            return items;
         }
     }
 }

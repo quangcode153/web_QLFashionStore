@@ -11,7 +11,15 @@ public class ChatService : IChatService
 {
     private readonly HttpClient _httpClient;
     private readonly string _chatbotUrl;
+    private readonly string? _groqApiKey;
+    private readonly string _groqModel;
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
+
+    private const string StylistSystemPrompt = 
+        "Bạn là Stylist AI tư vấn thời trang cao cấp của thương hiệu QF NOIR. " +
+        "Nhiệm vụ của bạn là tư vấn phối đồ thông minh, đề xuất màu sắc, cách mix & match giữa áo và quần, " +
+        "hướng dẫn chọn bảng size chuẩn theo chiều cao và cân nặng. " +
+        "Phong cách: Lịch sự, nhã nhặn, sang trọng, tinh tế và sành điệu. Trả lời bằng tiếng Việt ngắn gọn, súc tích, tự nhiên.";
 
     public ChatService(HttpClient httpClient, IConfiguration configuration)
     {
@@ -19,6 +27,15 @@ public class ChatService : IChatService
         _chatbotUrl = Environment.GetEnvironmentVariable("CHATBOT_URL")
             ?? configuration["ChatbotUrl"]
             ?? "http://localhost:3001";
+
+        _groqApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY")
+            ?? configuration["Groq:ApiKey"]
+            ?? configuration["GROQ_API_KEY"];
+
+        _groqModel = Environment.GetEnvironmentVariable("GROQ_MODEL")
+            ?? configuration["Groq:Model"]
+            ?? configuration["GROQ_MODEL"]
+            ?? "qwen/qwen3.8-27b";
     }
 
     public async Task<ChatResponseDto> ProcessChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
@@ -32,6 +49,7 @@ public class ChatService : IChatService
             };
         }
 
+        // TẦNG 1: GỌI TỚI MICROSERVICE CHATBOT (Node.js) NẾU ĐANG CHẠY
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -63,13 +81,90 @@ public class ChatService : IChatService
         }
         catch (Exception ex)
         {
-            // Bắt TaskCanceledException (Timeout) và HttpRequestException (Connection Refused)
-            // Kích hoạt Fallback Stylist Engine an toàn, tuyệt đối không quăng lỗi ra phía Client
-            Console.WriteLine($"[ChatService Fallback Activated] Nguyên nhân: {ex.Message}");
+            Console.WriteLine($"[ChatService Microservice Offline/Timeout] Nguyên nhân: {ex.Message}. Kích hoạt trực tiếp Groq Cloud AI...");
         }
 
-        // TẦNG BẢO HIỂM NỘI BỘ (BACKEND FALLBACK STYLIST ENGINE)
+        // TẦNG 2: GỌI TRỰC TIẾP GROQ CLOUD AI ONLINE (TỰ ĐỘNG KHI MICROSERVICE OFFLINE)
+        if (!string.IsNullOrWhiteSpace(_groqApiKey))
+        {
+            try
+            {
+                var groqResponse = await CallGroqCloudDirectlyAsync(request, cancellationToken);
+                if (groqResponse != null)
+                {
+                    return groqResponse;
+                }
+            }
+            catch (Exception groqEx)
+            {
+                Console.WriteLine($"[ChatService Groq Direct Call Failed]: {groqEx.Message}");
+            }
+        }
+
+        // TẦNG 3: BẢO HIỂM NỘI BỘ (BACKEND FALLBACK STYLIST ENGINE) KHI HOÀN TOÀN MẤT KẾT NỐI MẠNG
         return GenerateFallbackResponse(request.Message);
+    }
+
+    private async Task<ChatResponseDto?> CallGroqCloudDirectlyAsync(ChatRequestDto request, CancellationToken cancellationToken)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        var messages = new List<object>
+        {
+            new { role = "system", content = StylistSystemPrompt }
+        };
+
+        if (request.History != null)
+        {
+            foreach (var h in request.History)
+            {
+                var role = h.Role?.ToLowerInvariant() == "user" ? "user" : "assistant";
+                var content = h.Content ?? "";
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    messages.Add(new { role, content });
+                }
+            }
+        }
+
+        messages.Add(new { role = "user", content = request.Message });
+
+        var payload = new
+        {
+            model = _groqModel,
+            messages = messages,
+            temperature = 0.3,
+            max_tokens = 600
+        };
+
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+        httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _groqApiKey);
+        httpRequest.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.SendAsync(httpRequest, cts.Token);
+        if (response.IsSuccessStatusCode)
+        {
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cts.Token), cancellationToken: cts.Token);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+            {
+                var firstChoice = choices[0];
+                if (firstChoice.TryGetProperty("message", out var msg) && msg.TryGetProperty("content", out var contentElem))
+                {
+                    var reply = contentElem.GetString();
+                    if (!string.IsNullOrWhiteSpace(reply))
+                    {
+                        return new ChatResponseDto
+                        {
+                            Reply = reply.Trim(),
+                            Engine = "Groq Cloud (Online)"
+                        };
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public async Task<object> CheckHealthAsync(CancellationToken cancellationToken = default)

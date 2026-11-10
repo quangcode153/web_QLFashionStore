@@ -18,7 +18,17 @@ public class CatalogApiClient : ICatalogApiClient
         var url = $"api/products?pageNumber={query.PageNumber}&pageSize={query.PageSize}&sortBy={query.SortBy}";
         if (!string.IsNullOrWhiteSpace(query.Search)) url += $"&search={Uri.EscapeDataString(query.Search)}";
         if (query.CategoryId.HasValue) url += $"&categoryId={query.CategoryId.Value}";
-        if (query.BrandId.HasValue) url += $"&brandId={query.BrandId.Value}";
+        if (query.BrandIds != null && query.BrandIds.Any())
+        {
+            foreach (var bId in query.BrandIds)
+            {
+                url += $"&brandIds={bId}";
+            }
+        }
+        else if (query.BrandId.HasValue)
+        {
+            url += $"&brandId={query.BrandId.Value}";
+        }
         if (query.MinPrice.HasValue) url += $"&minPrice={query.MinPrice.Value}";
         if (query.MaxPrice.HasValue) url += $"&maxPrice={query.MaxPrice.Value}";
         if (query.IsSale.HasValue) url += $"&isSale={query.IsSale.Value.ToString().ToLower()}";

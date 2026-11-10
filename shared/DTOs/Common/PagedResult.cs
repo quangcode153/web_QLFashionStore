@@ -29,6 +29,7 @@ public class ProductQueryParameters
     public string? Search { get; set; }
     public int? CategoryId { get; set; }
     public int? BrandId { get; set; }
+    public List<int>? BrandIds { get; set; } = new();
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }
     public string? SortBy { get; set; } = "newest";
