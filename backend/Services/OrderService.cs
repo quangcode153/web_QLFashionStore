@@ -101,9 +101,10 @@ public class OrderService : IOrderService
             }
         }
 
+        int orderId = 0;
         try
         {
-            var orderId = (request.MaChiNhanh.HasValue && request.MaChiNhanh.Value > 0)
+            orderId = (request.MaChiNhanh.HasValue && request.MaChiNhanh.Value > 0)
                 ? await _orderRepository.CreateOrderAsync(request.MaKhachHang, request.MaNhanVien, request.MaGiamGia, request.MaChiNhanh.Value)
                 : await _orderRepository.CreateOrderAsync(request.MaKhachHang, request.MaNhanVien, request.MaGiamGia);
 
@@ -138,6 +139,20 @@ public class OrderService : IOrderService
         }
         catch (Exception ex)
         {
+            // Bồi hoàn giao dịch (Compensating Rollback): Nếu đơn hàng đã được tạo nhưng thêm món thất bại,
+            // lập tức hủy đơn để giải phóng / hoàn lại tồn kho các sản phẩm đã thêm trước đó
+            if (orderId > 0)
+            {
+                try
+                {
+                    await _orderRepository.UpdateOrderStatusAsync(orderId, "Đã hủy");
+                }
+                catch
+                {
+                    // Fail-safe bù trừ
+                }
+            }
+
             return ApiResponse<int>.Fail($"Lỗi khi tạo đơn hàng: {ex.Message}");
         }
     }

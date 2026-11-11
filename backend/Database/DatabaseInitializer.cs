@@ -640,6 +640,85 @@ BEGIN
         cd.ten_cap_do AS cap_do_moi
     FROM KhachHang kh
     JOIN CapDoThanhVien cd ON kh.ma_cap_do = cd.ma_cap_do;
+END;
+GO
+CREATE OR ALTER PROCEDURE dbo.sp_CapNhatTrangThaiHoaDon
+    @MaHoaDon INT,
+    @TrangThaiMoi NVARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @TrangThaiMoi NOT IN (N'Chờ xử lý', N'Đang giao hàng', N'Đã hoàn thành', N'Đã hủy', N'Đã hoàn trả')
+    BEGIN
+        RAISERROR(N'Trạng thái không hợp lệ!', 16, 1);
+        RETURN;
+    END;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        DECLARE @TrangThaiCu NVARCHAR(20);
+        DECLARE @MaChiNhanhDon INT;
+        SELECT @TrangThaiCu = trang_thai, 
+               @MaChiNhanhDon = ISNULL(ma_chi_nhanh, 9) 
+        FROM HoaDon 
+        WHERE ma_hoa_don = @MaHoaDon;
+
+        IF @TrangThaiCu IS NULL
+        BEGIN
+            RAISERROR(N'Hóa đơn không tồn tại!', 16, 1);
+        END;
+
+        IF (@TrangThaiMoi = N'Đã hủy' AND @TrangThaiCu <> N'Đã hủy')
+        BEGIN
+            -- 1. Hoàn tồn kho chi nhánh cụ thể của đơn hàng
+            UPDATE tk
+            SET tk.so_luong_ton = tk.so_luong_ton + ct.so_luong,
+                tk.ngay_cap_nhat = GETDATE()
+            FROM TonKhoChiNhanh tk
+            JOIN ChiTietHoaDon ct ON tk.ma_bien_the = ct.ma_bien_the
+            WHERE ct.ma_hoa_don = @MaHoaDon AND tk.ma_chi_nhanh = @MaChiNhanhDon;
+
+            -- 2. Hoàn tồn kho biến thể chung
+            UPDATE bt
+            SET bt.so_luong_ton = bt.so_luong_ton + ct.so_luong,
+                bt.ngay_cap_nhat = GETDATE()
+            FROM BienTheSanPham bt
+            JOIN ChiTietHoaDon ct ON bt.ma_bien_the = ct.ma_bien_the
+            WHERE ct.ma_hoa_don = @MaHoaDon;
+
+            -- 3. Ghi vết nhật ký biến động kho
+            INSERT INTO NhatKyKho (ma_bien_the, so_luong_thay_doi, ly_do, nguoi_thay_doi, loai_nguoi_thay_doi, thoi_gian, ma_chi_nhanh)
+            SELECT ct.ma_bien_the, ct.so_luong, 'DIEU_CHINH', NULL, 'HE_THONG', GETDATE(), @MaChiNhanhDon
+            FROM ChiTietHoaDon ct
+            WHERE ct.ma_hoa_don = @MaHoaDon;
+
+            -- 4. Hoàn lại lượt dùng mã giảm giá nếu đơn có áp dụng Voucher
+            DECLARE @MaKM INT;
+            SELECT @MaKM = ma_khuyen_mai FROM HoaDon WHERE ma_hoa_don = @MaHoaDon;
+            IF (@MaKM IS NOT NULL)
+            BEGIN
+                UPDATE ChuongTrinhKhuyenMai
+                SET so_luong_dung = so_luong_dung + 1
+                WHERE ma_khuyen_mai = @MaKM;
+            END;
+        END;
+
+        UPDATE HoaDon
+        SET trang_thai = @TrangThaiMoi
+        WHERE ma_hoa_don = @MaHoaDon;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH;
 END;";
     }
 }

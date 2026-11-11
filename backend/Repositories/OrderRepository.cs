@@ -336,6 +336,25 @@ public class OrderRepository : IOrderRepository
             ";
             await connection.ExecuteAsync(sqlInsertLog, new { variantId, quantity, staffId }, transaction);
 
+            // 6. Thu hồi điểm tích lũy thưởng thành viên phát sinh từ số lượng hàng đổi trả (chống trục lợi tích điểm)
+            const string sqlDeductLoyaltyPoints = @"
+                DECLARE @UnitPrice DECIMAL(12,2) = 0;
+                SELECT @UnitPrice = don_gia FROM ChiTietHoaDon WHERE ma_hoa_don = @orderId AND ma_bien_the = @variantId;
+                DECLARE @RefundAmount DECIMAL(12,2) = @UnitPrice * @quantity;
+
+                UPDATE kh
+                SET kh.diem_thuong = CASE 
+                    WHEN kh.diem_thuong >= CAST((@RefundAmount / 10000.0) * ISNULL(cd.he_so_tich_diem, 1.0) AS INT)
+                    THEN kh.diem_thuong - CAST((@RefundAmount / 10000.0) * ISNULL(cd.he_so_tich_diem, 1.0) AS INT)
+                    ELSE 0
+                END
+                FROM KhachHang kh
+                JOIN HoaDon hd ON hd.ma_khach_hang = kh.ma_khach_hang
+                LEFT JOIN CapDoThanhVien cd ON kh.ma_cap_do = cd.ma_cap_do
+                WHERE hd.ma_hoa_don = @orderId;
+            ";
+            await connection.ExecuteAsync(sqlDeductLoyaltyPoints, new { orderId, variantId, quantity }, transaction);
+
             transaction.Commit();
 
             var result = new ReturnOrderResultDto

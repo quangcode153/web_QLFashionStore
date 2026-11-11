@@ -58,3 +58,11 @@ public class AccountSummaryDto
     public bool DangHoatDong { get; set; }
 }
 
+public class ForgotPasswordDto
+{
+    public string TenDangNhap { get; set; } = string.Empty;
+    public string DienThoai { get; set; } = string.Empty;
+    public string MatKhauMoi { get; set; } = string.Empty;
+}
+
+

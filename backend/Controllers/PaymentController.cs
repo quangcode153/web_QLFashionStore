@@ -69,6 +69,34 @@ namespace Backend.Controllers
                 return NotFound(ApiResponse<bool>.Fail($"Không tìm thấy đơn hàng #{orderId}"));
             }
 
+            // Kiểm tra trạng thái đơn: Không cho phép đổi thông tin thanh toán nếu đơn đã đóng
+            var currentStatus = await _orderRepository.GetOrderStatusAsync(orderId);
+            if (string.Equals(currentStatus, "Đã hoàn thành", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(currentStatus, "Đã hủy", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(currentStatus, "Đã hoàn trả", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(ApiResponse<bool>.Fail($"Đơn hàng #{orderId} ở trạng thái '{currentStatus}', không thể thay đổi thông tin thanh toán."));
+            }
+
+            // Phòng thủ IDOR: Nếu là khách hàng đăng nhập, chỉ được xác nhận thanh toán đơn của chính mình
+            if (User.Identity != null && User.Identity.IsAuthenticated)
+            {
+                var roleClaim = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+                var isStaff = Shared.Constants.RoleConstants.IsStaff(roleClaim);
+                if (!isStaff)
+                {
+                    var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    if (int.TryParse(userIdClaim, out var currentUserId))
+                    {
+                        if (ownership.CustomerId.HasValue && ownership.CustomerId.Value != currentUserId)
+                        {
+                            return StatusCode(Microsoft.AspNetCore.Http.StatusCodes.Status403Forbidden, 
+                                ApiResponse<bool>.Fail("Bạn không có quyền can thiệp vào đơn hàng của tài khoản khác!"));
+                        }
+                    }
+                }
+            }
+
             // Ghi nhận thanh toán: Cập nhật tag PTTT sang MoMo hoặc VietQR tương ứng
             string normalizedMethod = (method ?? "MOMO").ToUpperInvariant();
             string newTag;

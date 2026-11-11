@@ -18,6 +18,7 @@ public interface IAuthService
     Task<ApiResponse<List<AccountSummaryDto>>> GetAccountsAsync(string currentUserRole, int? currentBranchId);
     Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole);
     Task<ApiResponse<bool>> ToggleAccountStatusAsync(int accountId, string currentUserRole, int? currentBranchId);
+    Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordDto request);
 }
 
 public class AuthService : IAuthService
@@ -379,5 +380,44 @@ public class AuthService : IAuthService
         }
 
         return ApiResponse<bool>.Ok(success, "Cập nhật trạng thái hoạt động tài khoản thành công!");
+    }
+
+    public async Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordDto request)
+    {
+        if (request == null)
+        {
+            return ApiResponse<bool>.Fail("Yêu cầu không hợp lệ.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.TenDangNhap))
+        {
+            return ApiResponse<bool>.Fail("Vui lòng nhập tên đăng nhập!");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.DienThoai))
+        {
+            return ApiResponse<bool>.Fail("Vui lòng nhập số điện thoại đã đăng ký!");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.MatKhauMoi) || request.MatKhauMoi.Length < 6)
+        {
+            return ApiResponse<bool>.Fail("Mật khẩu mới tối thiểu phải từ 6 ký tự!");
+        }
+
+        var isMatch = await _authRepository.VerifyCustomerPhoneAsync(request.TenDangNhap, request.DienThoai);
+        if (!isMatch)
+        {
+            return ApiResponse<bool>.Fail("Số điện thoại không khớp với thông tin đã đăng ký trong hệ thống!");
+        }
+
+        var newHash = _passwordHasher.HashPassword(request.MatKhauMoi);
+        var success = await _authRepository.ResetCustomerPasswordAsync(request.TenDangNhap, newHash);
+
+        if (!success)
+        {
+            return ApiResponse<bool>.Fail("Không thể cập nhật mật khẩu mới. Vui lòng thử lại sau!");
+        }
+
+        return ApiResponse<bool>.Ok(true, "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.");
     }
 }

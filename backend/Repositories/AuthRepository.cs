@@ -30,6 +30,8 @@ public interface IAuthRepository
     Task<List<Shared.DTOs.Auth.AccountSummaryDto>> GetAllAccountsAsync(string? roleFilter = null);
     Task<bool> ToggleAccountStatusAsync(int accountId);
     Task<Shared.DTOs.Auth.AccountSummaryDto?> GetAccountByIdAsync(int accountId);
+    Task<bool> VerifyCustomerPhoneAsync(string username, string phone);
+    Task<bool> ResetCustomerPasswordAsync(string username, string newPasswordHash);
 }
 
 public class AuthRepository : IAuthRepository
@@ -295,5 +297,23 @@ public class AuthRepository : IAuthRepository
             ? "UPDATE KhachHang SET mat_khau_hash = @Hash WHERE ma_khach_hang = @Id;"
             : "UPDATE TaiKhoan SET mat_khau_hash = @Hash WHERE ma_tai_khoan = @Id;";
         await connection.ExecuteAsync(sql, new { Hash = newHash, Id = accountId });
+    }
+
+    public async Task<bool> VerifyCustomerPhoneAsync(string username, string phone)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(phone)) return false;
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = "SELECT COUNT(1) FROM KhachHang WHERE ten_dang_nhap = @username AND dien_thoai = @phone AND da_xoa = 0;";
+        var count = await connection.ExecuteScalarAsync<int>(sql, new { username = username.Trim(), phone = phone.Trim() });
+        return count > 0;
+    }
+
+    public async Task<bool> ResetCustomerPasswordAsync(string username, string newPasswordHash)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(newPasswordHash)) return false;
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = "UPDATE KhachHang SET mat_khau_hash = @newPasswordHash WHERE ten_dang_nhap = @username AND da_xoa = 0;";
+        var rows = await connection.ExecuteAsync(sql, new { username = username.Trim(), newPasswordHash });
+        return rows > 0;
     }
 }

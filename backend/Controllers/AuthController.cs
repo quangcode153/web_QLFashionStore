@@ -43,6 +43,18 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Đặt lại mật khẩu tự phục vụ cho khách hàng dựa trên Tên đăng nhập và Số điện thoại đã đăng ký
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto request)
+    {
+        var response = await _authService.ForgotPasswordAsync(request);
+        if (!response.Success) return BadRequest(response);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Quản lý khu vực (chi nhánh) hoặc Quản lý đa khu vực (Admin chuỗi) tạo tài khoản nhân viên.
     /// - Quản lý chi nhánh: chỉ được tạo Nhân viên bán hàng / Thu ngân.
     /// - Quản lý đa chi nhánh: được tạo Quản lý chi nhánh, Thu ngân, Thủ kho, v.v.
