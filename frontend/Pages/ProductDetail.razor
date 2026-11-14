@@ -1,11 +1,13 @@
 @page "/product/{id:int}"
 @page "/products/{id:int}"
 @namespace Frontend.Pages
+@implements IDisposable
 @inject ICatalogApiClient CatalogApi
 @inject ICartService CartService
 @inject IToastService Toast
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
+@inject IServiceProvider ServiceProvider
 
 <div class="pdp-container">
     <!-- Breadcrumb Navigation -->
@@ -489,8 +491,14 @@
     private bool CanAddToCart => SelectedVariant != null && SelectedVariant.SoLuongTon > 0 && Quantity > 0 && Quantity <= SelectedVariant.SoLuongTon;
     private bool IsEntirelyOutOfStock => !Variants.Any() || Variants.All(v => v.SoLuongTon <= 0);
 
+    private ISignalRNotificationService? SignalRService => ServiceProvider.GetService(typeof(ISignalRNotificationService)) as ISignalRNotificationService;
+
     protected override async Task OnInitializedAsync()
     {
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated += HandleRealtimeInventoryUpdate;
+        }
         await LoadProductAsync();
     }
 
@@ -787,6 +795,38 @@
         finally
         {
             _loadingBranchStock = false;
+        }
+    }
+
+    private void HandleRealtimeInventoryUpdate(int variantId, int qty, string action)
+    {
+        var targetVariant = Variants.FirstOrDefault(v => v.MaBienThe == variantId);
+        if (targetVariant != null)
+        {
+            if (action == "XUAT_BAN")
+            {
+                targetVariant.SoLuongTon = Math.Max(0, targetVariant.SoLuongTon - qty);
+            }
+            else if (action == "NHAP_KHO" || action == "DOI_TRA")
+            {
+                targetVariant.SoLuongTon += qty;
+            }
+
+            if (SelectedVariant != null && SelectedVariant.MaBienThe == variantId && Quantity > targetVariant.SoLuongTon)
+            {
+                Quantity = Math.Max(1, targetVariant.SoLuongTon);
+            }
+
+            _ = InvokeAsync(StateHasChanged);
+            _ = SyncProductContextToAiAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated -= HandleRealtimeInventoryUpdate;
         }
     }
 }

@@ -92,6 +92,51 @@ public class SignalRRealtimeTests
             Times.Once);
     }
 
+    [Fact(DisplayName = "TS-RT-06: Tạo đơn hàng thành công phát sự kiện InventoryUpdated qua InventoryHub cho từng mặt hàng bán ra")]
+    public async Task CreateOrderAsync_WhenSuccess_BroadcastsInventoryUpdated_ForSoldItems()
+    {
+        // Arrange
+        var request = new CreateOrderRequestDto
+        {
+            MaKhachHang = 1,
+            MaNhanVien = 2,
+            Items = new List<CreateOrderItemDto>
+            {
+                new() { MaBienThe = 10, SoLuong = 3 },
+                new() { MaBienThe = 20, SoLuong = 1 }
+            }
+        };
+
+        _mockOrderRepo.Setup(r => r.CreateOrderAsync(1, 2, null))
+            .ReturnsAsync(105);
+
+        var service = new OrderService(
+            _mockOrderRepo.Object,
+            _mockNotificationHub.Object,
+            _mockInventoryHub.Object);
+
+        // Act
+        var result = await service.CreateOrderAsync(request);
+
+        // Assert
+        result.Success.Should().BeTrue();
+
+        // Xác thực phát sự kiện InventoryUpdated cho cả 2 sản phẩm bán ra
+        _mockInventoryAllProxy.Verify(
+            p => p.SendCoreAsync(
+                "InventoryUpdated",
+                It.Is<object[]>(args => args.Length >= 3 && Convert.ToInt32(args[0]) == 10 && Convert.ToInt32(args[1]) == 3 && (string)args[2] == "XUAT_BAN"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _mockInventoryAllProxy.Verify(
+            p => p.SendCoreAsync(
+                "InventoryUpdated",
+                It.Is<object[]>(args => args.Length >= 3 && Convert.ToInt32(args[0]) == 20 && Convert.ToInt32(args[1]) == 1 && (string)args[2] == "XUAT_BAN"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     [Fact(DisplayName = "TS-RT-02: Đổi trả hàng thành công phát sự kiện InventoryUpdated qua InventoryHub")]
     public async Task ProcessReturnAsync_WhenSuccess_BroadcastsInventoryUpdated()
     {

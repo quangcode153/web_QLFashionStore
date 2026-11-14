@@ -10,6 +10,7 @@
 @inject NavigationManager Navigation
 @inject Frontend.Services.IAuthStateService AuthStateService
 @inject Frontend.Services.ISignalRNotificationService SignalRService
+@implements IDisposable
 
 <div class="warehouse-portal-layout">
     <!-- TOPBAR ĐIỀU HÀNH KHO CHUYÊN NGHIỆP -->
@@ -3120,7 +3121,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await SignalRService.StartAsync();
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated += HandleRealtimeInventoryUpdate;
+            await SignalRService.StartAsync();
+        }
         SyncAuthFromAuthStateService();
         await LoadWarehouseData();
     }
@@ -3977,5 +3982,34 @@
         }
         catch { }
         Navigation.NavigateTo("/login");
+    }
+
+    private void HandleRealtimeInventoryUpdate(int variantId, int qty, string action)
+    {
+        if (_allVariants != null && _allVariants.Any())
+        {
+            var target = _allVariants.FirstOrDefault(v => v.MaBienThe == variantId);
+            if (target != null)
+            {
+                if (action == "XUAT_BAN")
+                    target.SoLuongTon = Math.Max(0, target.SoLuongTon - qty);
+                else if (action == "NHAP_KHO" || action == "DOI_TRA")
+                    target.SoLuongTon += qty;
+
+                _totalStockInChain = _allVariants.Sum(x => x.SoLuongTon);
+                _lowStockAlerts = _allVariants.Where(x => x.SoLuongTon > 0 && x.SoLuongTon <= 10).OrderBy(x => x.SoLuongTon).ToList();
+                _outOfStockCount = _allVariants.Count(x => x.SoLuongTon == 0);
+
+                _ = InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated -= HandleRealtimeInventoryUpdate;
+        }
     }
 }

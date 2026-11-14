@@ -135,6 +135,21 @@ public class OrderService : IOrderService
                 }
             }
 
+            if (_inventoryHub != null)
+            {
+                try
+                {
+                    foreach (var item in request.Items)
+                    {
+                        await _inventoryHub.Clients.All.SendAsync("InventoryUpdated", item.MaBienThe, item.SoLuong, "XUAT_BAN");
+                    }
+                }
+                catch
+                {
+                    // Fail-safe: Lỗi gửi broadcast tồn kho không làm gián đoạn tạo đơn
+                }
+            }
+
             return ApiResponse<int>.Ok(orderId, "Tạo đơn hàng thành công");
         }
         catch (Exception ex)

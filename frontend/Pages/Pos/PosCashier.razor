@@ -1716,7 +1716,11 @@
         }
         catch { }
 
-        await SignalRService.StartAsync();
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated += HandleRealtimeInventoryUpdate;
+            await SignalRService.StartAsync();
+        }
         await LoadFastSaleProducts();
     }
 
@@ -1838,9 +1842,30 @@
     {
         try
         {
+            if (SignalRService != null)
+            {
+                SignalRService.OnInventoryUpdated -= HandleRealtimeInventoryUpdate;
+            }
             _dotNetRef?.Dispose();
         }
         catch { }
+    }
+
+    private void HandleRealtimeInventoryUpdate(int variantId, int qty, string action)
+    {
+        if (_fastSaleVariants != null && _fastSaleVariants.Any())
+        {
+            var v = _fastSaleVariants.FirstOrDefault(x => x.MaBienThe == variantId);
+            if (v != null)
+            {
+                if (action == "XUAT_BAN")
+                    v.SoLuongTon = Math.Max(0, v.SoLuongTon - qty);
+                else if (action == "NHAP_KHO" || action == "DOI_TRA")
+                    v.SoLuongTon += qty;
+
+                _ = InvokeAsync(StateHasChanged);
+            }
+        }
     }
 
     private async Task OnScannerKeyDown(KeyboardEventArgs e)

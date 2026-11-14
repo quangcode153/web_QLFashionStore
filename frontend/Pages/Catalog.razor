@@ -7,6 +7,7 @@
 @inject NavigationManager NavManager
 @inject IAuthStateService AuthStateService
 @inject IJSRuntime JSRuntime
+@inject IServiceProvider ServiceProvider
 @implements IDisposable
 
 <div class="catalog-page-container">
@@ -1287,9 +1288,15 @@
         return "Bộ Sưu Tập Sản Phẩm";
     }
 
+    private ISignalRNotificationService? SignalRService => ServiceProvider.GetService(typeof(ISignalRNotificationService)) as ISignalRNotificationService;
+
     protected override async Task OnInitializedAsync()
     {
         NavManager.LocationChanged += HandleLocationChanged;
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated += HandleRealtimeInventoryUpdate;
+        }
         await LoadMetadataAsync();
         _metadataLoaded = true;
         ApplyUrlParameters();
@@ -1354,7 +1361,28 @@
     public void Dispose()
     {
         NavManager.LocationChanged -= HandleLocationChanged;
+        if (SignalRService != null)
+        {
+            SignalRService.OnInventoryUpdated -= HandleRealtimeInventoryUpdate;
+        }
         _bannerAutoplayTimer?.Dispose();
+    }
+
+    private void HandleRealtimeInventoryUpdate(int variantId, int qty, string action)
+    {
+        if (_quickSelectVariants != null && _quickSelectVariants.Any())
+        {
+            var v = _quickSelectVariants.FirstOrDefault(x => x.MaBienThe == variantId);
+            if (v != null)
+            {
+                if (action == "XUAT_BAN")
+                    v.SoLuongTon = Math.Max(0, v.SoLuongTon - qty);
+                else if (action == "NHAP_KHO" || action == "DOI_TRA")
+                    v.SoLuongTon += qty;
+
+                _ = InvokeAsync(StateHasChanged);
+            }
+        }
     }
 
     protected override async Task OnParametersSetAsync()
