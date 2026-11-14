@@ -48,6 +48,21 @@
         <button class="qf-header-close-btn" id="qfCloseBtn" title="Thu nhỏ">✕</button>
       </div>
 
+      <!-- Thẻ thông tin sản phẩm đang mở (Hiển thị khi khách ở trang chi tiết sản phẩm) -->
+      <div class="qf-product-context-bar" id="qfProductContextBar" style="display: none;">
+        <div class="qf-product-context-thumb">
+          <img id="qfContextImg" src="/images/no-image.svg" alt="Sản phẩm" />
+        </div>
+        <div class="qf-product-context-details">
+          <div class="qf-product-context-title" id="qfContextTitle">Sản phẩm đang xem</div>
+          <div class="qf-product-context-meta">
+            <span class="qf-context-price" id="qfContextPrice"></span>
+            <span class="qf-context-variant" id="qfContextVariant">Chưa chọn màu/size</span>
+          </div>
+        </div>
+        <button class="qf-context-close-btn" id="qfContextCloseBtn" title="Ẩn thẻ sản phẩm">✕</button>
+      </div>
+
       <div class="qf-chat-body" id="qfChatBody">
         <div class="qf-msg-row bot">
           <div class="qf-msg-avatar">AI</div>
@@ -102,8 +117,70 @@
   const chatBody = document.getElementById('qfChatBody');
   const inputField = document.getElementById('qfInputField');
   const sendBtn = document.getElementById('qfSendBtn');
+  const contextBar = document.getElementById('qfProductContextBar');
+  const contextCloseBtn = document.getElementById('qfContextCloseBtn');
 
   let history = [];
+  let currentProductContext = null;
+
+  // Render thẻ thông tin sản phẩm đang mở
+  function renderProductContext() {
+    if (!contextBar) return;
+    if (!currentProductContext || !currentProductContext.name) {
+      contextBar.style.display = 'none';
+      return;
+    }
+
+    const img = document.getElementById('qfContextImg');
+    const title = document.getElementById('qfContextTitle');
+    const price = document.getElementById('qfContextPrice');
+    const variant = document.getElementById('qfContextVariant');
+
+    if (img) img.src = currentProductContext.imageUrl || '/images/no-image.svg';
+    if (title) title.textContent = currentProductContext.name;
+    if (price) {
+      price.textContent = currentProductContext.price
+        ? `${Number(currentProductContext.price).toLocaleString('vi-VN')}₫`
+        : '';
+    }
+
+    if (variant) {
+      if (currentProductContext.color || currentProductContext.size) {
+        const vText = [currentProductContext.color, currentProductContext.size].filter(Boolean).join(' / ');
+        const stockText = currentProductContext.stock > 0 ? `Còn ${currentProductContext.stock}` : 'Tạm hết hàng';
+        variant.textContent = `${vText} (${stockText})`;
+      } else {
+        variant.textContent = 'Chưa chọn màu/size';
+      }
+    }
+
+    contextBar.style.display = 'flex';
+    updateContextQuickActions();
+  }
+
+  function updateContextQuickActions() {
+    if (!chatBody || !currentProductContext || !currentProductContext.name) return;
+    const quickContainer = chatBody.querySelector('.qf-quick-actions');
+    if (!quickContainer) return;
+
+    const pName = currentProductContext.name;
+    const variantDesc = currentProductContext.color && currentProductContext.size
+      ? `màu ${currentProductContext.color} size ${currentProductContext.size}`
+      : 'mẫu này';
+
+    quickContainer.innerHTML = `
+      <button class="qf-quick-btn" onclick="window.qfSendQuick('Tư vấn chọn size cho ${pName} theo chiều cao và cân nặng')">Tư vấn chọn size</button>
+      <button class="qf-quick-btn" onclick="window.qfSendQuick('${pName} ${variantDesc} còn hàng trong kho không?')">Kiểm tra tồn kho</button>
+      <button class="qf-quick-btn" onclick="window.qfSendQuick('Chất liệu ${pName} mặc có mát và bền không?')">Hỏi về chất liệu</button>
+      <button class="qf-quick-btn" onclick="window.qfSendQuick('Gợi ý cách phối đồ đẹp nhất với ${pName}')">Gợi ý cách phối đồ</button>
+    `;
+  }
+
+  if (contextCloseBtn && contextBar) {
+    contextCloseBtn.addEventListener('click', () => {
+      contextBar.style.display = 'none';
+    });
+  }
 
   // Toggle Mở/Đóng cửa sổ chat
   function toggleChat() {
@@ -201,7 +278,8 @@
         },
         body: JSON.stringify({
           message: msg,
-          history: history
+          history: history,
+          productContext: currentProductContext
         })
       });
 
@@ -234,10 +312,22 @@
     sendMessage(promptText);
   };
 
+  // Expose các hàm thiết lập ngữ cảnh sản phẩm toàn cục cho Blazor C#
+  window.qfSetProductContext = function (ctx) {
+    currentProductContext = ctx;
+    renderProductContext();
+  };
+
+  window.qfClearProductContext = function () {
+    currentProductContext = null;
+    renderProductContext();
+  };
+
   // Expose các hàm điều khiển toàn cục cho Blazor C# gọi qua JSRuntime
   window.qfOpenChat = function (initialPrompt) {
     root.style.display = '';
     openChat();
+    renderProductContext();
     if (initialPrompt && typeof initialPrompt === 'string' && initialPrompt.trim() !== '') {
       sendMessage(initialPrompt);
     }

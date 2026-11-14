@@ -145,7 +145,7 @@ export function extractMeasurements(text) {
  * Xử lý tin nhắn người dùng bằng Rule-Based Offline Engine
  * Hỗ trợ tham số history để giữ ngữ cảnh hội thoại
  */
-export async function processOfflineRuleBased(message, history = []) {
+export async function processOfflineRuleBased(message, history = [], productContext = null) {
   const lowerMsg = message.toLowerCase();
 
   // 1. KIỂM TRA PHẠM VI (GUARDRAIL OFFLINE)
@@ -166,7 +166,46 @@ export async function processOfflineRuleBased(message, history = []) {
     }
   }
 
-  // 2. TƯ VẤN CHỌN SIZE THEO CHIỀU CAO & CÂN NẶNG (KÈM NGỮ CẢNH TỪ HISTORY)
+  // 1.5. XỬ LÝ TRỰC TIẾP NGỮ CẢNH SẢN PHẨM KHÁCH HÀNG ĐANG XEM (PRODUCT CONTEXT AWARE)
+  if (productContext && productContext.name) {
+    const pName = productContext.name;
+    const pMaterial = productContext.material || 'chất vải thoáng mát cao cấp';
+
+    // Hỏi về chất liệu
+    if (lowerMsg.includes('chất liệu') || lowerMsg.includes('vải') || lowerMsg.includes('mát') || lowerMsg.includes('nhăn') || lowerMsg.includes('co giãn')) {
+      return {
+        reply: `Dạ, mẫu "${pName}" được may từ chất liệu ${pMaterial} ạ. Vải mềm mại, thoáng mát và co giãn thoải mái, giữ form dáng rất tốt ạ!`,
+        toolsUsed: [{ name: 'Offline_ProductContext_Material', args: { product: pName } }],
+        engine: 'Rule-Based Offline'
+      };
+    }
+
+    // Hỏi về còn hàng / tồn kho
+    if (lowerMsg.includes('còn hàng') || lowerMsg.includes('tồn kho') || lowerMsg.includes('còn không') || lowerMsg.includes('hết hàng') || lowerMsg.includes('màu gì') || lowerMsg.includes('size nào')) {
+      if (productContext.hasSelectedVariant && productContext.color && productContext.size) {
+        const stockStatus = productContext.stock > 0
+          ? `hiện còn ${productContext.stock} sản phẩm trong kho sẵn sàng giao ngay ạ!`
+          : `hiện tại phiên bản này đang tạm hết hàng trong kho online. Quý khách có thể chọn màu hoặc size khác nhé ạ!`;
+
+        return {
+          reply: `Dạ, mẫu "${pName}" phiên bản màu ${productContext.color} size ${productContext.size} ${stockStatus}`,
+          toolsUsed: [{ name: 'Offline_ProductContext_VariantStock', args: { product: pName, color: productContext.color, size: productContext.size } }],
+          engine: 'Rule-Based Offline'
+        };
+      }
+    }
+
+    // Tư vấn phối đồ
+    if (lowerMsg.includes('phối') || lowerMsg.includes('mix') || lowerMsg.includes('mặc cùng') || lowerMsg.includes('kết hợp')) {
+      return {
+        reply: `Dạ, với thiết kế hiện đại của mẫu "${pName}", Stylist AI gợi ý bạn:\n- Đi làm: Phối cùng Quần tây slimfit hoặc Quần kaki Chinos tông màu trung tính, thêm thắt lưng da bò lịch lãm.\n- Đi chơi/Dạo phố: Kết hợp với Quần jean co giãn hoặc Quần short cùng sneaker trắng năng động!\nBạn muốn mặc mẫu này trong dịp nào để em tư vấn chi tiết hơn ạ?`,
+        toolsUsed: [{ name: 'Offline_ProductContext_Outfit', args: { product: pName } }],
+        engine: 'Rule-Based Offline'
+      };
+    }
+  }
+
+  // 2. TƯ VẤN CHỌN SIZE THEO CHIỀU CAO & CÂN NẶNG (KÈM NGỮ CẢNH TỪ PRODUCT CONTEXT HOẶC HISTORY)
   const { height, weight } = extractMeasurements(message);
   if (height || weight) {
     const h = height || 170;
@@ -176,7 +215,7 @@ export async function processOfflineRuleBased(message, history = []) {
     let reply = `Dạ, với vóc dáng chiều cao khoảng ${h}cm và cân nặng ${w}kg, Stylist AI khuyên bạn nên chọn Size ${size} ạ!\n${advice}\n\n`;
 
     // Kiểm tra xem khách có đang hỏi về một sản phẩm cụ thể từ trước không
-    const previousProduct = extractProductFromHistory(history);
+    const previousProduct = productContext?.name || extractProductFromHistory(history);
     if (previousProduct) {
       try {
         const variants = await getProductVariants(previousProduct);

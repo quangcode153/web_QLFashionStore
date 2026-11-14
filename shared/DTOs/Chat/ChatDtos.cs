@@ -9,6 +9,42 @@ public class ChatRequestDto
 
     [JsonPropertyName("history")]
     public List<ChatHistoryItemDto>? History { get; set; } = new();
+
+    [JsonPropertyName("productContext")]
+    public ProductContextDto? ProductContext { get; set; }
+}
+
+public class ProductContextDto
+{
+    [JsonPropertyName("id")]
+    public int? Id { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("price")]
+    public decimal? Price { get; set; }
+
+    [JsonPropertyName("imageUrl")]
+    public string? ImageUrl { get; set; }
+
+    [JsonPropertyName("material")]
+    public string? Material { get; set; }
+
+    [JsonPropertyName("color")]
+    public string? Color { get; set; }
+
+    [JsonPropertyName("size")]
+    public string? Size { get; set; }
+
+    [JsonPropertyName("sku")]
+    public string? Sku { get; set; }
+
+    [JsonPropertyName("stock")]
+    public int? Stock { get; set; }
+
+    [JsonPropertyName("hasSelectedVariant")]
+    public bool HasSelectedVariant { get; set; }
 }
 
 public class ChatHistoryItemDto

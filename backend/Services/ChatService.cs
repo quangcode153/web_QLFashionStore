@@ -102,7 +102,7 @@ public class ChatService : IChatService
         }
 
         // TẦNG 3: BẢO HIỂM NỘI BỘ (BACKEND FALLBACK STYLIST ENGINE) KHI HOÀN TOÀN MẤT KẾT NỐI MẠNG
-        return GenerateFallbackResponse(request.Message);
+        return GenerateFallbackResponse(request.Message, request.ProductContext);
     }
 
     private async Task<ChatResponseDto?> CallGroqCloudDirectlyAsync(ChatRequestDto request, CancellationToken cancellationToken)
@@ -114,6 +114,19 @@ public class ChatService : IChatService
         {
             new { role = "system", content = StylistSystemPrompt }
         };
+
+        if (request.ProductContext != null && !string.IsNullOrWhiteSpace(request.ProductContext.Name))
+        {
+            var p = request.ProductContext;
+            var variantInfo = p.HasSelectedVariant
+                ? $"Màu sắc: {p.Color ?? "Chưa chọn"}, Kích cỡ: {p.Size ?? "Chưa chọn"}, SKU: {p.Sku ?? "N/A"}, Tồn kho: {p.Stock ?? 0} sản phẩm."
+                : "Khách chưa chọn biến thể màu hoặc kích thước cụ thể.";
+            messages.Add(new
+            {
+                role = "system",
+                content = $"[NGỮ CẢNH TRANG SẢN PHẨM KHÁCH HÀNG ĐANG XEM]:\n- Tên sản phẩm: '{p.Name}'\n- Giá niêm yết: {p.Price:N0}đ\n- Chất liệu: '{p.Material ?? "Vải cao cấp QF"}'\n- Thuộc tính biến thể: {variantInfo}\nHãy ưu tiên tư vấn chuyên sâu về sản phẩm này (chọn size, màu sắc, phối đồ, chất vải) khi khách đặt câu hỏi."
+            });
+        }
 
         if (request.History != null)
         {
@@ -195,11 +208,86 @@ public class ChatService : IChatService
         };
     }
 
-    private static ChatResponseDto GenerateFallbackResponse(string userMessage)
+    private static ChatResponseDto GenerateFallbackResponse(string userMessage, ProductContextDto? productContext = null)
     {
         var lower = userMessage.ToLowerInvariant();
 
-        // 1. Phân tích chiều cao, cân nặng để tư vấn size
+        // 0. XỬ LÝ ƯU TIÊN THEO NGỮ CẢNH SẢN PHẨM KHÁCH ĐANG XEM (PRODUCT CONTEXT AWARE)
+        if (productContext != null && !string.IsNullOrWhiteSpace(productContext.Name))
+        {
+            var pName = productContext.Name.Trim();
+            var pPrice = productContext.Price.HasValue ? $"{productContext.Price.Value:N0}đ" : "giá niêm yết";
+            var pMaterial = !string.IsNullOrWhiteSpace(productContext.Material) ? productContext.Material : "chất liệu cao cấp chuẩn QF Noir";
+
+            // 0.1 Hỏi về chất liệu của sản phẩm đang xem
+            if (lower.Contains("chất liệu") || lower.Contains("vải") || lower.Contains("mát") || lower.Contains("co giãn") || lower.Contains("nhăn") || lower.Contains("xù"))
+            {
+                return new ChatResponseDto
+                {
+                    Reply = $"Dạ, sản phẩm {pName} được sản xuất từ chất liệu {pMaterial} ạ. Vải có độ hoàn thiện tỉ mỉ, mềm mại, thoáng mát và co giãn thoải mái khi vận động hàng ngày, đồng thời giữ form dáng rất tốt sau nhiều lần giặt ạ!",
+                    Engine = "Backend Fallback Stylist"
+                };
+            }
+
+            // 0.2 Hỏi về tình trạng còn hàng / tồn kho của sản phẩm đang xem
+            if (lower.Contains("còn hàng") || lower.Contains("tồn kho") || lower.Contains("hết hàng") || lower.Contains("còn không") || lower.Contains("màu gì") || lower.Contains("size nào"))
+            {
+                if (productContext.HasSelectedVariant && !string.IsNullOrWhiteSpace(productContext.Color) && !string.IsNullOrWhiteSpace(productContext.Size))
+                {
+                    var stockCount = productContext.Stock ?? 0;
+                    var stockStatus = stockCount > 0
+                        ? $"hiện còn {stockCount} sản phẩm trong kho sẵn sàng đóng gói giao ngay ạ."
+                        : "hiện tạm thời hết hàng trong kho online. Quý khách có thể chọn màu hoặc size khác, hoặc nhờ shop kiểm tra chi nhánh gần nhất nhé ạ!";
+
+                    return new ChatResponseDto
+                    {
+                        Reply = $"Dạ, đối với sản phẩm {pName} (Màu: {productContext.Color}, Size: {productContext.Size}), shop {stockStatus}",
+                        Engine = "Backend Fallback Stylist"
+                    };
+                }
+
+                return new ChatResponseDto
+                {
+                    Reply = $"Dạ, sản phẩm {pName} hiện đang có sẵn đầy đủ màu sắc và kích cỡ tại kho của shop với giá ưu đãi {pPrice}. Quý khách vui lòng click chọn Màu sắc và Kích thước cụ thể trên màn hình để kiểm tra số lượng tồn kho tức thì nhé ạ!",
+                    Engine = "Backend Fallback Stylist"
+                };
+            }
+
+            // 0.3 Tư vấn phối đồ với sản phẩm đang xem
+            if (lower.Contains("phối") || lower.Contains("mix") || lower.Contains("kết hợp") || lower.Contains("mặc cùng") || lower.Contains("mặc với") || lower.Contains("đi chơi") || lower.Contains("công sở"))
+            {
+                return new ChatResponseDto
+                {
+                    Reply = $"Dạ, đối với mẫu {pName}, Stylist AI gợi ý cách phối đồ cực kỳ chuẩn phong cách Minimalism:\n" +
+                            $"- Phong cách hàng ngày/dạo phố: Phối {pName} cùng Quần short hoặc Quần Jean slimfit, mang cùng giày sneaker trắng năng động.\n" +
+                            $"- Phong cách lịch sự/đi làm: Kết hợp cùng Quần tây hoặc Quần kaki Chinos tông màu be/đen/xám và phụ kiện thắt lưng da bò thật.\n" +
+                            $"Quý khách muốn mặc sản phẩm này trong dịp nào để em gợi ý chi tiết hơn nhé ạ!",
+                    Engine = "Backend Fallback Stylist"
+                };
+            }
+
+            // 0.4 Tư vấn chọn size cho sản phẩm đang xem
+            if (Regex.IsMatch(lower, @"(m\d{2}|\d{3}\s*cm|\d{2}\s*kg|size|nặng|cao)"))
+            {
+                string recommendedSize = "L";
+                if (lower.Contains("50kg") || lower.Contains("55kg") || lower.Contains("1m60") || lower.Contains("1m62"))
+                    recommendedSize = "S";
+                else if (lower.Contains("60kg") || lower.Contains("62kg") || lower.Contains("1m65") || lower.Contains("1m68"))
+                    recommendedSize = "M";
+                else if (lower.Contains("70kg") || lower.Contains("75kg") || lower.Contains("1m75") || lower.Contains("1m78"))
+                    recommendedSize = "XL";
+                else if (lower.Contains("80kg") || lower.Contains("85kg") || lower.Contains("90kg"))
+                    recommendedSize = "XXL";
+
+                return new ChatResponseDto
+                {
+                    Reply = $"Dạ, đối với mẫu {pName}, form dáng được cắt may chuẩn vóc dáng người Việt Nam. Với số đo của quý khách, em đề xuất chọn size {recommendedSize} là vừa vặn và tôn dáng nhất ạ. Quý khách có thể an tâm đặt hàng vì shop hỗ trợ đổi size miễn phí trong 14 ngày trên toàn quốc ạ!",
+                    Engine = "Backend Fallback Stylist"
+                };
+            }
+        }
+
+        // 1. Phân tích chiều cao, cân nặng để tư vấn size (khi không có context sản phẩm cụ thể)
         if (Regex.IsMatch(lower, @"(m\d{2}|\d{3}\s*cm|\d{2}\s*kg|size|nặng|cao)"))
         {
             string recommendedSize = "L";

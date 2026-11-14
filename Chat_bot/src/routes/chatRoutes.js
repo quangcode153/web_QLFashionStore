@@ -15,12 +15,12 @@ const router = express.Router();
  */
 router.post('/chat', async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, productContext } = req.body;
     if (!message || message.trim() === '') {
       return res.status(400).json({ error: 'Nội dung tin nhắn không được để trống.' });
     }
 
-    const result = await processChatMessage(history || [], message);
+    const result = await processChatMessage(history || [], message, productContext);
     return res.json(result);
   } catch (error) {
     console.error('[API /chat] Lỗi:', error);

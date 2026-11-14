@@ -105,7 +105,7 @@ const availableFunctions = {
 /**
  * Gọi Groq Cloud API (Tầng 1 - Online)
  */
-async function callGroqChat(history, userMessage) {
+async function callGroqChat(history, userMessage, productContext = null) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey || apiKey.trim() === '') {
     throw new Error('Chưa cấu hình GROQ_API_KEY');
@@ -114,13 +114,31 @@ async function callGroqChat(history, userMessage) {
   const model = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
   const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: SYSTEM_PROMPT }
+  ];
+
+  if (productContext && productContext.name) {
+    const vText = productContext.color && productContext.size
+      ? `Màu: ${productContext.color}, Size: ${productContext.size}, Mã SKU: ${productContext.sku || 'N/A'}, Tồn kho: ${productContext.stock || 0} sản phẩm.`
+      : 'Khách hàng chưa chọn màu hoặc kích thước cụ thể.';
+    messages.push({
+      role: 'system',
+      content: `[NGỮ CẢNH TRANG SẢN PHẨM KHÁCH HÀNG ĐANG XEM]:
+- Tên sản phẩm: "${productContext.name}"
+- Giá bán: ${productContext.price ? Number(productContext.price).toLocaleString('vi-VN') + 'đ' : 'N/A'}
+- Chất liệu: "${productContext.material || 'Vải cao cấp QF'}"
+- Biến thể đang chọn: ${vText}
+Hãy ưu tiên tư vấn, giải đáp và gợi ý trực tiếp xoay quanh sản phẩm này khi khách đặt câu hỏi mà không cần hỏi lại tên sản phẩm!`
+    });
+  }
+
+  messages.push(
     ...history.map(item => ({
       role: item.role === 'user' ? 'user' : 'assistant',
       content: item.content || item.text,
     })),
-    { role: 'user', content: userMessage },
-  ];
+    { role: 'user', content: userMessage }
+  );
 
   const toolsUsed = [];
   let currentMessages = [...messages];
@@ -196,17 +214,17 @@ async function callGroqChat(history, userMessage) {
  * - Tầng 1: Groq Cloud API (Siêu tốc, thông minh, 14.400 req/ngày miễn phí)
  * - Tầng 2: Rule-Based Engine (Offline, 0đ, không cần mạng, vô hạn quota)
  */
-export async function processChatMessage(history = [], userMessage) {
+export async function processChatMessage(history = [], userMessage, productContext = null) {
   // THỬ TẦNG 1: GROQ CLOUD AI
   try {
-    const result = await callGroqChat(history, userMessage);
+    const result = await callGroqChat(history, userMessage, productContext);
     return result;
   } catch (groqError) {
     console.warn(`[Tầng 1 Groq Error]: ${groqError.message}. TỰ ĐỘNG CHUYỂN SANG TẦNG 2: Rule-Based Offline Engine...`);
 
     // TẦNG 2: OFFLINE RULE-BASED ENGINE DỰ PHÒNG
     try {
-      const offlineResult = await processOfflineRuleBased(userMessage, history);
+      const offlineResult = await processOfflineRuleBased(userMessage, history, productContext);
       return offlineResult;
     } catch (fallbackError) {
       console.error('[Tầng 2 Error]:', fallbackError);
