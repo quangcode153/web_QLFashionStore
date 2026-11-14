@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {
   searchProducts,
   getProductVariants,
@@ -7,14 +9,17 @@ import {
 } from './inventoryService.js';
 import { processOfflineRuleBased } from './ruleBasedService.js';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const SYSTEM_PROMPT = `
 Bạn là "Stylist AI" - Trợ lý tư vấn thời trang thông minh và chuyên nghiệp của thương hiệu QF NOIR.
 
 === NGUYÊN TẮC GIỚI HẠN PHẠM VI (GUARDRAILS) - BẮT BUỘC TUÂN THỦ ===
 1. PHẠM VI ĐƯỢC PHÉP:
-   - Tư vấn các mẫu sản phẩm thời trang (áo thun, polo, set đồ bộ thể thao, quần jogger, short, balo...).
+   - Tư vấn các mẫu sản phẩm thời trang (áo thun, polo, set đồ bộ thể thao, quần jogger, short, balo, sơ mi, quần tây...).
+   - Gợi ý phối đồ thời trang thông minh (Mix & Match), phối áo với quần chuẩn phong cách cho các dịp: đi chơi, dạo phố, công sở, đi làm, đi tiệc, thể thao...
    - Tư vấn chọn size dựa theo chiều cao và cân nặng của khách (kèm giải thích form dáng).
    - Kiểm tra màu sắc, các biến thể và số lượng TỒN KHO THỰC TẾ.
    - Báo giá bán và thông tin các chương trình khuyến mãi / mã giảm giá voucher.
@@ -136,7 +141,7 @@ async function callGroqChat(history, userMessage) {
         temperature: 0.3,
         max_tokens: 600,
       }),
-      signal: AbortSignal.timeout(12000), // Timeout 12 giây
+      signal: AbortSignal.timeout(4000), // Timeout 4 giây: khi offline/mất mạng chuyển sang Tầng 2 ngay lập tức
     });
 
     if (!res.ok) {
@@ -201,7 +206,7 @@ export async function processChatMessage(history = [], userMessage) {
 
     // TẦNG 2: OFFLINE RULE-BASED ENGINE DỰ PHÒNG
     try {
-      const offlineResult = await processOfflineRuleBased(userMessage);
+      const offlineResult = await processOfflineRuleBased(userMessage, history);
       return offlineResult;
     } catch (fallbackError) {
       console.error('[Tầng 2 Error]:', fallbackError);

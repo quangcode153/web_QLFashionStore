@@ -6,6 +6,79 @@ import {
 } from './inventoryService.js';
 import { executeQuery } from '../config/db.js';
 
+// Danh mục sản phẩm dự phòng mặc định khi DB đang bận hoặc offline
+const DEFAULT_FALLBACK_PRODUCTS = [
+  { ma_san_pham: 1, ten_san_pham: 'Áo Thun Cotton Basic Nam QF' },
+  { ma_san_pham: 2, ten_san_pham: 'Áo Polo Thể Thao Nam QF Pique' },
+  { ma_san_pham: 3, ten_san_pham: 'Áo Thun Cổ Tròn Premium Dày Dặn' },
+  { ma_san_pham: 4, ten_san_pham: 'Áo Thun Oversize Form Rộng Urban' },
+  { ma_san_pham: 5, ten_san_pham: 'Áo Thun Thể Thao Dry-Ex Co Giãn' },
+  { ma_san_pham: 6, ten_san_pham: 'Áo Sơ Mi Oxford Dài Tay Nam' },
+  { ma_san_pham: 7, ten_san_pham: 'Áo Sơ Mi Công Sở Slimfit Chống Nhăn' },
+  { ma_san_pham: 8, ten_san_pham: 'Áo Sơ Mi Linen Ngắn Tay Thoáng Mát' },
+  { ma_san_pham: 10, ten_san_pham: 'Quần Jean Slimfit Nam Co Giãn' },
+  { ma_san_pham: 11, ten_san_pham: 'Quần Jean Ống Suông Nam Straight' },
+  { ma_san_pham: 14, ten_san_pham: 'Quần Kaki Slimfit Nam Co Giãn' },
+  { ma_san_pham: 15, ten_san_pham: 'Quần Kaki Ống Đứng Nam Chinos' },
+  { ma_san_pham: 18, ten_san_pham: 'Áo Khoác Bomber Gió Nam QF' },
+  { ma_san_pham: 20, ten_san_pham: 'Áo Khoác Dù 2 Lớp Chống Nước QF' },
+  { ma_san_pham: 22, ten_san_pham: 'Quần Tây Nam Slimfit Co Giãn Công Sở' },
+  { ma_san_pham: 23, ten_san_pham: 'Quần Âu Nam Xếp Ly Phong Cách Ý' },
+  { ma_san_pham: 24, ten_san_pham: 'Quần Tây Nam Cạp Cao Gurkha Lịch Lãm' },
+  { ma_san_pham: 30, ten_san_pham: 'Set Đồ Bộ Thể Thao Nam Mùa Hè QF' },
+  { ma_san_pham: 31, ten_san_pham: 'Quần Jogger Nỉ Thể Thao Nam Bo Gấu' },
+  { ma_san_pham: 32, ten_san_pham: 'Quần Short Cargo Túi Hộp Nam' },
+  { ma_san_pham: 35, ten_san_pham: 'Balo Laptop Nam QF Chống Trộm' },
+  { ma_san_pham: 34, ten_san_pham: 'Túi Đeo Chéo Nam Da PU Kháng Nước' },
+  { ma_san_pham: 33, ten_san_pham: 'Túi Tote Canvas Nam QF Tối Giản' },
+  { ma_san_pham: 36, ten_san_pham: 'Thắt Lưng Da Bò Nam Khóa Kim' },
+  { ma_san_pham: 37, ten_san_pham: 'Ví Da Nam Gấp Đôi Cao Cấp QF' },
+  { ma_san_pham: 38, ten_san_pham: 'Ví Cầm Tay Clutch Nam Da Bò Thật' }
+];
+
+let cachedProducts = null;
+let lastProductsFetchTime = 0;
+const CACHE_TTL_MS = 10 * 60 * 1000; // Cache 10 phút
+
+async function getCachedProducts() {
+  const now = Date.now();
+  if (cachedProducts && (now - lastProductsFetchTime < CACHE_TTL_MS)) {
+    return cachedProducts;
+  }
+  try {
+    const products = await executeQuery(`SELECT ma_san_pham, ten_san_pham FROM SanPham WHERE da_xoa = 0 OR da_xoa IS NULL`);
+    if (products && products.length > 0) {
+      cachedProducts = products;
+      lastProductsFetchTime = now;
+      return cachedProducts;
+    }
+  } catch (err) {
+    console.warn('[Offline Engine] Không truy vấn được CSDL, sử dụng danh mục bộ nhớ:', err.message);
+  }
+  return cachedProducts || DEFAULT_FALLBACK_PRODUCTS;
+}
+
+/**
+ * Trích xuất tên sản phẩm từ lịch sử hội thoại trước đó để giữ ngữ cảnh (Context Retention)
+ */
+function extractProductFromHistory(history = []) {
+  if (!history || !Array.isArray(history) || history.length === 0) return null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const content = (history[i].content || history[i].text || '').toLowerCase();
+    const match = content.match(/đang xem sản phẩm ['"“”](.*?)['"“”]/i) || content.match(/sản phẩm ['"“”](.*?)['"“”]/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    const productList = cachedProducts || DEFAULT_FALLBACK_PRODUCTS;
+    for (const p of productList) {
+      if (content.includes(p.ten_san_pham.toLowerCase())) {
+        return p.ten_san_pham;
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Tính toán size áo/quần chuẩn thời trang dựa trên chiều cao và cân nặng
  */
@@ -70,8 +143,9 @@ export function extractMeasurements(text) {
 
 /**
  * Xử lý tin nhắn người dùng bằng Rule-Based Offline Engine
+ * Hỗ trợ tham số history để giữ ngữ cảnh hội thoại
  */
-export async function processOfflineRuleBased(message) {
+export async function processOfflineRuleBased(message, history = []) {
   const lowerMsg = message.toLowerCase();
 
   // 1. KIỂM TRA PHẠM VI (GUARDRAIL OFFLINE)
@@ -92,7 +166,7 @@ export async function processOfflineRuleBased(message) {
     }
   }
 
-  // 2. TƯ VẤN CHỌN SIZE THEO CHIỀU CAO & CÂN NẶNG
+  // 2. TƯ VẤN CHỌN SIZE THEO CHIỀU CAO & CÂN NẶNG (KÈM NGỮ CẢNH TỪ HISTORY)
   const { height, weight } = extractMeasurements(message);
   if (height || weight) {
     const h = height || 170;
@@ -101,7 +175,33 @@ export async function processOfflineRuleBased(message) {
 
     let reply = `Dạ, với vóc dáng chiều cao khoảng ${h}cm và cân nặng ${w}kg, Stylist AI khuyên bạn nên chọn Size ${size} ạ!\n${advice}\n\n`;
 
-    // Tra cứu các sản phẩm đang có size này còn hàng trong kho
+    // Kiểm tra xem khách có đang hỏi về một sản phẩm cụ thể từ trước không
+    const previousProduct = extractProductFromHistory(history);
+    if (previousProduct) {
+      try {
+        const variants = await getProductVariants(previousProduct);
+        if (variants && Array.isArray(variants) && variants.length > 0) {
+          const matchingVariants = variants.filter(v => (v.kich_co || '').toUpperCase() === size);
+          if (matchingVariants.length > 0) {
+            reply += `Với mẫu ${previousProduct} bạn đang quan tâm:\n`;
+            matchingVariants.forEach(v => {
+              const stock = v.so_luong_ton > 0 ? `Còn ${v.so_luong_ton} cái` : 'Tạm hết';
+              reply += ` - Màu ${v.mau_sac} (Size ${size}): ${stock}\n`;
+            });
+            reply += `\nQuý khách muốn chọn màu nào để em hướng dẫn thêm vào giỏ hàng nhé ạ!`;
+            return {
+              reply: reply.trim(),
+              toolsUsed: [{ name: 'RuleBased_ContextualSize', args: { product: previousProduct, size } }],
+              engine: 'Rule-Based Offline'
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[Offline Engine] Lỗi tra cứu size theo sản phẩm context:', e.message);
+      }
+    }
+
+    // Nếu không có context sản phẩm, gợi ý top sản phẩm đang có sẵn size này trong kho
     try {
       const availableItems = await executeQuery(`
         SELECT TOP 5 sp.ten_san_pham, bt.mau_sac, ISNULL(tk.so_luong_ton, 0) AS so_luong_ton, bt.gia_ban
@@ -124,13 +224,71 @@ export async function processOfflineRuleBased(message) {
     }
 
     return {
-      reply,
+      reply: reply.trim(),
       toolsUsed: [{ name: 'RuleBased_SizeCalculator', args: { height: h, weight: w, size } }],
       engine: 'Rule-Based Offline'
     };
   }
 
-  // 3. TRA CỨU KHUYẾN MÃI / VOUCHER
+  // 3. TƯ VẤN PHỐI ĐỒ / MIX & MATCH / ĐI CHƠI / CÔNG SỞ
+  if (/(phối đồ|mix đồ|kết hợp|đi chơi|công sở|đi làm|đi tiệc|hẹn hò|mặc gì)/i.test(message)) {
+    return {
+      reply: "Dạ, Stylist AI gợi ý cho bạn các công thức phối đồ chuẩn phong cách QF NOIR ạ:\n\n" +
+             "1. Đi làm công sở lịch lãm: Áo sơ mi Oxford hoặc Áo polo Pique kết hợp Quần tây Slimfit / Quần kaki Chinos, hoàn thiện cùng Thắt lưng da bò thật.\n" +
+             "2. Dạo phố năng động: Áo thun Cotton Compact hoặc Áo thun Oversize phối với Quần short Cargo túi hộp hoặc Quần jean Slimfit co giãn.\n" +
+             "3. Smart Casual thời thượng: Áo len cổ lọ dệt mịn bên trong khoác cùng Áo khoác Bomber gió cản nước và Quần âu xếp ly Ý.\n" +
+             "4. Thể thao ngày hè: Set Đồ Bộ Thể Thao Nam Mùa Hè QF vải Dry-Ex co giãn 4 chiều thoáng khí.\n\n" +
+             "Bạn đang chuẩn bị trang phục cho dịp nào để em tư vấn chi tiết hơn ạ?",
+      toolsUsed: [{ name: 'RuleBased_MixAndMatch' }],
+      engine: 'Rule-Based Offline'
+    };
+  }
+
+  // 4. DANH MỤC CÁC LOẠI ÁO (POLO, SƠ MI, THUN, KHOÁC, HOODIE)
+  if (/(loại áo|mẫu áo|dòng áo|danh mục áo|áo polo|áo thun|sơ mi|áo khoác|áo len|hoodie|sweater|\báo\b)/i.test(message) && !message.includes('quần')) {
+    return {
+      reply: "Dạ, hiện tại QF NOIR đang có sẵn các nhóm áo thời trang cao cấp sau để bạn lựa chọn ạ:\n\n" +
+             "1. Áo Thun Nam: Thun Cotton Basic (187.000đ), Thun Cổ Tròn Premium (210.000đ), Thun Oversize Form Rộng (255.000đ), Thun Thể Thao Dry-Ex (195.000đ).\n" +
+             "2. Áo Polo Nam: Áo Polo Thể Thao Nam QF Pique co giãn 4 chiều thoáng khí (219.000đ).\n" +
+             "3. Áo Sơ Mi Nam: Sơ mi Oxford Dài Tay (256.000đ), Sơ mi Công Sở Slimfit chống nhăn (475.000đ), Sơ mi Linen Ngắn Tay (464.000đ).\n" +
+             "4. Áo Khoác Nam: Áo Khoác Bomber Gió Nam (171.000đ), Áo Khoác Dù 2 Lớp Chống Nước (190.000đ).\n" +
+             "5. Áo Len & Hoodie: Áo Hoodie Nỉ Bông (320.000đ), Áo Len Cổ Lọ Hàn Quốc (380.000đ).\n\n" +
+             "Bạn đang quan tâm đến mẫu áo nào để em kiểm tra màu sắc và bảng size chi tiết ạ?",
+      toolsUsed: [{ name: 'RuleBased_ShirtCategory' }],
+      engine: 'Rule-Based Offline'
+    };
+  }
+
+  // 5. DANH MỤC CÁC LOẠI QUẦN (JEAN, TÂY, KAKI, JOGGER, SHORT)
+  if (/(loại quần|mẫu quần|dòng quần|danh mục quần|quần tây|quần jean|quần kaki|quần jogger|quần short|quần âu|\bquần\b)/i.test(message)) {
+    return {
+      reply: "Dạ, QF NOIR có đa dạng các dòng quần nam hiện đại chuẩn phong cách Minimalist ạ:\n\n" +
+             "1. Quần Tây & Âu: Quần Tây Slimfit Co Giãn Công Sở (380.000đ), Quần Âu Xếp Ly Phong Cách Ý (420.000đ), Quần Tây Cạp Cao Gurkha (490.000đ).\n" +
+             "2. Quần Jean Nam: Quần Jean Slimfit Co Giãn (549.000đ), Quần Jean Ống Suông Straight (480.000đ), Quần Jean Rách Gối Cá Tính (520.000đ).\n" +
+             "3. Quần Kaki & Jogger: Quần Kaki Slimfit (340.000đ), Quần Kaki Ống Đứng Chinos (360.000đ), Quần Jogger Nỉ Bo Gấu (290.000đ).\n" +
+             "4. Quần Short Nam: Quần Short Cargo Túi Hộp (302.000đ), Quần Short Kaki Đi Biển Dạo Phố (220.000đ).\n\n" +
+             "Bạn đang tìm quần mặc đi làm công sở hay đi chơi dạo phố để em hỗ trợ nhé ạ?",
+      toolsUsed: [{ name: 'RuleBased_PantsCategory' }],
+      engine: 'Rule-Based Offline'
+    };
+  }
+
+  // 6. BALO & PHỤ KIỆN (TÚI, VÍ, THẮT LƯNG)
+  if (/(balo|túi|ví|thắt lưng|phụ kiện|clutch|tote)/i.test(message)) {
+    return {
+      reply: "Dạ, QF NOIR có các dòng phụ kiện thời trang nam cao cấp sau ạ:\n\n" +
+             "- Balo Laptop Nam QF Chống Trộm vải Oxford kháng nước (390.000đ).\n" +
+             "- Túi Đeo Chéo Nam Da PU Kháng Nước cao cấp (260.000đ).\n" +
+             "- Túi Tote Canvas Nam QF Tối Giản (150.000đ).\n" +
+             "- Thắt Lưng Da Bò Nam Khóa Kim sang trọng (280.000đ).\n" +
+             "- Ví Da Nam Gấp Đôi Cao Cấp và Ví Cầm Tay Clutch Da Bò Thật.\n\n" +
+             "Bạn đang quan tâm đến phụ kiện nào để em kiểm tra tình trạng kho hàng ạ?",
+      toolsUsed: [{ name: 'RuleBased_AccessoriesCategory' }],
+      engine: 'Rule-Based Offline'
+    };
+  }
+
+  // 7. TRA CỨU KHUYẾN MÃI / VOUCHER
   if (lowerMsg.includes('khuyến mãi') || lowerMsg.includes('voucher') || lowerMsg.includes('giảm giá') || lowerMsg.includes('ưu đãi') || lowerMsg.includes('mã')) {
     try {
       const promos = await getActivePromotions();
@@ -150,37 +308,67 @@ export async function processOfflineRuleBased(message) {
           engine: 'Rule-Based Offline'
         };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[Offline Engine] Lỗi lấy khuyến mãi:', e.message);
+    }
+    return {
+      reply: "Dạ, hiện tại shop có các ưu đãi hot:\n- Miễn phí vận chuyển toàn quốc cho đơn từ 500.000đ.\n- Mã giảm giá SALE50K giảm 50.000đ cho đơn từ 400.000đ.\n- Chiết khấu VIP 5-15% tự động áp dụng khi đăng nhập.\nBạn nhớ áp mã khi đặt hàng nhé ạ!",
+      toolsUsed: [{ name: 'RuleBased_PromotionsFallback' }],
+      engine: 'Rule-Based Offline'
+    };
   }
 
-  // 4. TRA CỨU SẢN PHẨM & TỒN KHO THEO TỪ KHÓA
+  // 8. TRA CỨU SẢN PHẨM & TỒN KHO THEO TỪ KHÓA CỤ THỂ
   try {
-    const products = await executeQuery(`SELECT ma_san_pham, ten_san_pham FROM SanPham WHERE da_xoa = 0 OR da_xoa IS NULL`);
+    const products = await getCachedProducts();
     let matchedProduct = null;
 
     if (products && products.length > 0) {
+      // 8.1. Ưu tiên khớp chính xác hoặc khớp từ khóa đặc trưng
       for (const p of products) {
         const pNameLower = p.ten_san_pham.toLowerCase();
-        // Kiểm tra xem tên sản phẩm có xuất hiện trong tin nhắn khách không
-        const words = pNameLower.split(' ').filter(w => w.length > 2);
-        let matchCount = 0;
-        words.forEach(w => {
-          if (lowerMsg.includes(w)) matchCount++;
-        });
-
-        if (matchCount >= 2 || lowerMsg.includes(pNameLower)) {
+        if (lowerMsg.includes(pNameLower)) {
           matchedProduct = p;
           break;
+        }
+      }
+
+      // 8.2. Khớp từ khóa cụm (ít nhất 2 từ)
+      if (!matchedProduct) {
+        for (const p of products) {
+          const pNameLower = p.ten_san_pham.toLowerCase();
+          const words = pNameLower.split(' ').filter(w => w.length > 2);
+          let matchCount = 0;
+          words.forEach(w => {
+            if (lowerMsg.includes(w)) matchCount++;
+          });
+          if (matchCount >= 2) {
+            matchedProduct = p;
+            break;
+          }
+        }
+      }
+
+      // 8.3. Khớp các từ khóa đặc trưng duy nhất (ví dụ: "bomber", "oxford", "dry-ex", "gurkha", "chinos", "clutch", "pique")
+      if (!matchedProduct) {
+        const uniqueKeywords = ['bomber', 'oxford', 'dry-ex', 'gurkha', 'chinos', 'clutch', 'pique', 'cargo', 'jogger'];
+        for (const kw of uniqueKeywords) {
+          if (lowerMsg.includes(kw)) {
+            const found = products.find(p => p.ten_san_pham.toLowerCase().includes(kw));
+            if (found) {
+              matchedProduct = found;
+              break;
+            }
+          }
         }
       }
     }
 
     if (matchedProduct) {
       const variants = await getProductVariants(matchedProduct.ten_san_pham);
-      if (variants && variants.length > 0) {
+      if (variants && Array.isArray(variants) && variants.length > 0) {
         let reply = `Dạ, mẫu ${matchedProduct.ten_san_pham} hiện đang có các biến thể trong kho như sau ạ:\n\n`;
         
-        // Nhóm theo màu
         const colorMap = {};
         variants.forEach(v => {
           if (!colorMap[v.mau_sac]) colorMap[v.mau_sac] = [];
@@ -209,13 +397,14 @@ export async function processOfflineRuleBased(message) {
     console.warn('[Offline Engine] Lỗi match sản phẩm:', e.message);
   }
 
-  // 5. CÂU HỎI CHUNG / MẶC ĐỊNH
+  // 9. CÂU HỎI CHUNG / MẶC ĐỊNH
   return {
-    reply: "Dạ, em là Stylist AI của QF NOIR. Em có thể giúp bạn:\n" +
+    reply: "Dạ, em là Stylist AI của QF NOIR! Em có thể giúp bạn:\n" +
            "- Tư vấn chọn size chuẩn: Bạn cho em biết chiều cao và cân nặng nhé.\n" +
-           "- Kiểm tra màu sắc và tồn kho: Bạn hỏi tên mẫu áo/quần bạn đang xem.\n" +
+           "- Gợi ý phối đồ thời trang: Bạn hỏi về cách mix đồ đi chơi, công sở, dạo phố.\n" +
+           "- Danh mục & Tồn kho: Bạn hỏi về các mẫu áo, quần, balo, phụ kiện hoặc tên mẫu bạn đang xem.\n" +
            "- Mã giảm giá: Hỏi về các ưu đãi, voucher hôm nay.\n\n" +
-           "Bạn đang quan tâm đến mẫu nào để em hỗ trợ tư vấn ngay ạ?",
+           "Bạn đang quan tâm đến sản phẩm nào để em hỗ trợ tư vấn ngay ạ?",
     toolsUsed: [{ name: 'Default_Greeting' }],
     engine: 'Rule-Based Offline'
   };

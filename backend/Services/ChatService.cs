@@ -262,7 +262,37 @@ public class ChatService : IChatService
             };
         }
 
-        // 5. Mặc định
+        // 5. Tư vấn phối đồ / Mix & Match
+        if (lower.Contains("phối") || lower.Contains("mix") || lower.Contains("kết hợp") || lower.Contains("đi chơi") || lower.Contains("công sở") || lower.Contains("đi tiệc"))
+        {
+            return new ChatResponseDto
+            {
+                Reply = "Dạ, Stylist AI gợi ý các công thức phối đồ chuẩn phong cách thời trang QF NOIR ạ:\n" +
+                        "1. Đi làm công sở lịch lãm: Áo sơ mi Oxford hoặc Áo polo Pique phối cùng Quần tây slimfit hoặc Quần kaki Chinos, kèm Thắt lưng da bò thật.\n" +
+                        "2. Dạo phố năng động: Áo thun Cotton basic hoặc Áo polo thể thao phối cùng Quần short cargo túi hộp hoặc Quần jean slimfit co giãn.\n" +
+                        "3. Smart Casual thu đông: Áo len cổ lọ dệt mịn bên trong kết hợp Áo khoác bomber gió hoặc Áo khoác dù 2 lớp chống nước.\n" +
+                        "Quý khách đang chuẩn bị trang phục cho dịp nào để em tư vấn chi tiết hơn nhé ạ!",
+                Engine = "Backend Fallback Stylist"
+            };
+        }
+
+        // 6. Hỏi về Balo & Phụ kiện
+        if (lower.Contains("balo") || lower.Contains("túi") || lower.Contains("ví") || lower.Contains("thắt lưng") || lower.Contains("phụ kiện"))
+        {
+            return new ChatResponseDto
+            {
+                Reply = "Dạ, QF NOIR có các dòng phụ kiện thời trang nam cao cấp sau ạ:\n" +
+                        "- Balo Laptop Nam QF Chống Trộm vải Oxford kháng nước (390.000đ).\n" +
+                        "- Túi Đeo Chéo Nam Da PU Kháng Nước cao cấp (260.000đ).\n" +
+                        "- Túi Tote Canvas Nam QF Tối Giản (150.000đ).\n" +
+                        "- Thắt Lưng Da Bò Nam Khóa Kim sang trọng (280.000đ).\n" +
+                        "- Ví Da Nam Gấp Đôi Cao Cấp và Ví Cầm Tay Clutch Da Bò Thật.\n" +
+                        "Quý khách đang quan tâm đến phụ kiện nào để em kiểm tra tình trạng kho hàng ạ?",
+                Engine = "Backend Fallback Stylist"
+            };
+        }
+
+        // 7. Mặc định
         return new ChatResponseDto
         {
             Reply = "Dạ, em là Stylist AI của QF NOIR! Em có thể hỗ trợ quý khách tư vấn bảng size chuẩn, kiểm tra tình trạng còn hàng và gợi ý cách phối đồ thời trang. Quý khách vui lòng cho em biết chiều cao, cân nặng hoặc sản phẩm quý khách đang quan tâm để em hỗ trợ ngay nhé ạ!",

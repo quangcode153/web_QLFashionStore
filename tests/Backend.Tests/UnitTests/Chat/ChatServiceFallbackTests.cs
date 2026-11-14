@@ -35,6 +35,8 @@ public class ChatServiceFallbackTests
     [InlineData("shop có những mẫu quần nào", "quần")]
     [InlineData("mình cao 1m72 nặng 65kg mặc size gì", "size")]
     [InlineData("shop có khuyến mãi gì không", "khuyến mãi")]
+    [InlineData("tư vấn phối đồ đi chơi", "phối")]
+    [InlineData("shop có balo hay phụ kiện gì", "balo")]
     public async Task ProcessChat_WhenMicroserviceTimesOut_ShouldReturnGracefulFallback(string userMsg, string expectedKeyword)
     {
         // ARRANGE: Giả lập Microservice bị Timeout quá thời gian
